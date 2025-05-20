@@ -1699,9 +1699,11 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
 {
   struct B_NodeTable *fp, *gp;
   struct B_CacheTable *cachep;
-  bddp key, f0, f1, g0, g1, h0, h1, h;
-  bddvar v, flev, glev;
-  char z; /* flag to check ZBDD node */
+  /* Some initial values are not used, but 
+  we set them to suppress compiler warnings */
+  bddp key, f0, f1, g0 = 0, g1 = 0, h0, h1, h;
+  bddvar v = 0, flev, glev;
+  char z = 0; /* flag to check ZBDD node */
 
   /* Check terminal case */
   if(!skip) switch(op)
