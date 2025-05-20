@@ -6,11 +6,6 @@
 #ifndef bddc_h
 #define bddc_h
 
-#if (defined BDD_CPP)||(! defined B_OLDC)
-#  define B_ARG(a) a       /* ANSI C style */
-#else
-#  define B_ARG(a) ()      /* K&R C style */
-#endif
 
 /***************** Internal macro for index *****************/
 #define B_VAR_WIDTH 16U  /* Width of variable index */
@@ -50,86 +45,82 @@ typedef unsigned int bddvar;
                     /* bddp of a constant valued node */
 #define bddvalmax B_VAL_MASK  /* Max constant value */
 
-#ifdef BDD_CPP
-  extern "C" {
-#endif /* BDD_CPP */
+
 
 /***************** For stack overflow limit *****************/
 extern const int BDD_RecurLimit;
 extern int BDD_RecurCount;
- 
+
 /***************** External operations *****************/
 
 /***************** Init. and config. ****************/
-extern int    bddinit B_ARG((bddp initsize, bddp limitsize));
-extern bddvar bddnewvar B_ARG((void));
-extern bddvar bddnewvaroflev B_ARG((bddvar lev));
-extern bddvar bddlevofvar B_ARG((bddvar v));
-extern bddvar bddvaroflev B_ARG((bddvar lev));
-extern bddvar bddvarused B_ARG((void));
+extern int    bddinit (bddp initsize, bddp limitsize);
+extern bddvar bddnewvar (void);
+extern bddvar bddnewvaroflev (bddvar lev);
+extern bddvar bddlevofvar (bddvar v);
+extern bddvar bddvaroflev (bddvar lev);
+extern bddvar bddvarused(void);
 
 /************** Basic logic operations *************/
-extern bddp   bddprime B_ARG((bddvar v));
-extern bddvar bddtop B_ARG((bddp f));
-extern bddp   bddcopy B_ARG((bddp f));
-extern bddp   bddnot B_ARG((bddp f));
-extern bddp   bddand B_ARG((bddp f, bddp g));
-extern bddp   bddor B_ARG((bddp f, bddp g));
-extern bddp   bddxor B_ARG((bddp f, bddp g));
-extern bddp   bddnand B_ARG((bddp f, bddp g));
-extern bddp   bddnor B_ARG((bddp f, bddp g));
-extern bddp   bddxnor B_ARG((bddp f, bddp g));
-extern bddp   bddat0 B_ARG((bddp f, bddvar v));
-extern bddp   bddat1 B_ARG((bddp f, bddvar v));
+extern bddp   bddprime(bddvar v);
+extern bddvar bddtop(bddp f);
+extern bddp   bddcopy(bddp f);
+extern bddp   bddnot(bddp f);
+extern bddp   bddand(bddp f, bddp g);
+extern bddp   bddor(bddp f, bddp g);
+extern bddp   bddxor(bddp f, bddp g);
+extern bddp   bddnand(bddp f, bddp g);
+extern bddp   bddnor(bddp f, bddp g);
+extern bddp   bddxnor(bddp f, bddp g);
+extern bddp   bddat0(bddp f, bddvar v);
+extern bddp   bddat1(bddp f, bddvar v);
 
 /********** Memory management and observation ***********/
-extern void   bddfree B_ARG((bddp f));
-extern bddp   bddused B_ARG((void));
-extern int    bddgc B_ARG((void));
-extern bddp   bddsize B_ARG((bddp f));
-extern bddp   bddvsize B_ARG((bddp *p, int lim));
-extern void   bddexport B_ARG((FILE *strm, bddp *p, int lim));
-extern int    bddimport B_ARG((FILE *strm, bddp *p, int lim));
-extern void   bdddump B_ARG((bddp f));
-extern void   bddvdump B_ARG((bddp *p, int lim));
-extern void   bddgraph B_ARG((bddp f));
-extern void   bddgraph0 B_ARG((bddp f));
-extern void   bddvgraph B_ARG((bddp *p, int lim));
-extern void   bddvgraph0 B_ARG((bddp *p, int lim));
+extern void   bddfree(bddp f);
+extern bddp   bddused(void);
+extern int    bddgc(void);
+extern bddp   bddsize(bddp f);
+extern bddp   bddvsize(bddp *p, int lim);
+extern void   bddexport(FILE *strm, bddp *p, int lim);
+extern int    bddimport(FILE *strm, bddp *p, int lim);
+extern void   bdddump(bddp f);
+extern void   bddvdump(bddp *p, int lim);
+extern void   bddgraph(bddp f);
+extern void   bddgraph0(bddp f);
+extern void   bddvgraph(bddp *p, int lim);
+extern void   bddvgraph0(bddp *p, int lim);
 
 /************** Advanced logic operations *************/
-extern bddp   bddlshift B_ARG((bddp f, bddvar shift));
-extern bddp   bddrshift B_ARG((bddp f, bddvar shift));
-extern bddp   bddsupport B_ARG((bddp f));
-extern bddp   bdduniv B_ARG((bddp f, bddp g));
-extern bddp   bddexist B_ARG((bddp f, bddp g));
-extern bddp   bddcofactor B_ARG((bddp f, bddp g));
-extern int    bddimply B_ARG((bddp f, bddp g));
-extern bddp   bddrcache B_ARG((unsigned char op, bddp f, bddp g));
+extern bddp   bddlshift(bddp f, bddvar shift);
+extern bddp   bddrshift(bddp f, bddvar shift);
+extern bddp   bddsupport(bddp f);
+extern bddp   bdduniv(bddp f, bddp g);
+extern bddp   bddexist(bddp f, bddp g);
+extern bddp   bddcofactor(bddp f, bddp g);
+extern int    bddimply(bddp f, bddp g);
+extern bddp   bddrcache(unsigned char op, bddp f, bddp g);
 extern void   bddwcache
-              B_ARG((unsigned char op, bddp f, bddp g, bddp h));
+              (unsigned char op, bddp f, bddp g, bddp h);
 
 /************** ZBDD operations *************/
-extern bddp   bddoffset B_ARG((bddp f, bddvar v));
-extern bddp   bddonset B_ARG((bddp f, bddvar v));
-extern bddp   bddonset0 B_ARG((bddp f, bddvar v));
-extern bddp   bddchange B_ARG((bddp f, bddvar v));
-extern bddp   bddintersec B_ARG((bddp f, bddp g));
-extern bddp   bddunion B_ARG((bddp f, bddp g));
-extern bddp   bddsubtract B_ARG((bddp f, bddp g));
-extern bddp   bddcard B_ARG((bddp f));
-extern bddp   bddlit B_ARG((bddp f));
-extern bddp   bddlen B_ARG((bddp f));
-extern int    bddimportz B_ARG((FILE* strm, bddp* p, int lim));
-extern char  *bddcardmp16 B_ARG((bddp f, char *s));
-extern int    bddisbdd B_ARG((bddp f));
-extern int    bddiszbdd B_ARG((bddp f));
+extern bddp   bddoffset(bddp f, bddvar v);
+extern bddp   bddonset(bddp f, bddvar v);
+extern bddp   bddonset0(bddp f, bddvar v);
+extern bddp   bddchange(bddp f, bddvar v);
+extern bddp   bddintersec(bddp f, bddp g);
+extern bddp   bddunion(bddp f, bddp g);
+extern bddp   bddsubtract(bddp f, bddp g);
+extern bddp   bddcard(bddp f);
+extern bddp   bddlit(bddp f);
+extern bddp   bddlen(bddp f);
+extern int    bddimportz(FILE* strm, bddp* p, int lim);
+extern char  *bddcardmp16(bddp f, char *s);
+extern int    bddisbdd(bddp f);
+extern int    bddiszbdd(bddp f);
 
 /************** SeqBDD operations *************/
-extern bddp   bddpush B_ARG((bddp f, bddvar v));
+extern bddp   bddpush(bddp f, bddvar v);
 
-#ifdef BDD_CPP
-  }
-#endif /* BDD_CPP */
+
 
 #endif /* bddc_h */
