@@ -15,7 +15,11 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 # Change from SAPPOROBDD
 
 * All the code is written in C++.
-* Suppress some compiler warnings.
+* Some compiler warnings are suppressed.
+* We change default to 64-bit version and add B_32 macro for 32-bit version.
+* Namespace 'sapporobdd' is introduced.
+* ZBDD is renamed to ZDD.
+* The manual is converted to Markdown.
 
 # Author
 
