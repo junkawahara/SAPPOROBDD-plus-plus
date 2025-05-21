@@ -13,6 +13,8 @@ XOR, OTHER）、入力エッジのリスト（最大２つまで）、セレク�
 
 ### 公開クラスメソッド
 
+### BDDDG
+
 ```cpp
 BDDDG::BDDDG(void)
 ```
@@ -20,11 +22,15 @@ BDDDG::BDDDG(void)
 constructer。初期値として空のBDDDGオブジェクトを生成する。
 DDGには何も登録されていない。
 
+### ~BDDDG
+
 ```cpp
 BDDDG::~BDDDG(void)
 ```
 
 destructer。
+
+### Decomp
 
 ```cpp
 int BDDDG::Decomp(BDD f)
@@ -37,6 +43,8 @@ int BDDDG::Decomp(BDD f)
 は非線形（OTHER）としてセレクタ節点が挿入される。
 記憶あふれの場合や f がnull のときは、-1を返す。
 
+### Decomp2
+
 ```cpp
 int BDDDG::Decomp2(BDD f)
 ```
@@ -45,6 +53,8 @@ int BDDDG::Decomp2(BDD f)
 セレクタの変数の組合せを、最上位、次上位、とようにしてなるべく
 小さい個数の変数で掃引することを試みる。他の点は Decomp(f)と同じ。
 記憶あふれの場合や f がnull のときは、-1を返す。
+
+### DecompAll
 
 ```cpp
 int BDDDG::DecompAll(BDD f)
@@ -55,6 +65,8 @@ int BDDDG::DecompAll(BDD f)
 最小となる変数組合せを求める。コファクタ数が２つ以下ならば線形関数
 （演算の種類 AND, OR, XOR）に分解され、そうでなければ非線形（他の演算 OTHER）
 として扱われる。記憶あふれの場合や f がnull のときは、-1を返す。
+
+### DecompITE
 
 ```cpp
 int BDDDG::DecompITE(BDD f)
@@ -67,6 +79,8 @@ int BDDDG::DecompITE(BDD f)
 となり、セレクタ集合は必ず変数１つとなる。記憶あふれの場合や f がnull の
 ときは、-1を返す。
 
+### DecompSOP
+
 ```cpp
 int BDDDG::DecompSOP(BDD f)
 ```
@@ -75,6 +89,8 @@ int BDDDG::DecompSOP(BDD f)
 まず積項を構成する各変数リテラルをANDで結合する節点を作り、その後
 各積項をORで結合する回路を作る。２段論理回路構造として表現される。
 記憶あふれの場合や f がnull のときは、-1を返す。
+
+### DecompESOP
 
 ```cpp
 int BDDDG::DecompESOP(BDD f)
@@ -85,6 +101,8 @@ int BDDDG::DecompESOP(BDD f)
 各積項をXORで結合する回路を作る。２段論理回路構造として表現される。
 記憶あふれの場合や f がnull のときは、-1を返す。
 
+### TopNode
+
 ```cpp
 int BDDDG::TopNode(void) const
 ```
@@ -93,11 +111,15 @@ DDG の出力節点番号（最後に分解した関数に対応する節点）�
 TopNode は必ずしも節点番号の最大値ではない。
 null のときは、-1を返す。
 
+### PrintCore
+
 ```cpp
 void BDDDG::PrintCore(void) const
 ```
 
 DDGの節点情報を標準出力に出力する。
+
+### Print
 
 ```cpp
 void BDDDG::Print(FILE *strm = stdout, int is_CSoP = 0) const
@@ -133,11 +155,15 @@ stmで指定したファイルストリームに出力する。
 
 ## LCM関連の関数
 
+### CtoI_LcmC
+
 ```cpp
 CtoI CtoI_LcmC(char *fname1, char *fname2, int th)
 ```
 
 fname1で指定する名前のファイルからFIMIベンチマークフォーマットのトランザクションデータベースを読み込み、LCMアルゴリズムを用いて、閾値 th 回以上出現する飽和頻出アイテム集合を表す CtoIオブジェクトを生成し、それを返す。fname2にNULL以外が指定された場合は、変数順序ファイルを読み込んで、その順序でLCMを実行する。記憶あふれの場合は null を返す。ファイル読み込みに失敗した場合はエラーメッセージを出力する。（LCM関連のメソッドは別途インストールする必要あり）
+
+### CtoI_LcmM
 
 ```cpp
 CtoI CtoI_LcmM(char *fname1, char *fname2, int th)
@@ -145,17 +171,23 @@ CtoI CtoI_LcmM(char *fname1, char *fname2, int th)
 
 fname1で指定する名前のファイルからFIMIベンチマークフォーマットのトランザクションデータベースを読み込み、LCMアルゴリズムを用いて、閾値 th 回以上出現する極大頻出アイテム集合を表す CtoIオブジェクトを生成し、それを返す。fname2にNULL以外が指定された場合は、変数順序ファイルを読み込んで、その順序でLCMを実行する。記憶あふれの場合は null を返す。ファイル読み込みに失敗した場合はエラーメッセージを出力する。（LCM関連のメソッドは別途インストールする必要あり）
 
+### CtoI_LcmCV
+
 ```cpp
 CtoI CtoI_LcmCV(char *fname1, char *fname2, int th)
 ```
 
 CtoI_LcmCとほとんど同じだが、それぞれのアイテム組合せの出現回数を保持したCtoIオブジェクトを生成し、それを返す。（LCM関連のメソッドは別途インストールする必要あり）
 
+### CtoI_LcmMV
+
 ```cpp
 CtoI CtoI_LcmMV(char *fname1, char *fname2, int th)
 ```
 
 CtoI_LcmMとほとんど同じだが、それぞれのアイテム組合せの出現回数を保持したCtoIオブジェクトを生成し、それを返す。（LCM関連のメソッドは別途インストールする必要あり）
+
+### CtoI_Lcm
 
 ```cpp
 CtoI CtoI_Lcm(char *fname1, char *fname2, int th)

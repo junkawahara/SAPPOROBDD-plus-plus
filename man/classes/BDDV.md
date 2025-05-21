@@ -36,6 +36,8 @@ extern const int BDD_MaxVar
 
 ### 関連する外部関数
 
+### BDDV_Init
+
 ```cpp
 int BDDV_Init(bddword init=256, bddword limit=BDD_NodeMax)
 ```
@@ -48,6 +50,8 @@ BDDV_SysVarTop(通常20）までの変数が、出力選択変数としてシス
 配置される。BDDVを用いる場合は、必ず最初にBDDV_Init()を実行しなければ
 ならない。
 
+### BDDV_UserTopLev
+
 ```cpp
 int BDDV_UserTopLev(void)
 ```
@@ -59,6 +63,8 @@ int BDDV_UserTopLev(void)
 あり、(BDDV_UserTopLev + 1)から(BDDV_UserTopLev + BDDV_SysVarTop)までの
 間である。
 
+### BDDV_NewVar
+
 ```cpp
 int BDDV_NewVar(void)
 ```
@@ -68,6 +74,8 @@ BDD_NewVar()と同様に、新しい入力変数を１つ生成し、その変�
 返す。BDD_NewVar()との違いは、VarIDが1から始まるのではなく、
 (BDDV_SysVarTop + 1)から始まる点である。ただし変数の順位(通称level)は1から
 スタートする。出力選択変数のlevelは1ずつ上位にシフトしていく。
+
+### BDDV_NewVarOfLev
 
 ```cpp
 int BDDV_NewVarOfLev(int lev)
@@ -80,6 +88,8 @@ VarIDが1から始まるのではなく、(BDDV_SysVarTop + 1)から始まる点
 ただし指定できる変数の順位(通称level)は、1以上かつ「これまでユーザが宣言
 した変数の個数 +1」までである。出力選択変数のlevelは1ずつ上位にシフトしていく。
 
+### operator&
+
 ```cpp
 BDDV operator&(const BDDV& fv, const BDDV& gv)
 ```
@@ -87,6 +97,8 @@ BDDV operator&(const BDDV& fv, const BDDV& gv)
 fvとgvの各要素同士の論理積を表すBDDVオブジェクトを生成し、それを返す。
 配列長が一致していなければエラー（異常終了）。記憶あふれの場合は 長さ1のnullを
 返す。引数にnullが含まれていた場合には、長さ1のnullを返す。
+
+### operator|
 
 ```cpp
 BDDV operator|(const BDDV& fv, const BDDV& gv)
@@ -96,6 +108,8 @@ fvとgvの各要素同士の論理和を表すBDDVオブジェクトを生成し
 配列長が一致していなければエラー（異常終了）。記憶あふれの場合は 長さ1のnullを
 返す。引数にnullが含まれていた場合には、長さ1のnullを返す。
 
+### operator^
+
 ```cpp
 BDDV operator^(const BDDV& fv, const BDDV& gv)
 ```
@@ -104,6 +118,8 @@ fvとgvの各要素同士の排他的論理和を表すBDDVオブジェクトを
 配列長が一致していなければエラー（異常終了）。記憶あふれの場合は 長さ1のnullを
 返す。引数にnullが含まれていた場合には、長さ1のnullを返す。
 
+### operator==
+
 ```cpp
 int operator==(const BDDV& fv, const BDDV& gv)
 ```
@@ -111,12 +127,16 @@ int operator==(const BDDV& fv, const BDDV& gv)
 fvとgvの対応する要素が全て同じ論理関数かどうかの真偽(1/0)を返す。
 配列長が一致していなければエラー（異常終了）。
 
+### operator!=
+
 ```cpp
 int operator!=(const BDDV& fv, const BDDV& gv)
 ```
 
 fvとgvの対応する要素の少なくとも1組が異なる論理関数かどうかの
 真偽(1/0)を返す。配列長が一致していなければエラー（異常終了）。
+
+### BDDV_Imply
 
 ```cpp
 int BDDV_Imply(BDDV fv, BDDV gv)
@@ -127,17 +147,23 @@ fv と gv の包含性判定を行う。すなわち、(~fv | gv) が全ての�
 判定だけを行うので、(~fv | gv)の演算を実行するよりも高速である。
 引数にnullを与えた場合には0を返す。
 
+### BDDV_Import
+
 ```cpp
 BDDV BDDV_Import(FILE *strm = stdin)
 ```
 
 strmで指定するファイルからBDDVの構造を読み込み、BDDVオブジェクトを生成して、それを返す。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
 
+### BDDV_ImportPla
+
 ```cpp
 BDDV BDDV_ImportPla(FILE *strm = stdin, int sopf = 0)
 ```
 
 strmで指定するファイルからESPRESSOフォーマットのPLAデータを読み込み、BDDVオブジェクトを生成して、それを返す。ESPRESSOフォーマットでは、.i .o .type .e のキーワードのみサポートする。生成されるBDDVオブジェクトの要素数は、入力されたPLAデータの出力数のちょうど2倍になっており、前半部分がonset関数、後半部分がdcset関数を表現している。sopfフラグが0以外の場合は、SOPクラスとデータ変換がしやすいように、偶数番号のVarIDを使用する。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
+
+### operator||
 
 ```cpp
 BDDV operator||(const BDDV& fv, const BDDV& gv)
@@ -148,6 +174,8 @@ fv, gv は変化しない。fv の配列長が２のべき乗数のとき、処�
 記憶あふれの場合は 長さ1のnullを返す。引数にnullが含まれていた場合には、
 長さ1のnullを返す。
 
+### BDDV_Mask1
+
 ```cpp
 BDDV BDDV_Mask1(int ix, int len)
 ```
@@ -156,6 +184,8 @@ ix 番目の要素だけが恒真関数で、他は恒偽関数となってい�
 len の多出力定数論理関数を表すBDDVオブジェクトを生成し、それを返す。
 記憶あふれの場合は 長さ1のnullを返す。引数にnullが含まれていた場合には、
 長さ1のnullを返す。不当な引数を与えた場合はエラー（異常終了）。
+
+### BDDV_Mask2
 
 ```cpp
 BDDV BDDV_Mask2(int ix, int len)
@@ -166,6 +196,8 @@ BDDV BDDV_Mask2(int ix, int len)
 記憶あふれの場合は 長さ1のnullを返す。引数にnullが含まれていた場合には、
 長さ1のnullを返す。不当な引数を与えた場合はエラー（異常終了）。
 (再掲)
+### BDD_NewVar
+
 ```cpp
 int BDD_NewVar(void)
 int BDD_NewVarOfLev(int lev)
@@ -179,17 +211,23 @@ void BDD_GC(void)
 
 ### 公開クラスメソッド
 
+### BDDV
+
 ```cpp
 BDDV::BDDV(void)
 ```
 
 基本constructer。配列長 0 のBDDVオブジェクトを生成する。
 
+### BDDV
+
 ```cpp
 BDDV::BDDV(const BDDV& fv)
 ```
 
 引数 fv を複製する constructer。
+
+### BDDV
 
 ```cpp
 BDDV::BDDV(const BDD&, int len = 1)
@@ -199,17 +237,23 @@ BDDV::BDDV(const BDD&, int len = 1)
 生成するconstructer。f に null を与えた場合は、len指定に関わらず
 長さ1となる。
 
+### ~BDDV
+
 ```cpp
 BDDV::~BDDV(void)
 ```
 
 destructer。
 
+### operator=
+
 ```cpp
 BDDV& BDDV::operator=(const BDDV& fv)
 ```
 
 自分自身の元のデータを消去し、fv を代入する。関数の値としてfvを返す。
+
+### operator&=
 
 ```cpp
 BDDV BDDV::operator&=(const BDDV& fv)
@@ -219,6 +263,8 @@ BDDV BDDV::operator&=(const BDDV& fv)
 していなければならない。記憶あふれの場合は 長さ1のnullを返す。自分自身
 または引数にnullが含まれていた場合には、長さ1のnullを返す。
 
+### operator|=
+
 ```cpp
 BDDV BDDV::operator|=(const BDDV& fv)
 ```
@@ -227,6 +273,8 @@ BDDV BDDV::operator|=(const BDDV& fv)
 していなければならない。記憶あふれの場合は 長さ1のnullを返す。自分自身
 または引数にnullが含まれていた場合には、長さ1のnullを返す。
 
+### operator^=
+
 ```cpp
 BDDV BDDV::operator^=(const BDDV& fv)
 ```
@@ -234,6 +282,8 @@ BDDV BDDV::operator^=(const BDDV& fv)
 自分自身と fv の各要素同士の排他的論理和を求め、自分自身に代入する。配列長は
 一致していなければならない。記憶あふれの場合は 長さ1のnullを返す。自分自身
 または引数にnullが含まれていた場合には、長さ1のnullを返す。
+
+### operator<<=
 
 ```cpp
 BDDV BDDV::operator<<=(int s)
@@ -247,6 +297,8 @@ BDDVを、自分自身に代入する。また演算結果を関数値として�
 null を表すオブジェクトを返す。自分自身が null のときは何もしない。sに負の値を
 指定することはできない。
 
+### operator>>=
+
 ```cpp
 BDDV BDDV::operator>>=(int s)
 ```
@@ -259,12 +311,16 @@ BDDVを、自分自身に代入する。また演算結果を関数値として�
 null を表すオブジェクトを返す。自分自身が null のときは何もしない。sに負の値を
 指定することはできない。
 
+### operator~
+
 ```cpp
 BDDV BDDV::operator~(void) const 
 ```
 
 自分自身の各要素の否定関数を表すBDDVオブジェクトを生成し、それを返す。
 自分自身にnullが含まれていた場合には、長さ1のnullを返す。
+
+### operator<<
 
 ```cpp
 BDDV BDDV::operator<<(int s) const 
@@ -277,6 +333,8 @@ BDDVを生成し、それを返す。出力選択変数には影響はない。�
 あらかじめ宣言しておくこと。記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは何もしない。sに負の値を指定することはできない。
 
+### operator>>
+
 ```cpp
 BDDV BDDV::operator>>(int s) const 
 ```
@@ -288,6 +346,8 @@ BDDVを生成し、それを返す。出力選択変数には影響はない。�
 あらかじめ宣言しておくこと。記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは何もしない。sに負の値を指定することはできない。
 
+### At0
+
 ```cpp
 BDDV BDDV::At0(int var) const 
 ```
@@ -296,6 +356,8 @@ BDDV BDDV::At0(int var) const
 論理関数（射影）の配列を表すBDDVオブジェクトを生成し、それを返す。
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullのときは、
 nullを返す。
+
+### At1
 
 ```cpp
 BDDV BDDV::At1(int var) const 
@@ -306,6 +368,8 @@ BDDV BDDV::At1(int var) const
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullのときは、
 nullを返す。
 
+### Cofact
+
 ```cpp
 BDDV BDDV::Cofact(BDD f) const 
 ```
@@ -314,6 +378,8 @@ BDDV BDDV::Cofact(BDD f) const
 行った論理関数の配列を表すBDDVオブジェクトを生成し、それを返す。
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullのとき、
 およびfがnullのときは、nullを返す。
+
+### Univ
 
 ```cpp
 BDDV BDDV::Univ(BDD f) const 
@@ -325,6 +391,8 @@ BDDVオブジェクトを生成し、それを返す。入力変数の部分集�
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullのとき、
 およびfがnullのときは、nullを返す。
 
+### Exist
+
 ```cpp
 BDDV BDDV::Exist(BDD f) const 
 ```
@@ -335,6 +403,8 @@ BDDVオブジェクトを生成し、それを返す。入力変数の部分集�
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullのとき、
 およびfがnullのときは、nullを返す。
 
+### Support
+
 ```cpp
 BDDV BDDV::Support(void) const 
 ```
@@ -344,12 +414,16 @@ BDDVの先頭要素にして長さ1のBDDVオブジェクトを生成し、そ�
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullのときは、
 nullを返す。
 
+### Top
+
 ```cpp
 int BDDV::Top(void) const 
 ```
 
 自分自身が含む任意のBDDに含まれる最上位の入力変数番号を返す。
 nullのときは、0を返す。
+
+### Elem
 
 ```cpp
 int BDDV::Elem(int ix) const 
@@ -358,11 +432,15 @@ int BDDV::Elem(int ix) const
 自分自身のix番目の要素のBDDを返す。ixが0以上配列長未満でなければ
 エラー（異常終了）。
 
+### Last
+
 ```cpp
 int BDDV::Last(void) const 
 ```
 
 自分自身の配列長を返す。正常な配列長は 0 以上の値である。
+
+### Size
 
 ```cpp
 bddword BDDV::Size(void) const 
@@ -370,11 +448,15 @@ bddword BDDV::Size(void) const
 
 自分自身の総節点数を返す。nullのときは、0を返す。
 
+### Export
+
 ```cpp
 void BDDV::Export(FILE *strm = stdout) const 
 ```
 
 BDDVの内部データ構造を、strmで指定するファイルに出力する。
+
+### Print
 
 ```cpp
 void BDDV::Print(void) const 

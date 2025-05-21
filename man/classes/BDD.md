@@ -23,6 +23,8 @@ extern const int BDD_MaxVar
 
 ### 関連する外部関数
 
+### BDD_Init
+
 ```cpp
 int BDD_Init(bddword init=256, bddword limit=BDD_MaxNode)
 ```
@@ -44,6 +46,8 @@ initやlimitの指定を省略した場合は、initは256に、limitは原理�
 され、再度初期化される。BDD_Init()を一度も実行せずに演算を開始した場合は、
 initとlimitには自動的にデフォルト値が設定される。
 
+### BDD_NewVar
+
 ```cpp
 int BDD_NewVar(void)
 ```
@@ -56,6 +60,8 @@ int BDD_NewVar(void)
 なお、最初にBDDV_Init()で初期化した場合（BDDVクラスを扱う場合）には、
 最初にシステム用に変数が使われるので、VarIDは (BDDV_SysVarTop + 1)から
 開始し、順に1ずつ大きな値となる。
+
+### BDD_NewVarOfLev
 
 ```cpp
 int BDD_NewVarOfLev(int lev)
@@ -70,6 +76,8 @@ lev以上の変数を１つずつ上にずらして（levelを１ずつ増加さ
 個数＋１」以下でなければならない。そうでなければエラーを出力して異常終了する。
 変数の個数が最大値BDD_MaxVarを超えるとエラーを出力して異常終了する。
 
+### BDD_LevOfVar
+
 ```cpp
 int BDD_LevOfVar(int v) 
 ```
@@ -77,6 +85,8 @@ int BDD_LevOfVar(int v)
 引数vで指定した変数番号(通称VarID）のBDD展開順位(通称level)を返す。
 引数vは1以上かつ「現在の変数の個数」以下でなければならない。
 そうでなければエラーを出力して異常終了する。
+
+### BDD_VarOfLev
 
 ```cpp
 int BDD_VarOfLev(int lev)
@@ -86,12 +96,16 @@ int BDD_VarOfLev(int lev)
 引数levは1以上かつ「現在の変数の個数」以下でなければならない。
 そうでなければエラーを出力して異常終了する。
 
+### BDD_VarUsed
+
 ```cpp
 int BDD_VarUsed(void)
 ```
 
 現在までに宣言済みの入力変数の個数を返す。
 （BDDV用に自動的に宣言された特殊変数の個数も含む）
+
+### BDD_TopLev
 
 ```cpp
 int BDD_TopLev(void)
@@ -102,6 +116,8 @@ int BDD_TopLev(void)
 BDD_VarUsed() - BDDV_SysVarTop に等しい。
 BDD_Init()で初期化した場合は、BDD_VarUsed() と等しい。
 
+### BDD_Used
+
 ```cpp
 bddword BDD_Used(void)
 ```
@@ -109,6 +125,8 @@ bddword BDD_Used(void)
 現在使用中の総節点数を返す。使用済みで再利用可能な節点も、実際に
 回収されるまでは使用中として数えるため、正確な節点数を知るには、
 直前に BDD_GC()を実行（ガベジコレクション起動）する必要がある。
+
+### BDD_GC
 
 ```cpp
 void BDD_GC(void)
@@ -118,6 +136,8 @@ void BDD_GC(void)
 起動しなくても、記憶が足りなくなった場合には自動的に起動される。
 ガベジコレクションで空き節点が回収された場合は 0 を返し、空き節点が
 １個も見つからなかった場合は 1 を返す。
+
+### BDD_CacheInt
 
 ```cpp
 bddword BDD_CacheInt(unsigned char op, bddword f, bddword g)
@@ -130,6 +150,8 @@ nullに相当する数値（BDD_MaxNodeよりも約2倍大きな数値で
 BDD(-1).GetID()で得られる値）を返す。f, g が BDD 型の演算の場合は、
 GetID()で bddword 型に変換して与える。
 
+### BDD_CacheBDD
+
 ```cpp
 BDD BDD_CacheBDD(unsigned char op, bddword f, bddword g)
 ```
@@ -139,6 +161,8 @@ op は演算の種類を表す番号で、20 以上の値を入れる。演算�
 いる場合はその BDD を返し、見つからなかった場合は、null を表すオブジェ
 クトを返す。f, g が BDD 型の演算の場合は、GetID()で bddword 型に変換して与える。
 
+### BDD_CacheEnt
+
 ```cpp
 void BDD_CacheEnt(unsigned char op, bddword f, bddword g, bddword h)
 ```
@@ -147,12 +171,16 @@ f と g の演算結果 h を演算キャッシュに登録する。op は演算
 号で、20 以上の値を入れる。被演算子や演算結果が数値のときは、そのま
 ま与える。BDD 型の演算の場合は、GetID()で bddword 型に変換して与える。
 
+### BDDvar
+
 ```cpp
 BDD BDDvar(int var)
 ```
 
 入力変数番号var の変数そのもの（恒等関数）を表すBDDオブジェクトを
 生成し、それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。
+
+### operator&
 
 ```cpp
 BDD operator&(const BDD& f, const BDD& g)
@@ -162,6 +190,8 @@ f と g の論理積を表すBDDオブジェクトを生成し、それを返す
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
+### operator|
+
 ```cpp
 BDD operator|(const BDD& f, const BDD& g)
 ```
@@ -169,6 +199,8 @@ BDD operator|(const BDD& f, const BDD& g)
 f と g の論理和を表すBDDオブジェクトを生成し、それを返す。記憶あふれの
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### operator^
 
 ```cpp
 BDD operator^(const BDD&, const BDD&)
@@ -178,17 +210,23 @@ f と g の排他的論理和を表すBDDオブジェクトを生成し、それ
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合
 にはnullを返す。
 
+### operator==
+
 ```cpp
 int operator==(const BDD& f, const BDD& g)
 ```
 
 f と g が同じ論理関数かどうかの真偽(1/0)を返す。
 
+### operator!=
+
 ```cpp
 int operator!=(const BDD& f, const BDD& g)
 ```
 
 f と g が異なる論理関数かどうかの真偽(1/0)を返す。
+
+### BDD_Imply
 
 ```cpp
 int BDD_Imply(const BDD& f, const BDD& g)
@@ -198,11 +236,15 @@ f と g の包含性判定を行う。すなわち、(~f | g) が恒真かどう
 (~f | g) のBDDオブジェクトを生成せずに判定だけを行うので、(~f | g)の
 演算を実行するよりも高速である。引数にnullを与えた場合には0を返す。
 
+### BDD_Import
+
 ```cpp
 BDD BDD_Import(FILE *strm = stdin)
 ```
 
 strmで指定するファイルからBDDの構造を読み込み、BDDオブジェクトを生成して、それを返す。ただし、ファイルに書かれているデータが多出力であった場合は、最初の出力の論理関数のみ読み込む。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
+
+### BDD_Random
 
 ```cpp
 BDD BDD_Random(int dim, int density = 50)
@@ -212,6 +254,8 @@ BDD BDD_Random(int dim, int density = 50)
 乱数表である論理関数）を表すBDDオブジェクトを生成し、それを返す。
 引数density によって、真理値表濃度（１の出現確率％）を指定することが
 できる。記憶あふれの場合は、null を表すオブジェクトを返す。
+
+### BDDerr
 
 ```cpp
 void BDDerr(char *msg)
@@ -225,11 +269,15 @@ void BDDerr(char *msg, char *name)
 
 ### 公開クラスメソッド
 
+### BDD
+
 ```cpp
 BDD::BDD(void)
 ```
 
 基本constructer。初期値として恒偽関数を表すBDDオブジェクトを生成する。
+
+### BDD
 
 ```cpp
 BDD::BDD(int val)
@@ -238,11 +286,15 @@ BDD::BDD(int val)
 定数論理関数のオブジェクトを作り出す constructer。val == 0 ならば恒偽関数、
 val > 0 ならば恒真関数、val < 0 ならば null を表すBDDオブジェクトを生成する。
 
+### BDD
+
 ```cpp
 BDD::BDD(const BDD& f)
 ```
 
 引数 f を複製する constructer。
+
+### ~BDD
 
 ```cpp
 BDD::~BDD(void)
@@ -250,11 +302,15 @@ BDD::~BDD(void)
 
 destructer。内部のBDD節点の記憶管理は自動化されており、使用済みの節点は適当なタイミングで回収され、再利用される。
 
+### operator=
+
 ```cpp
 BDD& BDD::operator=(const BDD& f)
 ```
 
 自分自身に f を代入し、fを関数値として返す。
+
+### operator&=
 
 ```cpp
 BDD BDD::operator&=(const BDD& f)
@@ -263,12 +319,16 @@ BDD BDD::operator&=(const BDD& f)
 自分自身と f との論理積を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは何もしない。f が null のときは、null を代入する。
 
+### operator|=
+
 ```cpp
 BDD BDD::operator|=(const BDD& f)
 ```
 
 自分自身と f との論理和を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは何もしない。f が null のときは、null を代入する。
+
+### operator^=
 
 ```cpp
 BDD BDD::operator^=(const BDD& f)
@@ -277,6 +337,8 @@ BDD BDD::operator^=(const BDD& f)
 自分自身と f との排他的論理和を求め、自分自身に代入する。演算結果を関数値
 として返す。記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が
 null のときは何もしない。f が null のときは、null を代入する。
+
+### operator<<=
 
 ```cpp
 BDD BDD::operator<<=(int s)
@@ -290,6 +352,8 @@ BDD BDD::operator<<=(int s)
 オブジェクトを返す。自分自身が null のときは何もしない。sに負の値を指定する
 ことはできない。
 
+### operator>>=
+
 ```cpp
 BDD BDD::operator>>=(int s)
 ```
@@ -302,12 +366,16 @@ BDD BDD::operator>>=(int s)
 ならない。記憶あふれの場合は、null を表すオブジェクトを返す。自分自身がnullの
 ときは何もしない。sに負の値を指定することはできない。
 
+### operator~
+
 ```cpp
 BDD BDD::operator~(void) const
 ```
 
 自分自身の否定の論理関数を表すBDDオブジェクトを生成し、それを返す。
 自分自身が null のときは、null を返す。
+
+### operator<<
 
 ```cpp
 BDD BDD::operator<<(int s) const 
@@ -319,6 +387,8 @@ BDD BDD::operator<<(int s) const
 なるようなsを与えてはならない。必要な入力変数はあらかじめ宣言しておくこと。
 記憶あふれの場合は、nullを表すオブジェクトを返す。自分自身がnullのときは
 何もしない。sに負の値を指定することはできない。
+
+### operator>>
 
 ```cpp
 BDD BDD::operator>>(int s) const 
@@ -332,6 +402,8 @@ BDD BDD::operator>>(int s) const
 nullを表すオブジェクトを返す。自分自身がnullのときは何もしない。
 sに負の値を指定することはできない。
 
+### At0
+
 ```cpp
 BDD BDD::At0(int var) const 
 ```
@@ -340,6 +412,8 @@ BDD BDD::At0(int var) const
 論理関数（射影）を表すBDDオブジェクトを生成し、それを返す。記憶あふれ
 の場合は、null を表すオブジェクトを返す。自分自身がnullのときは、
 nullを返す。
+
+### At1
 
 ```cpp
 BDD BDD::At1(int var) const 
@@ -350,6 +424,8 @@ BDD BDD::At1(int var) const
 の場合は、null を表すオブジェクトを返す。自分自身がnullのときは、
 nullを返す。
 
+### Cofact
+
 ```cpp
 BDD BDD::Cofact(BDD f) const 
 ```
@@ -358,6 +434,8 @@ BDD BDD::Cofact(BDD f) const
 行った論理関数を表すBDDオブジェクトを生成し、それを返す。記憶あふれの場合
 は、null を表すオブジェクトを返す。自分自身が null のとき、および f が
 nullのときは、null を返す。
+
+### Univ
 
 ```cpp
 BDD BDD::Univ(BDD f) const 
@@ -371,6 +449,8 @@ BDD BDD::Univ(BDD f) const
 を表すオブジェクトを返す。自分自身が null のとき、および f がnullのと
 きは、null を返す。
 
+### Exist
+
 ```cpp
 BDD BDD::Exist(BDD f) const 
 ```
@@ -383,6 +463,8 @@ BDD BDD::Exist(BDD f) const
 を表すオブジェクトを返す。自分自身が null のとき、および f がnullのと
 きは、null を返す。
 
+### Support
+
 ```cpp
 BDD BDD::Support(void) const 
 ```
@@ -392,6 +474,8 @@ BDD BDD::Support(void) const
 null を表すオブジェクトを返す。自分自身が null のとき、および f がnull
 のときは、null を返す。
 
+### Top
+
 ```cpp
 int BDD::Top(void) const 
 ```
@@ -399,11 +483,15 @@ int BDD::Top(void) const
 自分自身のグラフに対して、最上位の入力変数の番号を返す。定数関数または
 null のときは、0 を返す。
 
+### Size
+
 ```cpp
 bddword BDD::Size(void) const 
 ```
 
 自分自身のグラフの節点数を返す。null に対しては 0を返す。
+
+### Export
 
 ```cpp
 void BDD::Export(FILE *strm = stdout) const 
@@ -411,11 +499,15 @@ void BDD::Export(FILE *strm = stdout) const
 
 BDDの内部データ構造を、strmで指定するファイルに出力する。
 
+### XPrint0
+
 ```cpp
 void BDD::XPrint0(void) const 
 ```
 
 自分自身のグラフを、X-Window に描画する。（否定エッジなし）
+
+### XPrint
 
 ```cpp
 void BDD::XPrint(void) const 
@@ -423,17 +515,23 @@ void BDD::XPrint(void) const
 
 自分自身のグラフを、X-Window に描画する。（否定エッジなし）
 
+### GetID
+
 ```cpp
 bddword BDD::GetID(void) const 
 ```
 
 論理関数を一意に表現する 1-word の識別番号（内部インデックス値）を返す。
 
+### Print
+
 ```cpp
 void BDD::Print(void) const 
 ```
 
 BDDの内部インデックス値、最上位の変数番号、節点数の情報を標準出力に出力する。
+
+### Swap
 
 ```cpp
 BDD BDD::Swap(int var1, int var2) const 
@@ -443,6 +541,8 @@ BDD BDD::Swap(int var1, int var2) const
 入れ換えたときの論理関数を表すオブジェクトを生成し、それを返す。
 引数はlevelではなく、変数番号で与えることに注意。記憶あふれの場合は、
 nullを表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
+
+### Smooth
 
 ```cpp
 BDD BDD::Smooth(int var) const 

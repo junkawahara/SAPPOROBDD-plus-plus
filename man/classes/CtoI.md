@@ -32,6 +32,8 @@ f3.Print();
 
 ### 関連する外部関数
 
+### operator+
+
 ```cpp
 CtoI operator+(const CtoI& f, const CtoI& g)
 ```
@@ -39,6 +41,8 @@ CtoI operator+(const CtoI& f, const CtoI& g)
 f と g のベクトル同士の係数加算した結果を表す CtoI オブジェクト
 を生成して、それを返す。この演算は集合族の和のような演算である。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
+
+### operator-
 
 ```cpp
 CtoI operator-(const CtoI& f, const CtoI& g)
@@ -49,6 +53,8 @@ f から g のベクトル同士の係数を減算した結果を表す CtoI オ
 和の演算の組合せとして定義される。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### operator*
+
 ```cpp
 CtoI operator*(const CtoI& f, const CtoI& g)
 ```
@@ -58,6 +64,8 @@ CtoI オブジェクトを生成して、それを返す。この演算は集合
 ような演算である。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### operator*
+
 ```cpp
 CtoI operator*(int n, const CtoI& f)
 ```
@@ -65,6 +73,8 @@ CtoI operator*(int n, const CtoI& f)
 f の全てのベクトルの係数を n 倍した結果を表すCtoI オブジェクト
 を生成して、それを返す。この演算はスカラー倍を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
+
+### operator*
 
 ```cpp
 CtoI operator*(const CtoI& f, int n)
@@ -74,6 +84,8 @@ f の全てのベクトルの係数を n 倍した結果を表すCtoI オブジ�
 を生成して、それを返す。この演算はスカラー倍を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### operator*
+
 ```cpp
 CtoI operator*(const ZBDD& f, int n)
 ```
@@ -81,6 +93,8 @@ CtoI operator*(const ZBDD& f, int n)
 ZBDDで表された組合せ集合fの各ベクトルに係数nを乗じた結果を表す
 CtoI オブジェクトを生成して、それを返す。この演算はスカラー倍を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
+
+### operator*
 
 ```cpp
 CtoI operator*(int n, const ZBDD& f)
@@ -90,6 +104,8 @@ ZBDDで表された組合せ集合fの各ベクトルに係数nを乗じた結�
 CtoI オブジェクトを生成して、それを返す。この演算はスカラー倍を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### operator*
+
 ```cpp
 CtoI operator*(const CtoI& f, const ZBDD& g)
 ```
@@ -97,6 +113,8 @@ CtoI operator*(const CtoI& f, const ZBDD& g)
 f の各ベクトルと g の各ベクトルの共通アイテムだけを保持した結果を表す
 CtoI オブジェクトを生成して、それを返す。この演算は積演算を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
+
+### operator*
 
 ```cpp
 CtoI operator*(const ZBDD& f, const CtoI& g)
@@ -106,6 +124,8 @@ f の各ベクトルと g の各ベクトルの共通アイテムだけを保持
 CtoI オブジェクトを生成して、それを返す。この演算は積演算を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### operator/
+
 ```cpp
 CtoI operator/(const CtoI& f, int n)
 ```
@@ -114,11 +134,15 @@ f の各ベクトルの係数を n で割って得られる商を係数とした
 CtoI オブジェクトを生成して、それを返す。この演算はスカラー商を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### CtoI_LcmC
+
 ```cpp
 CtoI CtoI_LcmC(char *fname1, char *fname2, int th)
 ```
 
 fname1で指定する名前のファイルからFIMIベンチマークフォーマットのトランザクションデータベースを読み込み、LCMアルゴリズムを用いて、閾値 th 回以上出現する飽和頻出アイテム集合を表す CtoIオブジェクトを生成し、それを返す。fname2にNULL以外が指定された場合は、変数順序ファイルを読み込んで、その順序でLCMを実行する。記憶あふれの場合は null を返す。ファイル読み込みに失敗した場合はエラーメッセージを出力する。（LCM関連のメソッドは別途インストールする必要あり）
+
+### CtoI_LcmM
 
 ```cpp
 CtoI CtoI_LcmM(char *fname1, char *fname2, int th)
@@ -126,17 +150,23 @@ CtoI CtoI_LcmM(char *fname1, char *fname2, int th)
 
 fname1で指定する名前のファイルからFIMIベンチマークフォーマットのトランザクションデータベースを読み込み、LCMアルゴリズムを用いて、閾値 th 回以上出現する極大頻出アイテム集合を表す CtoIオブジェクトを生成し、それを返す。fname2にNULL以外が指定された場合は、変数順序ファイルを読み込んで、その順序でLCMを実行する。記憶あふれの場合は null を返す。ファイル読み込みに失敗した場合はエラーメッセージを出力する。（LCM関連のメソッドは別途インストールする必要あり）
 
+### CtoI_LcmCV
+
 ```cpp
 CtoI CtoI_LcmCV(char *fname1, char *fname2, int th)
 ```
 
 CtoI_LcmCとほとんど同じだが、それぞれのアイテム組合せの出現回数を保持したCtoIオブジェクトを生成し、それを返す。（LCM関連のメソッドは別途インストールする必要あり）
 
+### CtoI_LcmMV
+
 ```cpp
 CtoI CtoI_LcmMV(char *fname1, char *fname2, int th)
 ```
 
 CtoI_LcmMとほとんど同じだが、それぞれのアイテム組合せの出現回数を保持したCtoIオブジェクトを生成し、それを返す。（LCM関連のメソッドは別途インストールする必要あり）
+
+### CtoI_Lcm
 
 ```cpp
 CtoI CtoI_Lcm(char *fname1, char *fname2, int th)
@@ -146,6 +176,8 @@ fname1で指定する名前のファイルからFIMIベンチマークフォー�
 
 ### 公開クラスメソッド
 
+### CtoI
+
 ```cpp
 CtoI::CtoI(void)
 ```
@@ -153,11 +185,15 @@ CtoI::CtoI(void)
 基本constructer。初期値として空の集合（何も格納されていない族）を
 表す CtoI オブジェクトを生成する。
 
+### CtoI
+
 ```cpp
 CtoI::CtoI(const CtoI& f)
 ```
 
 引数 f を複製する constructer。
+
+### CtoI
 
 ```cpp
 CtoI::CtoI(int n)

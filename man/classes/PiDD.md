@@ -18,6 +18,8 @@ ZBDD 表現を用いて順列集合を表現するクラスである。要素数
 
 ### 関連する外部関数
 
+### operator+
+
 ```cpp
 PiDD operator+(const PiDD& f, const PiDD& g)
 ```
@@ -25,6 +27,8 @@ PiDD operator+(const PiDD& f, const PiDD& g)
 f と g の和集合を表す PiDD オブジェクトを生成して、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 引数にnullを与えた場合にはnullを返す。
+
+### operator*
 
 ```cpp
 PiDD operator*(const PiDD& f, const PiDD& g)
@@ -34,6 +38,8 @@ f と g の積集合を表す PiDD オブジェクトを生成して、それを
 記憶あふれの場合は、null を表すオブジェクトを返す。
 引数にnullを与えた場合にはnullを返す。
 
+### operator-
+
 ```cpp
 PiDD operator-(const PiDD& f, const PiDD& g)
 ```
@@ -42,11 +48,15 @@ PiDD operator-(const PiDD& f, const PiDD& g)
 記憶あふれの場合は、null を表すオブジェクトを返す。
 引数にnullを与えた場合にはnullを返す。
 
+### operator==
+
 ```cpp
 int operator==(const PiDD& f, const PiDD& g)
 ```
 
 f と g が等しいかどうかの真偽値（1 または 0）を返す。
+
+### operator!=
 
 ```cpp
 int operator!=(const PiDD& f, const PiDD& g)
@@ -56,6 +66,8 @@ f と g が異なるかどうかの真偽値（1 または 0）を返す。
 
 ### 公開クラスメソッド
 
+### PiDD
+
 ```cpp
 PiDD::PiDD(void)
 ```
@@ -63,11 +75,15 @@ PiDD::PiDD(void)
 基本constructer。初期値として、空の順列集合を表す PiDD オブジェクトを
 生成する。
 
+### PiDD
+
 ```cpp
 PiDD::PiDD(const PiDD& f)
 ```
 
 引数 f を複製する constructer。
+
+### PiDD
 
 ```cpp
 PiDD::PiDD(const ZBDD& zbdd, int n)
@@ -77,17 +93,23 @@ ZBDD で表現された集合を、n 個のアイテムの順列集合として�
 PiDD オブジェクトを生成する。ZBDD の要素 アイテム番号は
 順列の大小関係を表す番号である。
 
+### ~PiDD
+
 ```cpp
 PiDD::~PiDD(void)
 ```
 
 destructer。
 
+### operator=
+
 ```cpp
 PiDD& PiDD::operator=(const PiDD& f)
 ```
 
 自分自身に f を代入し、自分自身への参照を返す。
+
+### operator+=
 
 ```cpp
 PiDD& PiDD::operator+=(const PiDD& f)
@@ -96,6 +118,8 @@ PiDD& PiDD::operator+=(const PiDD& f)
 自分自身と f との論理和を求め、自分自身に代入する。自分自身への参照を返す。
 記憶あふれの場合はnullを代入する。自分自身や引数がnullのときにはnullとなる。
 
+### operator*=
+
 ```cpp
 PiDD& PiDD::operator*=(const PiDD& f)
 ```
@@ -103,12 +127,16 @@ PiDD& PiDD::operator*=(const PiDD& f)
 自分自身と f との論理積を求め、自分自身に代入する。自分自身への参照を返す。
 記憶あふれの場合はnullを代入する。自分自身や引数がnullのときにはnullとなる。
 
+### operator-=
+
 ```cpp
 PiDD& PiDD::operator-=(const PiDD& f)
 ```
 
 自分自身から f を除いた集合を求め、自分自身に代入する。自分自身への参照を返す。
 記憶あふれの場合はnullを代入する。自分自身や引数がnullのときにはnullとなる。
+
+### Swap
 
 ```cpp
 PiDD PiDD::Swap(int i, int j) const
@@ -118,11 +146,15 @@ PiDD PiDD::Swap(int i, int j) const
 表す PiDD オブジェクトを生成して、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
 
+### GetZBDD
+
 ```cpp
 ZBDD PiDD::GetZBDD(void) const
 ```
 
 内部表現の ZBDD を複製したオブジェクトを生成して、それを返す。
+
+### GetN
 
 ```cpp
 int PiDD::GetN(void) const
@@ -130,6 +162,8 @@ int PiDD::GetN(void) const
 
 順列集合の各順列に含まれるアイテムの個数を返す。
 PiDD の生成時に与えられた値である。
+
+### Size
 
 ```cpp
 bddword PiDD::Size(void) const

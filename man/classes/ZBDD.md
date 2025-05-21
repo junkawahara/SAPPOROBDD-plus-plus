@@ -27,6 +27,8 @@ f4.Print();
 
 ### 関連する外部関数
 
+### operator*
+
 ```cpp
 ZBDD operator*(const ZBDD& f, const ZBDD& g)
 ```
@@ -34,6 +36,8 @@ ZBDD operator*(const ZBDD& f, const ZBDD& g)
 積集合（intersection）を表すZBDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### operator&
 
 ```cpp
 ZBDD operator&(const ZBDD& f, const ZBDD& g)
@@ -43,6 +47,8 @@ ZBDD operator&(const ZBDD& f, const ZBDD& g)
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。演算子 operator* と同じ操作である。
 
+### operator+
+
 ```cpp
 ZBDD operator+(const ZBDD& f, const ZBDD& g)
 ```
@@ -50,6 +56,8 @@ ZBDD operator+(const ZBDD& f, const ZBDD& g)
 和集合（union）を表すZBDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### operator|
 
 ```cpp
 ZBDD operator|(const ZBDD& f, const ZBDD& g)
@@ -59,6 +67,8 @@ ZBDD operator|(const ZBDD& f, const ZBDD& g)
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。演算子 operator+ と同じ操作である。
 
+### operator-
+
 ```cpp
 ZBDD operator-(const ZBDD& f, const ZBDD& g)
 ```
@@ -67,11 +77,15 @@ ZBDD operator-(const ZBDD& f, const ZBDD& g)
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
+### operator==
+
 ```cpp
 int operator==(const ZBDD& f, const ZBDD& g)
 ```
 
 f と g が同じ集合かどうかの真偽(1/0)を返す。
+
+### operator!=
 
 ```cpp
 int operator!=(const ZBDD& f, const ZBDD& g)
@@ -81,11 +95,15 @@ f と g が異なる集合かどうかの真偽(1/0)を返す。
 
 ### 公開クラスメソッド
 
+### ZBDD
+
 ```cpp
 ZBDD::ZBDD(void)
 ```
 
 基本constructer。初期値として空集合を表すZBDDオブジェクトを生成する。
+
+### ZBDD
 
 ```cpp
 ZBDD::ZBDD(int v)
@@ -94,11 +112,15 @@ ZBDD::ZBDD(int v)
 定数式を作り出す constructer。v == 0 ならば空集合、v > 0 ならば単位元集合、
 v < 0 ならば null を表すZBDDオブジェクトを生成する。
 
+### ZBDD
+
 ```cpp
 ZBDD::ZBDD(const ZBDD& f)
 ```
 
 引数 f を複製する constructer。
+
+### ZBDD
 
 ```cpp
 ZBDD::ZBDD(const BDD& bdd, int offset)
@@ -109,17 +131,23 @@ ZBDD変数に割り当てる。offsetに0を指定すると、0シフト（元�
 となる。記憶あふれの場合は null オブジェクトを生成する。
 例外として、変数の値が0のBDDの場合は空集合のZBDDとなる。
 
+### ~ZBDD
+
 ```cpp
 ZBDD::~ZBDD(void)
 ```
 
 destructer。内部のBDD節点の記憶管理は自動化されており、使用済みの節点は適当なタイミングで回収され、再利用される。
 
+### operator=
+
 ```cpp
 ZBDD& ZBDD::operator=(const ZBDD& f)
 ```
 
 自分自身に f を代入し、f を関数値として返す。
+
+### operator+=
 
 ```cpp
 ZBDD ZBDD::operator+=(const ZBDD& f)
@@ -128,6 +156,8 @@ ZBDD ZBDD::operator+=(const ZBDD& f)
 自分自身と f との和集合を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは何もしない。f が null のときは、null を代入する。
 
+### operator-=
+
 ```cpp
 ZBDD ZBDD::operator-=(const ZBDD& f)
 ```
@@ -135,12 +165,16 @@ ZBDD ZBDD::operator-=(const ZBDD& f)
 自分自身から f を除いた差集合を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは何もしない。f が null のときは、null を代入する。
 
+### operator*=
+
 ```cpp
 ZBDD ZBDD::operator*=(const ZBDD& f)
 ```
 
 自分自身と f との積集合を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは何もしない。f が null のときは、null を代入する。
+
+### Change
 
 ```cpp
 ZBDD ZBDD::Change(int v) const 
@@ -153,6 +187,8 @@ ZBDD ZBDD::Change(int v) const
 があるので注意すべきである。記憶あふれの場合は、null を表すオブジェクトを
 返す。自分自身が null のときは、nullを返す。
 
+### Swap
+
 ```cpp
 ZBDD ZBDD::Swap(int v1, int v2) const 
 ```
@@ -161,6 +197,8 @@ ZBDD ZBDD::Swap(int v1, int v2) const
 入れ替えた集合を表すZBDDオブジェクトを生成して、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
+
+### SymmetricDifference
 
 ```cpp
 ZBDD ZBDD::SymmetricDifference(const ZBDD& g) const 
@@ -172,6 +210,8 @@ ZBDD ZBDD::SymmetricDifference(const ZBDD& g) const
 オブジェクトを返す。自分自身が null のとき、または g が null
 のときは、null を返す。
 
+### Support
+
 ```cpp
 BDD ZBDD::Support(void) const 
 ```
@@ -179,6 +219,8 @@ BDD ZBDD::Support(void) const
 自分自身の集合要素が用いているアイテム変数を集め、その変数の
 項の論理和を表すBDDオブジェクトを生成し、それを返す。記憶あふれの場合は、
 nullを表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
+
+### Restrict
 
 ```cpp
 ZBDD ZBDD::Restrict(const ZBDD& g) const 
@@ -191,6 +233,8 @@ ZBDD ZBDD::Restrict(const ZBDD& g) const
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のとき、または g が null のときは、null を返す。
 
+### Permit
+
 ```cpp
 ZBDD ZBDD::Permit(const ZBDD& g) const 
 ```
@@ -201,6 +245,8 @@ ZBDD ZBDD::Permit(const ZBDD& g) const
 それほど計算効率がよくないことが多い。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のとき、または g が null のときは、null を返す。
+
+### PermitSym
 
 ```cpp
 ZBDD ZBDD::PermitSym(const ZBDD& g) const 
@@ -213,6 +259,8 @@ filter を適用したことになる。この演算は特殊ケースについ�
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のとき、または g が null のときは、null を返す。
 
+### PermitNot
+
 ```cpp
 ZBDD ZBDD::PermitNot(const ZBDD& g) const 
 ```
@@ -224,6 +272,8 @@ ZBDD ZBDD::PermitNot(const ZBDD& g) const
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のとき、または g が null のときは、null を返す。
 
+### Always
+
 ```cpp
 ZBDD ZBDD::Always(int v) const 
 ```
@@ -232,6 +282,8 @@ ZBDD ZBDD::Always(int v) const
 抽出した部分集合を表すZBDDオブジェクトを生成して、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
+
+### Never
 
 ```cpp
 ZBDD ZBDD::Never(int v) const 
@@ -242,12 +294,16 @@ ZBDD ZBDD::Never(int v) const
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
 
+### Top
+
 ```cpp
 int ZBDD::Top(void) const 
 ```
 
 自分自身のグラフに関係する入力変数の中で、最上位の変数番号を返す。
 自分自身が定数関数のとき、及びnullの場合は0を返す。
+
+### Card
 
 ```cpp
 bddword ZBDD::Card(void) const 
@@ -257,17 +313,23 @@ bddword ZBDD::Card(void) const
 有限の答えが得られないほど大きな要素数の場合やnullの場合は、
 bddnull（BDD_MaxNodeよりも大きな数値）を返す。
 
+### Size
+
 ```cpp
 bddword ZBDD::Size(void) const 
 ```
 
 自分自身のグラフの節点数を返す。nullに対しては0を返す。
 
+### Print
+
 ```cpp
 void ZBDD::Print(void) const 
 ```
 
 インデックスの値、最上位のリテラル番号、節点数の情報を標準出力に出力する。
+
+### ZLev
 
 ```cpp
 bddword ZBDD::ZLev(int lev, int last = 0) const 

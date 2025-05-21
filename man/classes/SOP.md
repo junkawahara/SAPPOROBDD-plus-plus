@@ -26,6 +26,8 @@ f3.Print();
 
 ### 関連する外部関数
 
+### SOP_NewVar
+
 ```cpp
 int SOP_NewVar(void)
 ```
@@ -37,6 +39,8 @@ int SOP_NewVar(void)
 対応する負リテラルのVarID はそれに1を加えた奇数である。
 変数の個数が最大値を超えるとエラーを出力して異常終了する。
 
+### operator+
+
 ```cpp
 SOP operator+(const SOP& f, const SOP& g)
 ```
@@ -44,6 +48,8 @@ SOP operator+(const SOP& f, const SOP& g)
 f と g の論理和（集合の和）を表す SOP オブジェクトを生成して、
 それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。
 引数にnullを与えた場合にはnullを返す。
+
+### operator*
 
 ```cpp
 SOP operator*(const SOP& f, const SOP& g)
@@ -53,6 +59,8 @@ f と g の論理和（積項の任意の選び方による積の和集合）を
 SOPオブジェクトを生成して、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
+### operator-
+
 ```cpp
 SOP operator-(const SOP& f, const SOP& g)
 ```
@@ -61,11 +69,15 @@ SOP operator-(const SOP& f, const SOP& g)
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合に
 はnullを返す。
 
+### operator==
+
 ```cpp
 int operator==(const SOP& f, const SOP& g)
 ```
 
 f と g が等しいかどうかの真偽値（1 または 0）を返す。
+
+### operator!=
 
 ```cpp
 int operator!=(const SOP& f, const SOP& g)
@@ -75,6 +87,8 @@ f と g が異なるかどうかの真偽値（1 または 0）を返す。
 
 ### 公開クラスメソッド
 
+### SOP
+
 ```cpp
 SOP::SOP(void)
 ```
@@ -82,11 +96,15 @@ SOP::SOP(void)
 基本constructer。初期値として、空の論理式（空集合）を表す SOP オブジェクトを
 生成する。空集合で表される論理式は恒偽（常に0）である。
 
+### SOP
+
 ```cpp
 SOP::SOP(const SOP& f)
 ```
 
 引数 f を複製する constructer。
+
+### SOP
 
 ```cpp
 SOP::SOP(int ltrl)
@@ -94,6 +112,8 @@ SOP::SOP(int ltrl)
 
 リテラル単体の論理式を表す SOP オブジェクトを生成する。
 ltrl は BDD_NewVar() で確保されたリテラルのVarIDでなければならない。
+
+### SOP
 
 ```cpp
 SOP::SOP(const ZBDD& zbdd)
@@ -107,17 +127,23 @@ ZBDD で表現された集合を、リテラルの肯定形のみの積項集合
 として解釈するのと、CtoI などとして解釈するのとでは異なる
 意味を持つことに注意せよ。
 
+### ~SOP
+
 ```cpp
 SOP::~SOP(void)
 ```
 
 destructer。
 
+### operator=
+
 ```cpp
 SOP& SOP::operator=(const SOP& f)
 ```
 
 自分自身に f を代入し、自分自身への参照を返す。
+
+### operator+=
 
 ```cpp
 SOP& SOP::operator+=(const SOP& f)
@@ -126,6 +152,8 @@ SOP& SOP::operator+=(const SOP& f)
 自分自身と f との論理和を求め、自分自身に代入する。自分自身への参照を返す。
 記憶あふれの場合はnullを代入する。自分自身や引数がnullのときにはnullとなる。
 
+### operator*=
+
 ```cpp
 SOP& SOP::operator*=(const SOP& f)
 ```
@@ -133,12 +161,16 @@ SOP& SOP::operator*=(const SOP& f)
 自分自身と f との論理積を求め、自分自身に代入する。自分自身への参照を返す。
 記憶あふれの場合はnullを代入する。自分自身や引数がnullのときにはnullとなる。
 
+### operator-=
+
 ```cpp
 SOP& SOP::operator-=(const SOP& f)
 ```
 
 自分自身から f を除いた集合を求め、自分自身に代入する。自分自身への参照を返す。
 記憶あふれの場合はnullを代入する。自分自身や引数がnullのときにはnullとなる。
+
+### And
 
 ```cpp
 SOP SOP::And(int lt) const
@@ -148,6 +180,8 @@ SOP SOP::And(int lt) const
 SOP オブジェクトを生成して、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
 
+### Or
+
 ```cpp
 SOP SOP::Or(int lt) const
 ```
@@ -156,6 +190,8 @@ SOP SOP::Or(int lt) const
 SOP オブジェクトを生成して、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
 
+### Xor
+
 ```cpp
 SOP SOP::Xor(int lt) const
 ```
@@ -163,6 +199,8 @@ SOP SOP::Xor(int lt) const
 自分自身の論理式に対して、リテラル lt との排他的論理和を計算した結果を表す 
 SOP オブジェクトを生成して、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
+
+### Compose
 
 ```cpp
 SOP SOP::Compose(const SOP& g, int v) const
@@ -174,6 +212,8 @@ gの全ての変数は、自分自身の論理式に含まれている変数番�
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身や引数がnullのときにはnullを返す。
 
+### Limit
+
 ```cpp
 SOP SOP::Limit(int n) const
 ```
@@ -181,6 +221,8 @@ SOP SOP::Limit(int n) const
 積項サイズがn以下の積項のみを取り出した論理式を表す SOP オブジェクト
 を生成して、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
+
+### Permit
 
 ```cpp
 SOP SOP::Permit(const SOP& g) const
@@ -191,6 +233,8 @@ SOP SOP::Permit(const SOP& g) const
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身がnullのとき
 またはgがnullのときは、nullを返す。
 
+### Permit0
+
 ```cpp
 SOP SOP::Permit0(const SOP& g) const
 ```
@@ -199,6 +243,8 @@ SOP SOP::Permit0(const SOP& g) const
 負リテラルをいずれも含まないような項だけを選び出した結果を表す SOP 
 オブジェクトを生成して、それを返す。記憶あふれの場合は、null を表す
 オブジェクトを返す。自分自身がnullのときまたはgがnullのときは、nullを返す。
+
+### Swap
 
 ```cpp
 SOP SOP::Swap(int v1, int v2) const
@@ -210,11 +256,15 @@ v1, v2は正リテラルの番号（偶数）を指定するだけで、負リ�
 入れ替えが実行される。記憶あふれの場合は、nullを表すオブジェクトを返す。
 自分自身がnullのときは、nullを返す。
 
+### GetZBDD
+
 ```cpp
 ZBDD SOP::GetZBDD(void) const
 ```
 
 内部表現の ZBDD を複製したオブジェクトを生成して、それを返す。
+
+### TopVar
 
 ```cpp
 int SOP::TopVar(void) const
@@ -224,6 +274,8 @@ int SOP::TopVar(void) const
 最小のVarIDを2で割った値）を返す。自分自身が定数論理式のとき、
 及びnullの場合は0を返す。
 
+### TopLit
+
 ```cpp
 int SOP::TopLit(void) const
 ```
@@ -231,12 +283,16 @@ int SOP::TopLit(void) const
 自分自身の論理式に含まれるリテラルの中で最小のVarIDを返す。
 自分自身が定数論理式のとき、及びnullの場合は0を返す。
 
+### Size
+
 ```cpp
 bddword SOP::Size(void) const
 ```
 
 自分自身の論理式に含まれる積項の個数を返す。
 nullに対しては 0 を返す。
+
+### LitNum
 
 ```cpp
 bddword SOP::LitNum(void) const
@@ -246,11 +302,15 @@ bddword SOP::LitNum(void) const
 （各積項に含まれるリテラルの個数を合計したもの）
 nullに対しては 0 を返す。
 
+### Print
+
 ```cpp
 void SOP::Print(void) const
 ```
 
 自分自身の論理式を積和形(SOP; Sum of Products)で標準出力に出力する。
+
+### PrintStats
 
 ```cpp
 void SOP::PrintStats(void) const

@@ -12,6 +12,8 @@ BtoI オブジェクトの生成にあたって、BDDV_Init()を最初に実行�
 
 ### 関連する外部関数
 
+### operator+
+
 ```cpp
 BtoI operator+(const BtoI& a, const BtoI& b)
 ```
@@ -19,6 +21,8 @@ BtoI operator+(const BtoI& a, const BtoI& b)
 a と b の加算を表すBtoIオブジェクトを生成し、それを返す。記憶あふれの
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### operator-
 
 ```cpp
 BtoI operator-(const BtoI& a, const BtoI& b)
@@ -28,6 +32,8 @@ a から b を減算した値を表すBtoIオブジェクトを生成し、そ�
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
+### operator*
+
 ```cpp
 BtoI operator*(const BtoI& a, const BtoI& b)
 ```
@@ -35,6 +41,8 @@ BtoI operator*(const BtoI& a, const BtoI& b)
 a と b の乗算を表すBtoIオブジェクトを生成し、それを返す。記憶あふれの
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### operator/
 
 ```cpp
 BtoI operator/(const BtoI& a, const BtoI& b)
@@ -44,6 +52,8 @@ a を b で除算した値を表すBtoIオブジェクトを生成し、それ�
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。b が0の場合も nullを返す。
 
+### operator&
+
 ```cpp
 BtoI operator&(const BtoI& a, const BtoI& b)
 ```
@@ -51,6 +61,8 @@ BtoI operator&(const BtoI& a, const BtoI& b)
 a と b のビットごとの論理積を表すBtoIオブジェクトを生成し、それを返す。記憶あふれの
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### operator|
 
 ```cpp
 BtoI operator|(const BtoI& a, const BtoI& b)
@@ -60,6 +72,8 @@ a と b のビットごとの論理和を表すBtoIオブジェクトを生成�
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
+### operator^
+
 ```cpp
 BtoI operator^(const BtoI& a, const BtoI& b)
 ```
@@ -67,6 +81,8 @@ BtoI operator^(const BtoI& a, const BtoI& b)
 a と b のビットごとの排他的論理和を表すBtoIオブジェクトを生成し、それを返す。記憶あふれの
 場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
+
+### BtoI_ITE
 
 ```cpp
 BtoI BtoI_ITE(const BDD& f, const BtoI& a, const BtoI& b)
@@ -78,11 +94,15 @@ nullを返す。
 
 ### 公開クラスメソッド
 
+### BtoI
+
 ```cpp
 BtoI::BtoI(void)
 ```
 
 基本constructer。初期値として整数値 0 (恒偽関数)を表す BtoI オブジェクトを生成する。
+
+### BtoI
 
 ```cpp
 BtoI::BtoI(const BtoI& fv)
@@ -90,12 +110,16 @@ BtoI::BtoI(const BtoI& fv)
 
 引数 fv を複製する constructer。
 
+### BtoI
+
 ```cpp
 BtoI::BtoI(const BDDV& fv)
 ```
 
 BDDVで表された関数fvを２値入力整数値出力の論理関数として扱うconstructer。
 配列要素0が最下位ビット、配列要素n-1が最上位ビットの２進数を表す関数となる。
+
+### BtoI
 
 ```cpp
 BtoI::BtoI(const BDD& f)
@@ -105,6 +129,8 @@ BDDで表された関数fを２値入力整数値出力の論理関数として�
 関数を保持する。fが定数0ならば、常に0を出力する関数となる。fが定数1ならば、常に1を
 出力する関数となる。fが定数でなければ、入力によって0または1を出力する関数となる。
 
+### BtoI
+
 ```cpp
 BtoI::BtoI(int val)
 ```
@@ -112,17 +138,23 @@ BtoI::BtoI(int val)
 整数値valを常に出力する定数関数のBtoIオブジェクトを作るconstructer。
 valは正または負の整数でよい。val < 0 の場合は2の補数表現となる。
 
+### ~BtoI
+
 ```cpp
 BtoI::~BtoI(void)
 ```
 
 destructer。
 
+### operator=
+
 ```cpp
 BtoI& BtoI::operator=(const BtoI& fv)
 ```
 
 自分自身に fv を代入し、fvを関数値として返す。
+
+### operator+=
 
 ```cpp
 BtoI& BtoI::operator+=(const BtoI& fv)
@@ -132,6 +164,8 @@ BtoI& BtoI::operator+=(const BtoI& fv)
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
 
+### operator-=
+
 ```cpp
 BtoI& BtoI::operator-=(const BtoI& fv)
 ```
@@ -140,6 +174,8 @@ BtoI& BtoI::operator-=(const BtoI& fv)
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
 
+### operator*=
+
 ```cpp
 BtoI& BtoI::operator*=(const BtoI& fv)
 ```
@@ -147,6 +183,8 @@ BtoI& BtoI::operator*=(const BtoI& fv)
 自分自身と fv の乗算を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
+
+### operator/=
 
 ```cpp
 BtoI& BtoI::operator/=(const BtoI& fv)
@@ -164,6 +202,8 @@ BtoI& BtoI::operator%=(const BtoI& fv)
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null または 0 のときは、null を代入する。
 
+### operator&=
+
 ```cpp
 BtoI& BtoI::operator&=(const BtoI& fv)
 ```
@@ -171,6 +211,8 @@ BtoI& BtoI::operator&=(const BtoI& fv)
 自分自身と fv のビットごとの論理積を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
+
+### operator|=
 
 ```cpp
 BtoI& BtoI::operator|=(const BtoI& fv)
@@ -180,6 +222,8 @@ BtoI& BtoI::operator|=(const BtoI& fv)
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
 
+### operator^=
+
 ```cpp
 BtoI& BtoI::operator^=(const BtoI& fv)
 ```
@@ -187,6 +231,8 @@ BtoI& BtoI::operator^=(const BtoI& fv)
 自分自身と fv のビットごとの排他的論理和を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
+
+### operator<<=
 
 ```cpp
 BtoI& BtoI::operator<<=(const BtoI& fv)
@@ -196,6 +242,8 @@ BtoI& BtoI::operator<<=(const BtoI& fv)
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
 
+### operator>>=
+
 ```cpp
 BtoI& BtoI::operator>>=(const BtoI& fv)
 ```
@@ -203,6 +251,8 @@ BtoI& BtoI::operator>>=(const BtoI& fv)
 自分自身を fv ビットだけ右シフトした値を求め、自分自身に代入する。演算結果を関数値として返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。fv が null のときは、null を代入する。
+
+### operator-
 
 ```cpp
 BtoI BtoI::operator-(void) const
@@ -212,6 +262,8 @@ BtoI BtoI::operator-(void) const
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 nullを返す。
 
+### operator~
+
 ```cpp
 BtoI BtoI::operator~(void) const
 ```
@@ -219,6 +271,8 @@ BtoI BtoI::operator~(void) const
 自分自身のビットごとの否定を表す BtoIオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 nullを返す。
+
+### operator!
 
 ```cpp
 BtoI BtoI::operator!(void) const
@@ -229,6 +283,8 @@ BtoI BtoI::operator!(void) const
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 nullを返す。
 
+### operator<<
+
 ```cpp
 BtoI BtoI::operator<<(const BtoI& fv) const
 ```
@@ -237,6 +293,8 @@ BtoI BtoI::operator<<(const BtoI& fv) const
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null または
 fv がnullのときは nullを返す。
 
+### operator>>
+
 ```cpp
 BtoI BtoI::operator>>(const BtoI& fv) const
 ```
@@ -244,6 +302,8 @@ BtoI BtoI::operator>>(const BtoI& fv) const
 自分自身を fv ビットだけ右シフトした値を表すBtoIオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null または
 fv がnullのときは nullを返す。
+
+### UpperBound
 
 ```cpp
 BtoI BtoI::UpperBound(void) const
@@ -254,6 +314,8 @@ BtoI BtoI::UpperBound(void) const
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が nullのときは
 nullを返す。
 
+### UpperBound
+
 ```cpp
 BtoI BtoI::UpperBound(const BDD& f) const
 ```
@@ -262,6 +324,8 @@ BtoI BtoI::UpperBound(const BDD& f) const
 すべての入力変数が上限のときに最大となる関数を表すBtoIオブジェクトを生成し、
 それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。自分自身または
 fが nullのときは nullを返す。
+
+### LowerBound
 
 ```cpp
 BtoI BtoI::LowerBound(void) const
@@ -272,6 +336,8 @@ BtoI BtoI::LowerBound(void) const
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が nullのときは
 nullを返す。
 
+### LowerBound
+
 ```cpp
 BtoI BtoI::LowerBound(const BDD& f) const
 ```
@@ -281,6 +347,8 @@ BtoI BtoI::LowerBound(const BDD& f) const
 それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。自分自身または
 fが nullのときは nullを返す。
 
+### At0
+
 ```cpp
 BtoI BtoI::At0(int v) const
 ```
@@ -289,6 +357,8 @@ BtoI BtoI::At0(int v) const
 論理関数を表すBtoIオブジェクトを生成し、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身が null のときは、nullを返す。
 
+### At1
+
 ```cpp
 BtoI BtoI::At1(int v) const
 ```
@@ -296,6 +366,8 @@ BtoI BtoI::At1(int v) const
 自分自身の関数の入力変数のうち、var番目の変数を1に固定したときの
 論理関数を表すBtoIオブジェクトを生成し、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身が null のときは、nullを返す。
+
+### Cofact
 
 ```cpp
 BtoI BtoI::Cofact(const BtoI& g) const
@@ -306,6 +378,8 @@ BtoI BtoI::Cofact(const BtoI& g) const
 は、null を表すオブジェクトを返す。自分自身が null のとき、および g が
 nullのときは、null を返す。
 
+### Spread
+
 ```cpp
 BtoI BtoI::Spread(int k) const
 ```
@@ -315,12 +389,16 @@ BtoI BtoI::Spread(int k) const
 生成し、それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
 
+### Top
+
 ```cpp
 int BtoI::Top(void) const
 ```
 
 自分自身のグラフに関係する入力変数の中で、最上位の変数番号を返す。
 自分自身が定数関数のとき、及びnullの場合は0を返す。
+
+### GetSignBDD
 
 ```cpp
 BDD BtoI::GetSignBDD(void) const
@@ -330,6 +408,8 @@ BDD BtoI::GetSignBDD(void) const
 負の値であり、0のとき非負値を表す。記憶あふれの場合は、null を表す
 オブジェクトを返す。自分自身が null のときは、nullを返す。
 
+### GetBDD
+
 ```cpp
 BDD BtoI::GetBDD(int ix) const
 ```
@@ -337,11 +417,15 @@ BDD BtoI::GetBDD(int ix) const
 自分自身からix番目のビットを表すBDDを抽出する。記憶あふれの場合は、
 null を表すオブジェクトを返す。自分自身が null のときは、nullを返す。
 
+### Len
+
 ```cpp
 int BtoI::Len(void) const
 ```
 
 自分自身のビット長を返す。nullに対しては0を返す。
+
+### GetBDDV
 
 ```cpp
 BDDV BtoI::GetBDDV(void) const
@@ -349,11 +433,15 @@ BDDV BtoI::GetBDDV(void) const
 
 内部表現で使っている BDDV を複製して返す。nullに対してはnullを返す。
 
+### Size
+
 ```cpp
 bddword BtoI::Size(void) const
 ```
 
 自分自身が使用するグラフ節点数を返す。nullに対しては 0 を返す。
+
+### Print
 
 ```cpp
 void BtoI::Print(void) const
