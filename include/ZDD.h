@@ -124,6 +124,14 @@ extern ZDD ZDD_LCM_A(char *, int);
 extern ZDD ZDD_LCM_C(char *, int);
 extern ZDD ZDD_LCM_M(char *, int);
 
+// Aliases for backward compatibility
+inline ZDD ZBDD_Meet(const ZDD& f, const ZDD& g) { return ZDD_Meet(f, g); }
+inline ZDD ZBDD_Random(int n, int density = 50) { return ZDD_Random(n, density); }
+inline ZDD ZBDD_Import(FILE *strm = stdin) { return ZDD_Import(strm); }
+inline ZDD ZBDD_LCM_A(char *fname, int th) { return ZDD_LCM_A(fname, th); }
+inline ZDD ZBDD_LCM_C(char *fname, int th) { return ZDD_LCM_C(fname, th); }
+inline ZDD ZBDD_LCM_M(char *fname, int th) { return ZDD_LCM_M(fname, th); }
+
 inline ZDD ZDD_ID(bddword zdd)
   { ZDD h; h._zdd = zdd; return h; }
 
@@ -207,6 +215,7 @@ public:
 typedef ZDDV ZBDDV; // for backward compatibility
 
 extern ZDDV ZDDV_Import(FILE *strm = stdin);
+inline ZDDV ZBDDV_Import(FILE *strm = stdin) { return ZDDV_Import(strm); } // for backward compatibility
 
 inline ZDDV operator&(const ZDDV& fv, const ZDDV& gv)
   { ZDDV hv; hv._zdd = fv._zdd & gv._zdd; return hv; }
