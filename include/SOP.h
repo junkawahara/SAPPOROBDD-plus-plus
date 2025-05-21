@@ -1,12 +1,12 @@
 /************************************************
- * ZBDD-based SOP class (SAPPORO-1.87) - Header *
+ * ZDD-based SOP class (SAPPORO-1.87) - Header *
  * (C) Shin-ichi MINATO  (May 14, 2021)         *
  ************************************************/
 
 #ifndef _SOP_
 #define _SOP_
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -25,24 +25,24 @@ extern SOP SOP_ISOP(BDD, BDD);
 
 class SOP
 {
-  ZBDD _zbdd;
+  ZDD _zdd;
 public:
-  SOP() { _zbdd = ZBDD(); }
-  SOP(int val) { _zbdd = ZBDD(val); }
-  SOP(const SOP& f) { _zbdd = f._zbdd; }
-  SOP(const ZBDD& zbdd) { _zbdd = zbdd; }
+  SOP() { _zdd = ZDD(); }
+  SOP(int val) { _zdd = ZDD(val); }
+  SOP(const SOP& f) { _zdd = f._zdd; }
+  SOP(const ZDD& zdd) { _zdd = zdd; }
   ~SOP() { }
   
-  SOP& operator=(const SOP& f) { _zbdd = f._zbdd; return *this; }
+  SOP& operator=(const SOP& f) { _zdd = f._zdd; return *this; }
 
   SOP& operator&=(const SOP& f)
-    { _zbdd = _zbdd & f._zbdd; return *this; }
+    { _zdd = _zdd & f._zdd; return *this; }
 
   SOP& operator+=(const SOP& f)
-    { _zbdd = _zbdd + f._zbdd; return *this; }
+    { _zdd = _zdd + f._zdd; return *this; }
 
   SOP& operator-=(const SOP& f)
-    { _zbdd = _zbdd - f._zbdd; return *this; }
+    { _zdd = _zdd - f._zdd; return *this; }
 
   SOP& operator*=(const SOP&); // inline
   SOP& operator/=(const SOP&); // inline
@@ -58,7 +58,7 @@ public:
   SOP Factor1(int) const;
   SOP FactorD(int) const;
 
-  int Top(void) const { return (_zbdd.Top() + 1) & ~1; }
+  int Top(void) const { return (_zdd.Top() + 1) & ~1; }
 
   bddword Size(void) const;
   bddword Cube(void) const;
@@ -76,7 +76,7 @@ public:
   void Print(void) const;
   int PrintPla(void) const;
   
-  ZBDD GetZBDD(void) const { return _zbdd; }
+  ZDD GetZDD(void) const { return _zdd; }
   BDD GetBDD(void) const;
   SOP InvISOP(void) const;
 
@@ -89,16 +89,16 @@ public:
 };
 
 inline SOP operator&(const SOP& f, const SOP& g)
-  { return SOP(f._zbdd & g._zbdd); }
+  { return SOP(f._zdd & g._zdd); }
 
 inline SOP operator+(const SOP& f, const SOP& g)
-  { return SOP(f._zbdd + g._zbdd); }
+  { return SOP(f._zdd + g._zdd); }
 
 inline SOP operator-(const SOP& f, const SOP& g)
-  { return SOP(f._zbdd - g._zbdd); }
+  { return SOP(f._zdd - g._zdd); }
 
 inline int operator==(const SOP& f, const SOP& g)
-  { return f._zbdd == g._zbdd; }
+  { return f._zdd == g._zdd; }
 
 inline int operator!=(const SOP& f, const SOP& g)
   { return !(f == g); }
@@ -132,13 +132,13 @@ extern SOPV SOPV_ISOP2(BDDV, BDDV);
 
 class SOPV
 {
-  ZBDDV _v;
+  ZDDV _v;
 
 public:
-  SOPV(void) { _v = ZBDDV(); }
+  SOPV(void) { _v = ZDDV(); }
   SOPV(const SOPV& v) { _v = v._v; }
-  SOPV(const ZBDDV& zbddv) { _v = zbddv; }
-  SOPV(const SOP& f, int loc = 0) { _v = ZBDDV(f.GetZBDD(), loc); }
+  SOPV(const ZDDV& zddv) { _v = zddv; }
+  SOPV(const SOP& f, int loc = 0) { _v = ZDDV(f.GetZDD(), loc); }
   ~SOPV() { }
 
   SOPV& operator=(const SOPV& v) { _v = v._v; return *this; }
@@ -170,7 +170,7 @@ public:
     { return SOPV(_v.Mask(start, length)); }
 
   SOP GetSOP(int) const;
-  ZBDDV GetZBDDV(void) const { return _v; }
+  ZDDV GetZDDV(void) const { return _v; }
   
   SOPV Swap(int, int) const;
 

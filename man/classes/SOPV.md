@@ -2,9 +2,9 @@
 
 ヘッダーファイル名: "SOP.h"  
 ソースファイル名: SOP.cc  
-内部から呼び出しているクラス: ZBDD, ZBDDV
+内部から呼び出しているクラス: ZDD, ZDDV
 
-SOP の配列を表すクラスである。内部表現は ZBDDV にほぼ等しいが、
+SOP の配列を表すクラスである。内部表現は ZDDV にほぼ等しいが、
 意味づけが異なる。
 
 ### 関連する外部関数
@@ -99,10 +99,10 @@ SOPV::SOPV(const SOP& f, int len = 1)
 ### SOPV
 
 ```cpp
-SOPV::SOPV(const ZBDDV& fv)
+SOPV::SOPV(const ZDDV& fv)
 ```
 
-内部表現 ZBDDVを表す ZBDDVオブジェクトを複製してSOPVとして
+内部表現 ZDDVを表す ZDDVオブジェクトを複製してSOPVとして
 生成するconstructer。
 
 ### ~SOPV
@@ -159,13 +159,13 @@ SOP SOPV::GetSOP(int ix) const
 
 自分自身の第ix番目の配列要素を返す。
 
-### GetZBDDV
+### GetZDDV
 
 ```cpp
-ZBDDV SOPV::GetZBDDV(void) const 
+ZDDV SOPV::GetZDDV(void) const 
 ```
 
-内部表現の ZBDDV を複製し、それを返す。
+内部表現の ZDDV を複製し、それを返す。
 
 ### Last
 

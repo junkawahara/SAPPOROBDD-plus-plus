@@ -8,7 +8,7 @@ class GBase;
 #ifndef _GBase_
 #define _GBase_
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -24,8 +24,8 @@ class GBase
 public:
   struct CacheEntry // for SimPaths
   {
-    ZBDD _f; // for ZDD-constrained enumeration
-    ZBDD _h;
+    ZDD _f; // for ZDD-constrained enumeration
+    ZDD _h;
     CacheEntry(void)
     {
       _f = -1; // for ZDD-constrained enumeration
@@ -59,7 +59,7 @@ public:
     CacheEntry* _ca; //for SimPaths
     GB_v* _ca_mate; //for SimPaths
     
-    ZBDD _f; // for ZDD-constrained enumeration
+    ZDD _f; // for ZDD-constrained enumeration
 
     Edge(void);
     ~Edge(void);
@@ -73,7 +73,7 @@ public:
   GB_e _lastin; //for HamPaths
 
   int _hamilton;
-  ZBDD _f; // for ZDD-constrained enumeration
+  ZDD _f; // for ZDD-constrained enumeration
 
   GBase(void);
   ~GBase(void);
@@ -83,14 +83,14 @@ public:
   int SetGrid(const int, const int);
   void Print(void) const;
 
-  ZBDD SimPaths(const GB_v, const GB_v);
-  ZBDD SimCycles(void);
+  ZDD SimPaths(const GB_v, const GB_v);
+  ZDD SimCycles(void);
   int BDDvarOfEdge(const GB_e) const;
   GB_e EdgeOfBDDvar(const int) const;
 
   void FixEdge(const GB_e, const char);
   void SetHamilton(const int);
-  void SetCond(ZBDD); // for ZDD-constrained enumeration
+  void SetCond(ZDD); // for ZDD-constrained enumeration
 };
 
 } // namespace sapporobdd

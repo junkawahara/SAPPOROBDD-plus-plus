@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <iostream>
 #include <cstring>
-#include "ZBDD.h"
+#include "ZDD.h"
 #include "BDDCT.h"
 #include "GBase.h"
 #include "gpm.h"
@@ -35,8 +35,8 @@ int NextV(const GB_v v, const GB_v lastv)
   return v2;
 }
 
-static void PrintPaths(const ZBDD &);
-void PrintPaths(const ZBDD& f)
+static void PrintPaths(const ZDD &);
+void PrintPaths(const ZDD& f)
 {
   if(f == 0) return;
   if(f == 1)
@@ -81,8 +81,8 @@ void PrintPaths(const ZBDD& f)
   return;
 }
 
-static void PrintEdges(const ZBDD &);
-void PrintEdges(const ZBDD& f)
+static void PrintEdges(const ZDD &);
+void PrintEdges(const ZDD& f)
 {
   if(f == 0) return;
   if(f == 1)
@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 
   cerr << "V: " << g._n << "    E: " << g._m << "\n";
 
-  ZBDD cond = 1;
+  ZDD cond = 1;
   for(int i=0; i<g._m; i++)
   {
     BDD_NewVar();
@@ -210,12 +210,12 @@ int main(int argc, char *argv[])
   ct.Alloc(g._m);
   if(nck_lb != -1)
   {
-    ZBDD cond_lb = ct.ZBDD_CostLE(cond, nck_lb-1);
-    ZBDD cond_ub = ct.ZBDD_CostLE(cond, nck_ub);
+    ZDD cond_lb = ct.ZDD_CostLE(cond, nck_lb-1);
+    ZDD cond_ub = ct.ZDD_CostLE(cond, nck_ub);
     cond = cond_ub - cond_lb;
   }
 
-  ZBDD f;
+  ZDD f;
   g.SetCond(cond);
   if(all) f = cond;
   else if(cycle) f = g.SimCycles();
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
   if(all) cerr << "all sets:       ";
   else if(cycle) cerr << "all cycles:     ";
   else cerr << "all paths:      ";
-  if(card < ZBDD(-1).GetID())
+  if(card < ZDD(-1).GetID())
     cerr << card << "\n";
   else 
   {
@@ -244,8 +244,8 @@ int main(int argc, char *argv[])
 
   for(GB_e i=0; i<g._m; i++) ct.SetCost(i, g._e[i]._cost);
 
-  ZBDD h;
-  ZBDD h_lb;
+  ZDD h;
+  ZDD h_lb;
   bddcost acc_worst, rej_best;
   if(prn)
   {
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
   {
     cerr << "----\ncost bound:     " << bound << "\n";
 
-    h = ct.ZBDD_CostLE(f, bound, acc_worst, rej_best);
+    h = ct.ZDD_CostLE(f, bound, acc_worst, rej_best);
     cerr << " accept_worst:  ";
     if(acc_worst != bddcost_null) cerr << acc_worst << "\n";
     else cerr << "-\n";
@@ -273,7 +273,7 @@ int main(int argc, char *argv[])
       if(all) cerr << "bounded sets:   ";
       else if(cycle) cerr << "bounded cycles: ";
       else cerr << " bounded paths: ";
-      if(card < ZBDD(-1).GetID())
+      if(card < ZDD(-1).GetID())
         cerr << card << "\n";
       else 
       {
@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
       cerr << " (total calls)  " << ct._call << "\n";
 
       cerr << "cost low_bound: " << l_bound << "\n";
-      h_lb = ct.ZBDD_CostLE(f, l_bound-1, acc_worst, rej_best);
+      h_lb = ct.ZDD_CostLE(f, l_bound-1, acc_worst, rej_best);
       cerr << " reject_worst:  ";
       if(acc_worst != bddcost_null) cerr << acc_worst << "\n";
       else cerr << "-\n";
@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
       if(all) cerr << "bounded sets:   ";
       else if(cycle) cerr << "bounded cycles: ";
       else cerr << " bounded paths: ";
-      if(card < ZBDD(-1).GetID())
+      if(card < ZDD(-1).GetID())
         cerr << card << "\n";
       else 
       {
@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
     if(all) cerr << "bounded sets:   ";
     else if(cycle) cerr << "bounded cycles: ";
     else cerr << "bounded paths:  ";
-    if(card < ZBDD(-1).GetID())
+    if(card < ZDD(-1).GetID())
       cerr << card << "\n";
     else 
     {

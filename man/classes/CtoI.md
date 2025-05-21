@@ -2,13 +2,13 @@
 
 ヘッダーファイル名: "CtoI.h"  
 ソースファイル名: CtoI.cc  
-内部から呼び出しているクラス: ZBDD, ZBDDV
+内部から呼び出しているクラス: ZDD, ZDDV
 
-ZBDDを用いて整数値組合せ集合（整係数ユネイト論理式）を表すクラス。
+ZDDを用いて整数値組合せ集合（整係数ユネイト論理式）を表すクラス。
 アイテム集合に対応する整数値の集合を表現する。整数値は符号付きの一般の整数
 （C言語のint型）である。組合せ集合の各要素のことをベクトルとも呼び、
-また整数値のことを重みまたは係数とも呼ぶ。内部表現はZBDDV であり、
-配列要素0が値0に対応するベクトルの集合（まとめたZBDD）、
+また整数値のことを重みまたは係数とも呼ぶ。内部表現はZDDV であり、
+配列要素0が値0に対応するベクトルの集合（まとめたZDD）、
 配列要素1が値1に対応するベクトルの集合、
 配列要素2が値2に対応するベクトルの集合、...
 配列要素-1が値-1に対応するベクトルの集合、
@@ -22,8 +22,8 @@ ZBDDを用いて整数値組合せ集合（整係数ユネイト論理式）を�
 int v1 = BDD_NewVar();
 int v2 = BDD_NewVar();
 int v3 = BDD_NewVar();
-CtoI f1 = CtoI(1) * ZBDD(v1);
-CtoI f2 = CtoI(2) * ZBDD(v2) * ZBDD(v3);
+CtoI f1 = CtoI(1) * ZDD(v1);
+CtoI f2 = CtoI(2) * ZDD(v2) * ZDD(v3);
 CtoI f3 = f1 + f2;
 f1.Print();
 f2.Print();
@@ -87,27 +87,27 @@ f の全てのベクトルの係数を n 倍した結果を表すCtoI オブジ�
 ### operator*
 
 ```cpp
-CtoI operator*(const ZBDD& f, int n)
+CtoI operator*(const ZDD& f, int n)
 ```
 
-ZBDDで表された組合せ集合fの各ベクトルに係数nを乗じた結果を表す
+ZDDで表された組合せ集合fの各ベクトルに係数nを乗じた結果を表す
 CtoI オブジェクトを生成して、それを返す。この演算はスカラー倍を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
 ### operator*
 
 ```cpp
-CtoI operator*(int n, const ZBDD& f)
+CtoI operator*(int n, const ZDD& f)
 ```
 
-ZBDDで表された組合せ集合fの各ベクトルに係数nを乗じた結果を表す
+ZDDで表された組合せ集合fの各ベクトルに係数nを乗じた結果を表す
 CtoI オブジェクトを生成して、それを返す。この演算はスカラー倍を表す。
 記憶あふれの場合はnull を表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
 ### operator*
 
 ```cpp
-CtoI operator*(const CtoI& f, const ZBDD& g)
+CtoI operator*(const CtoI& f, const ZDD& g)
 ```
 
 f の各ベクトルと g の各ベクトルの共通アイテムだけを保持した結果を表す
@@ -117,7 +117,7 @@ CtoI オブジェクトを生成して、それを返す。この演算は積演
 ### operator*
 
 ```cpp
-CtoI operator*(const ZBDD& f, const CtoI& g)
+CtoI operator*(const ZDD& f, const CtoI& g)
 ```
 
 f の各ベクトルと g の各ベクトルの共通アイテムだけを保持した結果を表す

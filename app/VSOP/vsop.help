@@ -80,7 +80,7 @@ quit                        Exits the program.
 <expr1> < <expr2>           Extracts combinations satisfying inequation.
 <expr1> <= <expr2>          Extracts combinations satisfying inequation.
 <expr1> ? <expr2> : <expr3> If <expr1> then <expr2> else <expr3>.
-Import("filename")          Imports ZBDD graph from the external file.
+Import("filename")          Imports ZDD graph from the external file.
 Lcm("<switch>" "<filename>" <num>)
                             generates frequent patterns using LCM algorithm
 			      from the FIMI format database file <filename> 
@@ -112,7 +112,7 @@ Lcm("<switch>" "<filename>" <num> "<filename2>")
 /hex         Displays integers in hexa-decimal.
 /bit         Displays in bit-wise expressions.
 /case        Sorts all combinations by their values.
-/size        Shows the size of the ZBDD.
+/size        Shows the size of the ZDD.
 /count       Shows the number of combinations in the set.
 /density     Shows the density of combinations in the set.
 /value       Shows the numerical value of the expression.
@@ -121,10 +121,10 @@ Lcm("<switch>" "<filename>" <num> "<filename2>")
 /mincover    Shows a minimum-cost combination in the set.
 /mincost     Shows cost of the minimum-cost combination.
 /decomp      Shows the simple disjoint decompositions.
-/plot        Draws ZBDD graph on X-Window.
-/export      Dumps ZBDD graph.
+/plot        Draws ZDD graph on X-Window.
+/export      Dumps ZDD graph.
 /export "filename"
-             Export ZBDD graph to the external file.
+             Export ZDD graph to the external file.
 
 <Special characters>
 

@@ -25,20 +25,20 @@ static const char BC_CtoI_MEET =  49;
 
 //----------- Macros for operation cache -----------
 #define CtoI_CACHE_CHK_RETURN(op, fx, gx) \
-  { ZBDD z = BDD_CacheZBDD(op, fx, gx); \
+  { ZDD z = BDD_CacheZDD(op, fx, gx); \
     if(z != -1) return CtoI(z); \
     BDD_RECUR_INC; }
 
 #define CtoI_CACHE_ENT_RETURN(op, fx, gx, h) \
   { BDD_RECUR_DEC; \
-    if(h != CtoI_Null()) BDD_CacheEnt(op, fx, gx, h._zbdd.GetID()); \
+    if(h != CtoI_Null()) BDD_CacheEnt(op, fx, gx, h._zdd.GetID()); \
     return h; }
 
 //-------------- Public Methods -----------
 CtoI::CtoI(int n)
 {
-  if(n == 0) _zbdd = 0;
-  else if(n == 1) _zbdd = 1;
+  if(n == 0) _zdd = 0;
+  else if(n == 1) _zdd = 1;
   else if(n < 0)
   {
     if((n = -n) < 0) BDDerr("CtoI::CtoI(): overflow.", n);
@@ -103,20 +103,20 @@ CtoI CtoI::FilterRestrict(const CtoI& a) const
 {
   CtoI th = IsBool()? *this: NonZero();
   CtoI aa = a.IsBool()? a: a.NonZero();
-  return FilterThen(CtoI(th._zbdd.Restrict(aa._zbdd)));
+  return FilterThen(CtoI(th._zdd.Restrict(aa._zdd)));
 }
 
 CtoI CtoI::FilterPermit(const CtoI& a) const
 {
   CtoI th = IsBool()? *this: NonZero();
   CtoI aa = a.IsBool()? a: a.NonZero();
-  return FilterThen(CtoI(th._zbdd.Permit(aa._zbdd)));
+  return FilterThen(CtoI(th._zdd.Permit(aa._zdd)));
 }
 
 CtoI CtoI::FilterPermitSym(int n) const
 {
   CtoI th = IsBool()? *this: NonZero();
-  return FilterThen(CtoI(th._zbdd.PermitSym(n)));
+  return FilterThen(CtoI(th._zdd.PermitSym(n)));
 }
 
 CtoI CtoI::NonZero() const
@@ -260,7 +260,7 @@ CtoI CtoI::ShiftDigit(int pow) const
   return a;
 }
 
-bddword CtoI::Size() const { return _zbdd.Size(); }
+bddword CtoI::Size() const { return _zdd.Size(); }
 
 int CtoI::GetInt() const
 {
@@ -424,7 +424,7 @@ int CtoI::PutForm() const
   return 0;
 }
 
-void CtoI::Print() const { _zbdd.Print(); }
+void CtoI::Print() const { _zdd.Print(); }
 
 CtoI CtoI::CountTerms() const
 {
@@ -438,7 +438,7 @@ CtoI CtoI::TotalVal() const
   int top = Top();
   if(top == 0) return *this;
 
-  bddword x = _zbdd.GetID();
+  bddword x = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_TV, x, 0);
 
   CtoI c = Factor0(top).TotalVal();
@@ -459,7 +459,7 @@ CtoI CtoI::TotalValItems() const
   int top = Top();
   if(top == 0) return CtoI(0);
 
-  bddword x = _zbdd.GetID();
+  bddword x = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_TVI, x, 0);
 
   CtoI c = Factor0(top).TotalValItems();
@@ -485,8 +485,8 @@ CtoI CtoI::ReduceItems(const CtoI& b) const
   int top = (BDD_LevOfVar(atop) > BDD_LevOfVar(btop))? atop: btop;
   if(top == 0) return *this;
 
-  bddword ax = _zbdd.GetID();
-  bddword bx = b._zbdd.GetID();
+  bddword ax = _zdd.GetID();
+  bddword bx = b._zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_RI, ax, bx);
 
   CtoI c = CtoI(0);
@@ -511,7 +511,7 @@ CtoI CtoI::FreqPatA(int Val) const
   if(*this == CtoI_Null()) return *this;
   if(IsConst()) return (GetInt() >= Val)? CtoI(1): CtoI(0);
 
-  int ax = _zbdd.GetID();
+  int ax = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_FPA, ax, Val);
 
   int top = TopItem();
@@ -529,12 +529,12 @@ CtoI CtoI::FreqPatA(int Val) const
       CtoI fd = f.Digit(d);
       if(d & 1)
       {
-        tv -= fd.GetZBDD().Card() << d;
+        tv -= fd.GetZDD().Card() << d;
         if(tv >= Val) break;
       }
       else
       {
-        tv += fd.GetZBDD().Card() << d;
+        tv += fd.GetZDD().Card() << d;
         if((tv>>1) >= Val) break;
       }
       f -= fd.ShiftDigit(d);
@@ -564,7 +564,7 @@ CtoI CtoI::FreqPatA2(int Val) const
   if(*this == CtoI_Null()) return *this;
   if(IsConst()) return (GetInt() >= Val)? CtoI(1): CtoI(0);
 
-  int ax = _zbdd.GetID();
+  int ax = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_FPA, ax, Val);
 
   int top = TopItem();
@@ -582,12 +582,12 @@ CtoI CtoI::FreqPatA2(int Val) const
       CtoI fd = f.Digit(d);
       if(d & 1)
       {
-        tv -= fd.GetZBDD().Card() << d;
+        tv -= fd.GetZDD().Card() << d;
         if(tv >= Val) break;
       }
       else
       {
-        tv += fd.GetZBDD().Card() << d;
+        tv += fd.GetZDD().Card() << d;
         if((tv>>1) >= Val) break;
       }
       f -= fd.ShiftDigit(d);
@@ -623,7 +623,7 @@ CtoI CtoI::FreqPatAV(int Val) const
   if(*this == CtoI_Null()) return *this;
   if(IsConst()) return (GetInt() >= Val)? *this: CtoI(0);
 
-  int ax = _zbdd.GetID();
+  int ax = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_FPAV, ax, Val);
 
   int top = TopItem();
@@ -641,12 +641,12 @@ CtoI CtoI::FreqPatAV(int Val) const
       CtoI fd = f.Digit(d);
       if(d & 1)
       {
-        tv -= fd.GetZBDD().Card() << d;
+        tv -= fd.GetZDD().Card() << d;
         if(tv >= Val) break;
       }
       else
       {
-        tv += fd.GetZBDD().Card() << d;
+        tv += fd.GetZDD().Card() << d;
         if((tv>>1) >= Val) break;
       }
       f -= fd.ShiftDigit(d);
@@ -669,7 +669,7 @@ CtoI CtoI::FreqPatM(int Val) const
   if(*this == CtoI_Null()) return *this;
   if(IsConst()) return (GetInt() >= Val)? CtoI(1): CtoI(0);
 
-  int ax = _zbdd.GetID();
+  int ax = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_FPM, ax, Val);
 
   int top = TopItem();
@@ -687,12 +687,12 @@ CtoI CtoI::FreqPatM(int Val) const
       CtoI fd = f.Digit(d);
       if(d & 1)
       {
-        tv -= fd.GetZBDD().Card() << d;
+        tv -= fd.GetZDD().Card() << d;
         if(tv >= Val) break;
       }
       else
       {
-        tv += fd.GetZBDD().Card() << d;
+        tv += fd.GetZDD().Card() << d;
         if((tv>>1) >= Val) break;
       }
       f -= fd.ShiftDigit(d);
@@ -722,7 +722,7 @@ CtoI CtoI::FreqPatC(int Val) const
   if(*this == CtoI_Null()) return *this;
   if(IsConst()) return (GetInt() >= Val)? CtoI(1): CtoI(0);
 
-  int ax = _zbdd.GetID();
+  int ax = _zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_FPC, ax, Val);
 
   int top = TopItem();
@@ -740,12 +740,12 @@ CtoI CtoI::FreqPatC(int Val) const
       CtoI fd = f.Digit(d);
       if(d & 1)
       {
-        tv -= fd.GetZBDD().Card() << d;
+        tv -= fd.GetZDD().Card() << d;
         if(tv >= Val) break;
       }
       else
       {
-        tv += fd.GetZBDD().Card() << d;
+        tv += fd.GetZDD().Card() << d;
         if((tv>>1) >= Val) break;
       }
       f -= fd.ShiftDigit(d);
@@ -808,12 +808,12 @@ CtoI operator *(const CtoI& ac, const CtoI& bc)
     atop = a.Top(); btop = b.Top();
   }
 
-  bddword ax = a._zbdd.GetID();
-  bddword bx = b._zbdd.GetID();
+  bddword ax = a._zdd.GetID();
+  bddword bx = b._zdd.GetID();
   if(atop == btop && ax < bx)
   {
     a = bc; b = ac;
-    ax = a._zbdd.GetID(); bx = b._zbdd.GetID();
+    ax = a._zdd.GetID(); bx = b._zdd.GetID();
   }
 
   CtoI_CACHE_CHK_RETURN(BC_CtoI_MULT, ax, bx);
@@ -851,8 +851,8 @@ CtoI operator /(const CtoI& ac, const CtoI& bc)
   if(bc == 0) BDDerr("CtoI::operator/(): Divide by zero.");
 
   CtoI a = ac; CtoI b = bc;
-  bddword ax = a._zbdd.GetID();
-  bddword bx = b._zbdd.GetID();
+  bddword ax = a._zdd.GetID();
+  bddword bx = b._zdd.GetID();
   CtoI_CACHE_CHK_RETURN(BC_CtoI_DIV, ax, bx);
 
   int v = b.TopItem();
@@ -1036,12 +1036,12 @@ CtoI CtoI_Meet(const CtoI& ac, const CtoI& bc)
     atop = a.Top(); btop = b.Top();
   }
 
-  bddword ax = a._zbdd.GetID();
-  bddword bx = b._zbdd.GetID();
+  bddword ax = a._zdd.GetID();
+  bddword bx = b._zdd.GetID();
   if(atop == btop && ax < bx)
   {
     a = bc; b = ac;
-    ax = a._zbdd.GetID(); bx = b._zbdd.GetID();
+    ax = a._zdd.GetID(); bx = b._zdd.GetID();
   }
 
   CtoI_CACHE_CHK_RETURN(BC_CtoI_MEET, ax, bx);

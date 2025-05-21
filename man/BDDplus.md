@@ -37,15 +37,15 @@
     - [BDDV](classes/BDDV.md) - BDDの配列（論理関数の配列）を表すクラス
       - [BtoI](classes/BtoI.md) - ２値入力整数値出力の論理関数を表すクラス
     - [BDDDG](classes/BDDDG.md) - BDDを単純直交分解した結果を表すクラス
-    - [ZBDD](classes/ZBDD.md) - ゼロサプレス型BDDで表現された組合せ集合を指すクラス
-      - [ZBDDV](classes/ZBDDV.md) - ZBDDの配列（組合せ集合の配列）を表すクラス
+    - [ZDD](classes/ZDD.md) - ゼロサプレス型BDDで表現された組合せ集合を指すクラス
+      - [ZDDV](classes/ZDDV.md) - ZDDの配列（組合せ集合の配列）を表すクラス
         - [CtoI](classes/CtoI.md) - 整数値組合せ集合（整係数ユネイト論理式）を表すクラス
       - [SOP](classes/SOP.md) - 正負のリテラルからなる積和形論理式を表現するクラス
         - [SOPV](classes/SOPV.md) - SOPの配列（積和形論理式の配列）を表すクラス
       - [PiDD](classes/PiDD.md) - 順列集合を表現するクラス
       - [SeqBDD](classes/SeqBDD.md) - 系列集合を表現するクラス
-      - [GBase](classes/GBase.md) - ZBDDでパス/サイクル列挙を行うためのクラス
-      - [BDDCT](classes/BDDCT.md) - BDD/ZBDDでコスト制約付き変数を扱うためのクラス
+      - [GBase](classes/GBase.md) - ZDDでパス/サイクル列挙を行うためのクラス
+      - [BDDCT](classes/BDDCT.md) - BDD/ZDDでコスト制約付き変数を扱うためのクラス
 
 - BDDクラスの使用例
 ```cpp

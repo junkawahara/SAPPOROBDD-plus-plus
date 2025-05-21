@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
   g.Import(fp);
 
   /*
-  ZBDD f = 1;
+  ZDD f = 1;
   for(int i=0; i<g._m; i++)
   {
     f += f.Change(g.BDDvarOfEdge(g._m-1-i));
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
   */
 
   g.SetHamilton(0);
-  ZBDD h;
+  ZDD h;
   //h = g.SimCycles();
   h = g.SimPaths(1, g._n);
   h.Print();

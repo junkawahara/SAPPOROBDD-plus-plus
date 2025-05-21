@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
   SOPV sv = SOPV_ISOP(v1, v2);
   cerr << "ISOP form: product:" << sv.Cube()
        << " literal:" << sv.Lit()
-       << " ZDDsize:" << sv.GetZBDDV().Size() << "\n";
+       << " ZDDsize:" << sv.GetZDDV().Size() << "\n";
   sv.PrintPla();
 
   return 0;

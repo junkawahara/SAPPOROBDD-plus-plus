@@ -1,5 +1,5 @@
 /****************************************
- * ZBDD-based SOP class (SAPPORO-1.87)  *
+ * ZDD-based SOP class (SAPPORO-1.87)  *
  * (Main part)                          *
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
@@ -22,13 +22,13 @@ static const char BC_SOP_IMPL = 36;
 
 //----------- Macros for operation cache -----------
 #define SOP_CACHE_CHK_RETURN(op, fx, gx) \
-  { ZBDD z = BDD_CacheZBDD(op, fx, gx); \
+  { ZDD z = BDD_CacheZDD(op, fx, gx); \
     if(z != -1) return SOP(z); \
     BDD_RECUR_INC; }
 
 #define SOP_CACHE_ENT_RETURN(op, fx, gx, h) \
   { BDD_RECUR_DEC; \
-    if(h != -1) BDD_CacheEnt(op, fx, gx, h.GetZBDD().GetID()); \
+    if(h != -1) BDD_CacheEnt(op, fx, gx, h.GetZDD().GetID()); \
     return h; }
 
 #define BDD_CACHE_CHK_RETURN(op, fx, gx) \
@@ -69,8 +69,8 @@ SOP operator*(const SOP& pc, const SOP& qc)
     top = p.Top();
   }
 
-  bddword px = p.GetZBDD().GetID();
-  bddword qx = q.GetZBDD().GetID();
+  bddword px = p.GetZDD().GetID();
+  bddword qx = q.GetZDD().GetID();
   SOP_CACHE_CHK_RETURN(BC_SOP_MULT, px, qx);
 
   SOP p1 = p.Factor1(top);
@@ -105,8 +105,8 @@ SOP operator/(const SOP& fc, const SOP& pc)
   int top = p.Top();
   if(BDD_LevOfVar(f.Top()) < BDD_LevOfVar(top)) return 0;
   
-  bddword fx = f.GetZBDD().GetID();
-  bddword px = p.GetZBDD().GetID();
+  bddword fx = f.GetZDD().GetID();
+  bddword px = p.GetZDD().GetID();
   SOP_CACHE_CHK_RETURN(BC_SOP_DIV, fx, px);
   
   SOP q = -1;
@@ -139,19 +139,19 @@ SOP operator/(const SOP& fc, const SOP& pc)
 SOP SOP::operator<<(int n) const
 {
   if(n & 1) BDDerr("SOP::operator<<: Invalid shift.", n);
-  return SOP(_zbdd << n);
+  return SOP(_zdd << n);
 }
 
 SOP SOP::operator>>(int n) const
 {
   if(n & 1) BDDerr("SOP::operator>>: Invalid shift.", n);
-  return SOP(_zbdd >> n);
+  return SOP(_zdd >> n);
 }
 
 SOP SOP::And0(int v) const
 {
   if(v & 1) BDDerr("SOP::And0: VarID must be even number.", v);
-  ZBDD f = _zbdd.OffSet(v);
+  ZDD f = _zdd.OffSet(v);
   f = f.OnSet0(v-1) + f.OffSet(v-1);
   f = f.Change(v-1);
   return SOP(f);
@@ -160,7 +160,7 @@ SOP SOP::And0(int v) const
 SOP SOP::And1(int v) const
 {
   if(v & 1) BDDerr("SOP::And1: VarID must be even number.", v);
-  ZBDD f = _zbdd.OffSet(v-1);
+  ZDD f = _zdd.OffSet(v-1);
   f = f.OnSet0(v) + f.OffSet(v);
   f = f.Change(v);
   return SOP(f);
@@ -169,31 +169,31 @@ SOP SOP::And1(int v) const
 SOP SOP::Factor0(int v) const
 {
   if(v & 1) BDDerr("SOP::Factor0: VarID must be even number.", v);
-  ZBDD f = _zbdd.OnSet0(v-1);
+  ZDD f = _zdd.OnSet0(v-1);
   return SOP(f);
 }
 
 SOP SOP::Factor1(int v) const
 {
   if(v & 1) BDDerr("SOP::Factor1: VarID must be even number.", v);
-  ZBDD f = _zbdd.OnSet0(v);
+  ZDD f = _zdd.OnSet0(v);
   return SOP(f);
 }
 
 SOP SOP::FactorD(int v) const
 {
   if(v & 1) BDDerr("SOP::FactorD: VarID must be even number.", v);
-  ZBDD f = _zbdd.OffSet(v).OffSet(v-1);
+  ZDD f = _zdd.OffSet(v).OffSet(v-1);
   return SOP(f);
 }
 
-bddword SOP::Size() const { return _zbdd.Size(); }
-bddword SOP::Cube() const { return _zbdd.Card(); }
-bddword SOP::Lit() const { return _zbdd.Lit(); }
+bddword SOP::Size() const { return _zdd.Size(); }
+bddword SOP::Cube() const { return _zdd.Card(); }
+bddword SOP::Lit() const { return _zdd.Lit(); }
 
 void SOP::Print() const
 {
-  cout << "[ " << _zbdd.GetID();
+  cout << "[ " << _zdd.GetID();
   cout << " Var:" << Top() << "(" << BDD_LevOfVar(Top()) << ")";
   cout << " Size:" << Size() << " ]\n";
   cout.flush();
@@ -207,7 +207,7 @@ BDD SOP::GetBDD() const
   if(*this == 0) return 0;
   if(*this == 1) return 1;
 
-  bddword sx = GetZBDD().GetID();
+  bddword sx = GetZDD().GetID();
   BDD_CACHE_CHK_RETURN(BC_SOP_BDD, sx, 0);
 
   int top = Top();
@@ -258,7 +258,7 @@ SOP SOP::Support() const
   if(*this == 0) return 0;
   if(*this == 1) return 0;
 
-  ZBDD fz = GetZBDD().Support();
+  ZDD fz = GetZDD().Support();
   SOP f = SOP(fz);
   int t;
   while(fz != 0)
@@ -295,7 +295,7 @@ SOP SOP::Swap(int v1, int v2) const
 {
   if(v1 & 1) BDDerr("SOP::Swap: VarID must be even number.", v1);
   if(v2 & 1) BDDerr("SOP::Swap: VarID must be even number.", v2);
-  ZBDD z = GetZBDD();
+  ZDD z = GetZDD();
   z = z.Swap(v1, v2);
   z = z.Swap(v1-1, v2-1);
   return SOP(z);
@@ -308,7 +308,7 @@ SOP SOP::Implicants(BDD f) const
   if(f == 1) return *this;
   if(*this == 1) return 0;
   
-  bddword fx = GetZBDD().GetID();
+  bddword fx = GetZDD().GetID();
   bddword gx = f.GetID();
   SOP_CACHE_CHK_RETURN(BC_SOP_IMPL, fx, gx);
   
@@ -344,7 +344,7 @@ SOPV SOPV::operator>>=(int n)  { return *this = *this >> n; }
 SOPV SOPV::And0(int v) const
 {
   if(v & 1) BDDerr("SOPV::And0: VarID must be even number.", v);
-  ZBDDV f = _v.OffSet(v);
+  ZDDV f = _v.OffSet(v);
   f = f.OnSet0(v-1) + f.OffSet(v-1);
   f = f.Change(v-1);
   return SOPV(f);
@@ -353,7 +353,7 @@ SOPV SOPV::And0(int v) const
 SOPV SOPV::And1(int v) const
 {
   if(v & 1) BDDerr("SOPV::And1: VarID must be even number.", v);
-  ZBDDV f = _v.OffSet(v-1);
+  ZDDV f = _v.OffSet(v-1);
   f = f.OnSet0(v) + f.OffSet(v);
   f = f.Change(v);
   return SOPV(f);
@@ -362,33 +362,33 @@ SOPV SOPV::And1(int v) const
 SOPV SOPV::Factor0(int v) const
 {
   if(v & 1) BDDerr("SOPV::Factor0: VarID must be even number.", v);
-  ZBDDV f = _v.OnSet0(v-1);
+  ZDDV f = _v.OnSet0(v-1);
   return SOPV(f);
 }
 
 SOPV SOPV::Factor1(int v) const
 {
   if(v & 1) BDDerr("SOPV::Factor1: VarID must be even number.", v);
-  ZBDDV f = _v.OnSet0(v);
+  ZDDV f = _v.OnSet0(v);
   return SOPV(f);
 }
 
 SOPV SOPV::FactorD(int v) const
 {
   if(v & 1) BDDerr("SOPV::FactorD: VarID must be even number.", v);
-  ZBDDV f = _v.OffSet(v).OffSet(v-1);
+  ZDDV f = _v.OffSet(v).OffSet(v-1);
   return SOPV(f);
 }
 
 bddword SOPV::Size() const { return _v.Size(); }
 
-SOP SOPV::GetSOP(int index) const { return SOP(_v.GetZBDD(index)); }
+SOP SOPV::GetSOP(int index) const { return SOP(_v.GetZDD(index)); }
 
 SOPV SOPV::Swap(int v1, int v2) const
 {
   if(v1 & 1) BDDerr("SOPV::Swap: VarID must be even number.", v1);
   if(v2 & 1) BDDerr("SOPV::Swap: VarID must be even number.", v2);
-  ZBDDV z = GetZBDDV();
+  ZDDV z = GetZDDV();
   z = z.Swap(v1, v2);
   z = z.Swap(v1-1, v2-1);
   return SOPV(z);
@@ -518,7 +518,7 @@ BCpair ISOP(BDD s, BDD r)
   bddword sx = s.GetID();
   bddword rx = r.GetID();
   BDD f = BDD_CacheBDD(BC_ISOP1, sx, rx);
-  ZBDD z = BDD_CacheZBDD(BC_ISOP2, sx, rx);
+  ZDD z = BDD_CacheZDD(BC_ISOP2, sx, rx);
   if(f != -1) if(z != -1) return BCpair(f, SOP(z));
   BDD_RECUR_INC;
 
@@ -548,7 +548,7 @@ BCpair ISOP(BDD s, BDD r)
   if(f == -1) return BCpair(-1, -1);
   if(cs == -1) return BCpair(-1, -1);
   BDD_CacheEnt(BC_ISOP1, sx, rx, f.GetID());
-  BDD_CacheEnt(BC_ISOP2, sx, rx, cs.GetZBDD().GetID());
+  BDD_CacheEnt(BC_ISOP2, sx, rx, cs.GetZDD().GetID());
   return BCpair(f, cs);
 }
 

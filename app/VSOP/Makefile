@@ -52,35 +52,35 @@ $(PRG64_ST): $(OBJ64_ST) $(LIB64)
 $(PRG64_LCM): $(OBJ64_LCM) $(LIB64)
 	$(CC) $(OPT64) $(OBJ64_LCM) $(LIB64) $(XLIB64) -o $(PRG64_LCM)
 
-print.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-         $(INCL)/ZBDD.h $(INCL)/BDD.h
+print.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+         $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT) -c print.cc
 
-print_64.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-            $(INCL)/ZBDD.h $(INCL)/BDD.h
+print_64.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+            $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c print.cc -o print_64.o
 
-print_st.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-            $(INCL)/ZBDD.h $(INCL)/BDD.h
+print_st.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+            $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT_ST) -c print.cc -o print_st.o
 
-print_64_st.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-               $(INCL)/ZBDD.h $(INCL)/BDD.h
+print_64_st.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+               $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64_ST) -c print.cc -o print_64_st.o
 
-table.o: table.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+table.o: table.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT) -c table.cc
 
-table_64.o: table.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+table_64.o: table.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c table.cc -o table_64.o
 
-lex.yy.o: lex.yy.cc y.tab.cc $(INCL)/CtoI.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+lex.yy.o: lex.yy.cc y.tab.cc $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT) -c lex.yy.cc
 
-lex.yy_64.o: lex.yy.cc y.tab.cc $(INCL)/CtoI.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+lex.yy_64.o: lex.yy.cc y.tab.cc $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c lex.yy.cc -o lex.yy_64.o
 
-lex.yy_64_lcm.o: lex.yy_lcm.cc y.tab_lcm.cc $(INCL)/CtoI.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+lex.yy_64_lcm.o: lex.yy_lcm.cc y.tab_lcm.cc $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c lex.yy_lcm.cc -o lex.yy_64_lcm.o
 
 lex.yy.cc: vsoplex.l
@@ -91,24 +91,24 @@ lex.yy_lcm.cc: vsoplex_lcm.l
 	$(LEX) vsoplex_lcm.l
 	mv lex.yy.c lex.yy_lcm.cc
 
-y.tab.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-         $(INCL)/ZBDD.h $(INCL)/BDD.h
+y.tab.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+         $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT) -c y.tab.cc
 
-y.tab_64.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-            $(INCL)/ZBDD.h $(INCL)/BDD.h
+y.tab_64.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+            $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c y.tab.cc -o y.tab_64.o
 
-y.tab_st.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-            $(INCL)/ZBDD.h $(INCL)/BDD.h
+y.tab_st.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+            $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT_ST) -c y.tab.cc -o y.tab_st.o
 
-y.tab_64_st.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-               $(INCL)/ZBDD.h $(INCL)/BDD.h
+y.tab_64_st.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+               $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64_ST) -c y.tab.cc -o y.tab_64_st.o
 
-y.tab_64_lcm.o: y.tab_lcm.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZBDDDG.h \
-            $(INCL)/ZBDD.h $(INCL)/BDD.h
+y.tab_64_lcm.o: y.tab_lcm.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
+            $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c y.tab_lcm.cc -o y.tab_64_lcm.o
 
 y.tab.cc: vsopyacc.y++

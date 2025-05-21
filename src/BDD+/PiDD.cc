@@ -21,13 +21,13 @@ static const char BC_PiDD_ODD = 84;
 
 //----------- Macros for operation cache -----------
 #define PiDD_CACHE_CHK_RETURN(op, fx, gx) \
-  { ZBDD z = BDD_CacheZBDD(op, fx, gx); \
+  { ZDD z = BDD_CacheZDD(op, fx, gx); \
     if(z != -1) return PiDD(z); \
     BDD_RECUR_INC; }
 
 #define PiDD_CACHE_ENT_RETURN(op, fx, gx, h) \
   { BDD_RECUR_DEC; \
-    if(h != -1) BDD_CacheEnt(op, fx, gx, h._zbdd.GetID()); \
+    if(h != -1) BDD_CacheEnt(op, fx, gx, h._zdd.GetID()); \
     return h; }
 
 //----------- External functions for PiDD ----------
@@ -82,15 +82,15 @@ PiDD operator*(const PiDD& p, const PiDD& q)
   if(p == -1) return -1;
   if(q == -1) return -1;
 
-  bddword pz = p._zbdd.GetID();
-  bddword qz = q._zbdd.GetID();
+  bddword pz = p._zdd.GetID();
+  bddword qz = q._zdd.GetID();
   PiDD_CACHE_CHK_RETURN(BC_PiDD_MULT, pz, qz);
 
   int qx = q.TopX();
   int qy = q.TopY();
-  int top = q._zbdd.Top();
-  PiDD q0 = PiDD(q._zbdd.OffSet(top));
-  PiDD q1 = PiDD(q._zbdd.OnSet0(top));
+  int top = q._zdd.Top();
+  PiDD q0 = PiDD(q._zdd.OffSet(top));
+  PiDD q1 = PiDD(q._zdd.OnSet0(top));
 
   PiDD r = (p * q0) + (p * q1).Swap(qx, qy);
   
@@ -106,17 +106,17 @@ PiDD operator/(const PiDD& f, const PiDD& p)
   int fx = f.TopX(); int px = p.TopX();
   if(fx < px) return 0;
 
-  bddword fz = f._zbdd.GetID();
-  bddword pz = p._zbdd.GetID();
+  bddword fz = f._zdd.GetID();
+  bddword pz = p._zdd.GetID();
   PiDD_CACHE_CHK_RETURN(BC_PiDD_DIV, fz, pz);
 
   int py = p.TopY();
-  int top = p._zbdd.Top();
-  PiDD p1 = PiDD(p._zbdd.OnSet0(top));
+  int top = p._zdd.Top();
+  PiDD p1 = PiDD(p._zdd.OnSet0(top));
   PiDD q = (f.Cofact(px, py) / p1).Cofact(py, py);
   if(q != 0)
   {
-    PiDD p0 = PiDD(p._zbdd.OffSet(top));
+    PiDD p0 = PiDD(p._zdd.OffSet(top));
     if(p0 != 0) q &= f / p0;
   }
 
@@ -136,7 +136,7 @@ PiDD& PiDD::operator%=(const PiDD& f) { return *this = *this % f; }
 
 PiDD PiDD::Swap(int u, int v) const
 {
-  if(_zbdd == -1) return -1;
+  if(_zdd == -1) return -1;
   int m = PiDD_VarUsed();
   if(u <= 0 || u > m)
      BDDerr("PiDD::Swap(): Invalid U ", (bddword) u);
@@ -149,15 +149,15 @@ PiDD PiDD::Swap(int u, int v) const
   int y = TopY();
 
   if(x < u)
-    return PiDD(_zbdd.Change(BDD_VarOfLev(PiDD_Lev_XY(u, v))));
+    return PiDD(_zdd.Change(BDD_VarOfLev(PiDD_Lev_XY(u, v))));
 
-  bddword pz = _zbdd.GetID();
+  bddword pz = _zdd.GetID();
   bddword qz = u * (PiDD_MaxVar + 1) + v;
   PiDD_CACHE_CHK_RETURN(BC_PiDD_SWAP, pz, qz);
 
-  int top = _zbdd.Top();
-  PiDD p0 = PiDD(_zbdd.OffSet(top));
-  PiDD p1 = PiDD(_zbdd.OnSet0(top));
+  int top = _zdd.Top();
+  PiDD p0 = PiDD(_zdd.OffSet(top));
+  PiDD p1 = PiDD(_zdd.OnSet0(top));
 
   PiDD r = p0.Swap(u, v)
          + p1.Swap(PiDD_U_XYU(x,y,u), v).Swap(x, PiDD_Y_YUV(y,u,v));
@@ -167,7 +167,7 @@ PiDD PiDD::Swap(int u, int v) const
 
 PiDD PiDD::Cofact(int u, int v) const
 {
-  if(_zbdd == -1) return -1;
+  if(_zdd == -1) return -1;
   int m = PiDD_VarUsed();
   if(u <= 0 || u > m)
      BDDerr("PiDD::Cofact(): Invalid U ", (bddword) u);
@@ -180,14 +180,14 @@ PiDD PiDD::Cofact(int u, int v) const
   int y = TopY();
   if(x == u && y > v) return 0;
 
-  int top = _zbdd.Top();
-  PiDD p0 = PiDD(_zbdd.OffSet(top));
-  PiDD p1 = PiDD(_zbdd.OnSet0(top));
+  int top = _zdd.Top();
+  PiDD p0 = PiDD(_zdd.OffSet(top));
+  PiDD p1 = PiDD(_zdd.OnSet0(top));
 
   if(x == u) return (y == v)? p1: p0.Cofact(u, v);
   if(y == v) return p0.Cofact(u, v);
   
-  bddword pz = _zbdd.GetID();
+  bddword pz = _zdd.GetID();
   bddword qz = u * (PiDD_MaxVar + 1) + v;
   PiDD_CACHE_CHK_RETURN(BC_PiDD_COFACT, pz, qz);
 
@@ -200,18 +200,18 @@ PiDD PiDD::Cofact(int u, int v) const
 
 PiDD PiDD::Odd() const
 {
-  if(_zbdd == -1) return -1;
+  if(_zdd == -1) return -1;
 
   int x = TopX();
   if(x == 0) return 0;
 
-  bddword pz = _zbdd.GetID();
+  bddword pz = _zdd.GetID();
   PiDD_CACHE_CHK_RETURN(BC_PiDD_ODD, pz, 0);
 
   int y = TopY();
-  int top = _zbdd.Top();
-  PiDD p0 = PiDD(_zbdd.OffSet(top));
-  PiDD p1 = PiDD(_zbdd.OnSet0(top));
+  int top = _zdd.Top();
+  PiDD p0 = PiDD(_zdd.OffSet(top));
+  PiDD p1 = PiDD(_zdd.OnSet0(top));
   PiDD r = p0.Odd() + p1.Even().Swap(x,y);
 
   PiDD_CACHE_ENT_RETURN(BC_PiDD_ODD, pz, 0, r);
@@ -219,12 +219,12 @@ PiDD PiDD::Odd() const
 
 PiDD PiDD::Even() const { return *this - this->Odd(); }
 
-PiDD PiDD::SwapBound(int n) const { return PiDD(_zbdd.PermitSym(n)); }
+PiDD PiDD::SwapBound(int n) const { return PiDD(_zdd.PermitSym(n)); }
 
-bddword PiDD::Size() const { return _zbdd.Size(); }
-bddword PiDD::Card() const { return _zbdd.Card(); }
+bddword PiDD::Size() const { return _zdd.Size(); }
+bddword PiDD::Card() const { return _zdd.Card(); }
 
-void PiDD::Print() const { _zbdd.Print(); }
+void PiDD::Print() const { _zdd.Print(); }
 
 static int* VarMap;
 static int Flag;

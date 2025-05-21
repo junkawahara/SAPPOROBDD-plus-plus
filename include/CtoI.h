@@ -9,7 +9,7 @@ class CtoI;
 #ifndef _CtoI_
 #define _CtoI_
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -17,33 +17,33 @@ namespace sapporobdd {
 
 class CtoI
 {
-  ZBDD _zbdd;
+  ZDD _zdd;
 
 public:
-  CtoI(void) { _zbdd = 0; }
-  CtoI(const CtoI& a) { _zbdd = a._zbdd; }
-  CtoI(const ZBDD& f) { _zbdd = f; }
+  CtoI(void) { _zdd = 0; }
+  CtoI(const CtoI& a) { _zdd = a._zdd; }
+  CtoI(const ZDD& f) { _zdd = f; }
   CtoI(int);
   ~CtoI(void) { }
 
-  CtoI& operator=(const CtoI& a) { _zbdd = a._zbdd; return *this; }
+  CtoI& operator=(const CtoI& a) { _zdd = a._zdd; return *this; }
   CtoI& operator+=(const CtoI&); // inline
   CtoI& operator-=(const CtoI&); // inline
   CtoI& operator*=(const CtoI&); // inline
   CtoI& operator/=(const CtoI&); // inline
   CtoI& operator%=(const CtoI&); // inline
 
-  int Top(void) const { return _zbdd.Top(); }
+  int Top(void) const { return _zdd.Top(); }
   int TopItem(void) const;
   int TopDigit(void) const;
   int IsBool(void) const { return (BDD_LevOfVar(Top()) <= BDD_TopLev()); }
   int IsConst(void) const { return TopItem() == 0; }
 
   CtoI AffixVar(int v) const
-    { return CtoI((_zbdd.OffSet(v) + _zbdd.OnSet0(v)).Change(v)); }
+    { return CtoI((_zdd.OffSet(v) + _zdd.OnSet0(v)).Change(v)); }
 
-  CtoI Factor0(int v) const { return CtoI(_zbdd.OffSet(v)); }
-  CtoI Factor1(int v) const { return CtoI(_zbdd.OnSet0(v)); }
+  CtoI Factor0(int v) const { return CtoI(_zdd.OffSet(v)); }
+  CtoI Factor1(int v) const { return CtoI(_zdd.OnSet0(v)); }
 
   CtoI FilterThen(const CtoI&) const;
   CtoI FilterElse(const CtoI&) const;
@@ -52,7 +52,7 @@ public:
   CtoI FilterPermit(const CtoI&) const;
   CtoI FilterPermitSym(int) const;
   CtoI Support(void) const
-    { CtoI h = IsBool()? *this: NonZero(); return CtoI(h._zbdd.Support()); }
+    { CtoI h = IsBool()? *this: NonZero(); return CtoI(h._zdd.Support()); }
 
   CtoI NonZero(void) const;
   CtoI Digit(int) const;
@@ -72,7 +72,7 @@ public:
   CtoI TotalVal(void) const;
   CtoI TotalValItems(void) const;
 
-  ZBDD GetZBDD(void) const { return _zbdd; }
+  ZDD GetZDD(void) const { return _zdd; }
 
   CtoI Abs(void) const; // inline
   CtoI Sign(void) const; // inline
@@ -139,18 +139,18 @@ extern CtoI CtoI_LcmAV(char *, char *, int);
 extern CtoI CtoI_LcmCV(char *, char *, int);
 extern CtoI CtoI_LcmMV(char *, char *, int);
 
-inline int operator==(const CtoI& a, const CtoI& b) { return a._zbdd == b._zbdd; }
+inline int operator==(const CtoI& a, const CtoI& b) { return a._zdd == b._zdd; }
 inline int operator!=(const CtoI& a, const CtoI& b) { return !(a == b); }
 inline CtoI operator%(const CtoI& a, const CtoI& b) { return a - (a / b) * b; }
 
 inline CtoI CtoI_Intsec(const CtoI& a, const CtoI& b)
-  { return CtoI(a._zbdd & b._zbdd); }
+  { return CtoI(a._zdd & b._zdd); }
 
 inline CtoI CtoI_Union(const CtoI& a, const CtoI& b)
-  { return CtoI(a._zbdd + b._zbdd); }
+  { return CtoI(a._zdd + b._zdd); }
 
 inline CtoI CtoI_Diff(const CtoI& a, const CtoI& b)
-  { return CtoI(a._zbdd - b._zbdd); }
+  { return CtoI(a._zdd - b._zdd); }
 
 inline CtoI CtoI_ITE(const CtoI& a, const CtoI& b, const CtoI& c)
   { return CtoI_Union(b.FilterThen(a), c.FilterElse(a)); }
@@ -169,7 +169,7 @@ inline CtoI CtoI_Max(const CtoI& a, const CtoI& b)
 inline CtoI CtoI_Min(const CtoI& a, const CtoI& b)
   { return CtoI_ITE(CtoI_GT(a, b), b, a); }
 
-inline CtoI CtoI_Null(void) { return CtoI(ZBDD(-1)); }
+inline CtoI CtoI_Null(void) { return CtoI(ZDD(-1)); }
 
 inline CtoI CtoI::Abs(void) const
   { CtoI a = CtoI_GT(*this, 0); return CtoI_Union(FilterThen(a), -FilterElse(a)); }

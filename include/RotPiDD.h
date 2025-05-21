@@ -10,7 +10,7 @@ class RotPiDD;
 
 #include<vector>
 #include<unordered_map>
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -38,16 +38,16 @@ extern RotPiDD operator*(const RotPiDD&, const RotPiDD&);
 
 class RotPiDD
 {
-  ZBDD _zbdd;
+  ZDD _zdd;
 public:
-  RotPiDD(void) { _zbdd = 0; }
-  RotPiDD(int a) { _zbdd = a; }
-  RotPiDD(const RotPiDD& f) { _zbdd = f._zbdd; }
-  RotPiDD(const ZBDD& zbdd) { _zbdd = zbdd; }
+  RotPiDD(void) { _zdd = 0; }
+  RotPiDD(int a) { _zdd = a; }
+  RotPiDD(const RotPiDD& f) { _zdd = f._zdd; }
+  RotPiDD(const ZDD& zdd) { _zdd = zdd; }
 
   ~RotPiDD(void) { }
 
-  RotPiDD& operator=(const RotPiDD& f) { _zbdd = f._zbdd; return *this; }
+  RotPiDD& operator=(const RotPiDD& f) { _zdd = f._zdd; return *this; }
   RotPiDD& operator&=(const RotPiDD&); // inline
   RotPiDD& operator+=(const RotPiDD&); // inline
   RotPiDD& operator-=(const RotPiDD&); // inline
@@ -80,10 +80,10 @@ public:
 
   int TopX(void) const { return RotPiDD_X_Lev(TopLev()); }
   int TopY(void) const { return RotPiDD_Y_Lev(TopLev()); }
-  int TopLev(void) const { return BDD_LevOfVar(_zbdd.Top()); }
+  int TopLev(void) const { return BDD_LevOfVar(_zdd.Top()); }
   bddword Size(void) const;
   bddword Card(void) const;
-  ZBDD GetZBDD(void) const { return _zbdd; }
+  ZDD GetZDD(void) const { return _zdd; }
 
   RotPiDD Extract_One(void);
   void Print(void) const;
@@ -99,16 +99,16 @@ public:
 };
 
 inline RotPiDD operator&(const RotPiDD& p, const RotPiDD& q)
-  { return RotPiDD(p._zbdd & q._zbdd); }
+  { return RotPiDD(p._zdd & q._zdd); }
 
 inline RotPiDD operator+(const RotPiDD& p, const RotPiDD& q)
-  { return RotPiDD(p._zbdd + q._zbdd); }
+  { return RotPiDD(p._zdd + q._zdd); }
 
 inline RotPiDD operator-(const RotPiDD& p, const RotPiDD& q)
-  { return RotPiDD(p._zbdd - q._zbdd); }
+  { return RotPiDD(p._zdd - q._zdd); }
 
 inline int operator==(const RotPiDD& p, const RotPiDD& q)
-  { return p._zbdd == q._zbdd; }
+  { return p._zdd == q._zdd; }
 
 inline int operator!=(const RotPiDD& p, const RotPiDD& q)
   { return !(p == q); }

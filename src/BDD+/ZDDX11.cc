@@ -1,38 +1,38 @@
 /****************************************
- * ZBDD+ Manipulator (SAPPORO-1.55)     *
+ * ZDD+ Manipulator (SAPPORO-1.55)     *
  * (Graphic methods)                    *
  * (C) Shin-ichi MINATO (Dec. 11, 2012) *
  ****************************************/
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
-void ZBDD::XPrint() const
+void ZDD::XPrint() const
 {
-	bddgraph(_zbdd);
+	bddgraph(_zdd);
 }
 
-void ZBDDV::XPrint() const
+void ZDDV::XPrint() const
 {
 	int len = Last() + 1;
 	bddword* bddv = new bddword[len];
-	for(int i=0; i<len; i++) bddv[i] = GetZBDD(i).GetID(); 
+	for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
 	bddvgraph(bddv, len);
 	delete[] bddv;
 }
 
 /*
-void ZBDD::XPrint0()
+void ZDD::XPrint0()
 {
-	bddgraph0(_zbdd);
+	bddgraph0(_zdd);
 }
 
-void ZBDDV::XPrint0()
+void ZDDV::XPrint0()
 {
 	int len = Last() + 1;
 	bddword* bddv = new bddword[len];
-	for(int i=0; i<len; i++) bddv[i] = GetZBDD(i).GetID(); 
+	for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
 	bddvgraph0(bddv, len);
 	delete[] bddv;
 }

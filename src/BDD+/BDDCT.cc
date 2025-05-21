@@ -192,7 +192,7 @@ int BDDCT::CacheEnlarge()
   return 0;
 }
 
-ZBDD BDDCT::CacheRef(const ZBDD& f, const bddcost bound,
+ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
                       bddcost& acc_worst, bddcost& rej_best)
 {
   if(!_casize) return -1;
@@ -214,7 +214,7 @@ ZBDD BDDCT::CacheRef(const ZBDD& f, const bddcost bound,
 	rej_best = -(itr->first);
 	return 0;
       }
-      ZBDD h = itr->second;
+      ZDD h = itr->second;
       if(h == -1) return -1;
       acc_worst = -(itr->first);
       if(acc_worst == -bddcost_null) acc_worst = bddcost_null;
@@ -231,7 +231,7 @@ ZBDD BDDCT::CacheRef(const ZBDD& f, const bddcost bound,
   }
 }
 
-int BDDCT::CacheEnt(const ZBDD& f, const ZBDD& h,
+int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
                      const bddcost acc_worst, const bddcost rej_best)
 {
   if(!_casize) return 1;
@@ -332,8 +332,8 @@ int BDDCT::Cache0Ent(const unsigned char op, const bddword id, const bddcost b)
 }
 
 static BDDCT* CT;
-static ZBDD CLE(const ZBDD &, const bddcost, bddcost &, bddcost &);
-ZBDD CLE(const ZBDD& f, const bddcost bound,
+static ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
+ZDD CLE(const ZDD& f, const bddcost bound,
           bddcost& acc_worst, bddcost& rej_best)
 {
   CT->_call++;
@@ -358,7 +358,7 @@ ZBDD CLE(const ZBDD& f, const bddcost bound,
       return 0;
     }
   }
-  ZBDD h;
+  ZDD h;
   h =  CT->CacheRef(f, bound, acc_worst, rej_best);
   if(h != -1) return h;
   int top = f.Top();
@@ -392,17 +392,17 @@ ZBDD CLE(const ZBDD& f, const bddcost bound,
   return h;
 }
 
-ZBDD BDDCT::ZBDD_CostLE(const ZBDD& f, const bddcost bound,
+ZDD BDDCT::ZDD_CostLE(const ZDD& f, const bddcost bound,
                          bddcost& acc_worst, bddcost& rej_best)
 {
   CT = this;
   _call = 0;
-  ZBDD h = CLE(f, bound, acc_worst, rej_best);
+  ZDD h = CLE(f, bound, acc_worst, rej_best);
   return h;
 }
 
-static bddcost MinC(const ZBDD&);
-bddcost MinC(const ZBDD& f)
+static bddcost MinC(const ZDD&);
+bddcost MinC(const ZDD& f)
 {
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
@@ -417,14 +417,14 @@ bddcost MinC(const ZBDD& f)
   return min;
 }
 
-bddcost BDDCT::MinCost(const ZBDD& f)
+bddcost BDDCT::MinCost(const ZDD& f)
 {
   CT = this;
   return MinC(f);
 }
 
-static bddcost MaxC(const ZBDD&);
-bddcost MaxC(const ZBDD& f)
+static bddcost MaxC(const ZDD&);
+bddcost MaxC(const ZDD& f)
 {
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
@@ -439,7 +439,7 @@ bddcost MaxC(const ZBDD& f)
   return max;
 }
 
-bddcost BDDCT::MaxCost(const ZBDD& f)
+bddcost BDDCT::MaxCost(const ZDD& f)
 {
   CT = this;
   return MaxC(f);
@@ -448,8 +448,8 @@ bddcost BDDCT::MaxCost(const ZBDD& f)
 static bddcost B;
 static bddcost RetMin;
 static bddcost RetMax;
-static ZBDD CLE0(const ZBDD &, const bddcost);
-ZBDD CLE0(const ZBDD& f, const bddcost spent)
+static ZDD CLE0(const ZDD &, const bddcost);
+ZDD CLE0(const ZDD& f, const bddcost spent)
 {
   if(f == 0)
   {
@@ -468,7 +468,7 @@ ZBDD CLE0(const ZBDD& f, const bddcost spent)
   if(max != bddcost_null) if(B >= max + spent) return f;
   int top = f.Top();
   int tlev = BDD_LevOfVar(top);
-  ZBDD h = CLE0(f.OffSet(top), spent);
+  ZDD h = CLE0(f.OffSet(top), spent);
   int min0 = RetMin;
   int max0 = RetMax;
   bddcost cost = CT->CostOfLev(tlev);
@@ -489,11 +489,11 @@ ZBDD CLE0(const ZBDD& f, const bddcost spent)
   return h;
 }
 
-ZBDD BDDCT::ZBDD_CostLE0(const ZBDD& f, const bddcost bound)
+ZDD BDDCT::ZDD_CostLE0(const ZDD& f, const bddcost bound)
 {
   CT = this;
   B = bound;
-  ZBDD h = CLE0(f, 0);
+  ZDD h = CLE0(f, 0);
   return h;
 }
 

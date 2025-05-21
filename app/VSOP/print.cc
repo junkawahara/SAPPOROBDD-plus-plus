@@ -6,7 +6,7 @@
 #include <cstring>
 #include "CtoI.h"
 #include "vsop.h"
-#include "ZBDDDG.h"
+#include "ZDDDG.h"
 using namespace std;
 
 #define LINE 70
@@ -355,31 +355,31 @@ int MapSel(CtoI a)
   return Map(a, i);
 }
 
-static void PrintD(ZBDDDG *, bddword);
-void PrintD(ZBDDDG* dg, bddword ndx)
+static void PrintD(ZDDDG *, bddword);
+void PrintD(ZDDDG* dg, bddword ndx)
 {
-  ZBDDDG_Tag tag, tag2;
+  ZDDDG_Tag tag, tag2;
   tag.Set(dg, ndx);
   bddword ndx0;
   int top;
   switch(tag.Type())
   {
-  case ZBDDDG_C0:
+  case ZDDDG_C0:
     bout << "0";
     break;
-  case ZBDDDG_P1:
+  case ZDDDG_P1:
     bout << "OR(";
     bout.Delimit();
     ndx0 = tag.TopNdx();
     tag2.Set(dg, ndx0);
-    if(tag2.Type() != ZBDDDG_OR)
+    if(tag2.Type() != ZDDDG_OR)
       PrintD(dg, ndx0);
     else
     {
       ndx0 = tag2.TopNdx();
       PrintD(dg, ndx0);
       ndx0 = tag2.NextNdx();
-      while(ndx0 != ZBDDDG_NIL)
+      while(ndx0 != ZDDDG_NIL)
       {
         bout.Delimit();
         PrintD(dg, ndx0);
@@ -391,17 +391,17 @@ void PrintD(ZBDDDG* dg, bddword ndx)
     bout.Delimit();
     bout << ")";
     break;
-  case ZBDDDG_LIT:
+  case ZDDDG_LIT:
     top = tag.Func().Top();
     bout << VTable.GetName(top);
     break;
-  case ZBDDDG_AND:
+  case ZDDDG_AND:
     bout << "AND(";
     bout.Delimit();
     ndx0 = tag.TopNdx();
     PrintD(dg, ndx0);
     ndx0 = tag.NextNdx();
-    while(ndx0 != ZBDDDG_NIL)
+    while(ndx0 != ZDDDG_NIL)
     {
       bout.Delimit();
       PrintD(dg, ndx0);
@@ -410,13 +410,13 @@ void PrintD(ZBDDDG* dg, bddword ndx)
     bout.Delimit();
     bout << ")";
     break;
-  case ZBDDDG_OR:
+  case ZDDDG_OR:
     bout << "OR(";
     bout.Delimit();
     ndx0 = tag.TopNdx();
     PrintD(dg, ndx0);
     ndx0 = tag.NextNdx();
-    while(ndx0 != ZBDDDG_NIL)
+    while(ndx0 != ZDDDG_NIL)
     {
       bout.Delimit();
       PrintD(dg, ndx0);
@@ -425,13 +425,13 @@ void PrintD(ZBDDDG* dg, bddword ndx)
     bout.Delimit();
     bout << ")";
     break;
-  case ZBDDDG_OTHER:
+  case ZDDDG_OTHER:
     bout << "[";
     bout.Delimit();
     ndx0 = tag.TopNdx();
     PrintD(dg, ndx0);
     ndx0 = tag.NextNdx();
-    while(ndx0 != ZBDDDG_NIL)
+    while(ndx0 != ZDDDG_NIL)
     {
       bout.Delimit();
       PrintD(dg, ndx0);
@@ -452,11 +452,11 @@ int PrintDecomp(CtoI a)
   if(a == CtoI_Null()) return 1;
   a = a.NonZero();
   if(a == CtoI_Null()) return 1;
-  ZBDD f = a.GetZBDD();
-  ZBDDDG* dg = new ZBDDDG();
+  ZDD f = a.GetZDD();
+  ZDDDG* dg = new ZDDDG();
   if(dg == 0) return 1;
   bddword ndx = dg->Decomp(f);
-  if(ndx == ZBDDDG_NIL) { delete dg; return 1; }
+  if(ndx == ZDDDG_NIL) { delete dg; return 1; }
 
   PrintD(dg, ndx);
   bout.Return();
@@ -465,10 +465,10 @@ int PrintDecomp(CtoI a)
 }
 
 static int PrintDD_N;
-static void PrintDD(ZBDDDG *, bddword);
-void PrintDD(ZBDDDG* dg, bddword ndx)
+static void PrintDD(ZDDDG *, bddword);
+void PrintDD(ZDDDG* dg, bddword ndx)
 {
-  ZBDDDG_Tag tag, tag2;
+  ZDDDG_Tag tag, tag2;
   tag.Set(dg, ndx);
   bddword ndx0;
   char s[20];
@@ -476,10 +476,10 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
   int n;
   switch(tag.Type())
   {
-  case ZBDDDG_C0:
+  case ZDDDG_C0:
     bout << "n0 [label=0];";
     break;
-  case ZBDDDG_P1:
+  case ZDDDG_P1:
     n = PrintDD_N++;
     sprintf(s, "n%d", n); bout << s;
     bout << " [label=OR];";
@@ -493,14 +493,14 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
 
     ndx0 = tag.TopNdx();
     tag2.Set(dg, ndx0);
-    if(tag2.Type() != ZBDDDG_OR)
+    if(tag2.Type() != ZDDDG_OR)
       PrintDD(dg, ndx0);
     else
     {
       ndx0 = tag2.TopNdx();
       PrintDD(dg, ndx0);
       ndx0 = tag2.NextNdx();
-      while(ndx0 != ZBDDDG_NIL)
+      while(ndx0 != ZDDDG_NIL)
       {
         sprintf(s, "n%d", n); bout << s;
         bout << " -> ";
@@ -524,7 +524,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
     PrintDD_N++;
 
     break;
-  case ZBDDDG_LIT:
+  case ZDDDG_LIT:
     top = tag.Func().Top();
 
     n = PrintDD_N++;
@@ -535,7 +535,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
     bout.Return();
 
     break;
-  case ZBDDDG_AND:
+  case ZDDDG_AND:
     n = PrintDD_N++;
     sprintf(s, "n%d", n); bout << s;
     bout << " [label=AND];";
@@ -550,7 +550,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
     ndx0 = tag.TopNdx();
     PrintDD(dg, ndx0);
     ndx0 = tag.NextNdx();
-    while(ndx0 != ZBDDDG_NIL)
+    while(ndx0 != ZDDDG_NIL)
     {
       sprintf(s, "n%d", n); bout << s;
       bout << " -> ";
@@ -562,7 +562,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
       ndx0 = tag.NextNdx();
     }
     break;
-  case ZBDDDG_OR:
+  case ZDDDG_OR:
     n = PrintDD_N++;
     sprintf(s, "n%d", n); bout << s;
     bout << " [label=OR];";
@@ -577,7 +577,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
     ndx0 = tag.TopNdx();
     PrintDD(dg, ndx0);
     ndx0 = tag.NextNdx();
-    while(ndx0 != ZBDDDG_NIL)
+    while(ndx0 != ZDDDG_NIL)
     {
       sprintf(s, "n%d", n); bout << s;
       bout << " -> ";
@@ -589,7 +589,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
       ndx0 = tag.NextNdx();
     }
     break;
-  case ZBDDDG_OTHER:
+  case ZDDDG_OTHER:
     n = PrintDD_N++;
     sprintf(s, "n%d", n); bout << s;
     bout << " [label=OTHER];";
@@ -604,7 +604,7 @@ void PrintDD(ZBDDDG* dg, bddword ndx)
     ndx0 = tag.TopNdx();
     PrintDD(dg, ndx0);
     ndx0 = tag.NextNdx();
-    while(ndx0 != ZBDDDG_NIL)
+    while(ndx0 != ZDDDG_NIL)
     {
       sprintf(s, "n%d", n); bout << s;
       bout << " -> ";
@@ -627,11 +627,11 @@ int PrintDecompDot(CtoI a)
   if(a == CtoI_Null()) return 1;
   a = a.NonZero();
   if(a == CtoI_Null()) return 1;
-  ZBDD f = a.GetZBDD();
-  ZBDDDG* dg = new ZBDDDG();
+  ZDD f = a.GetZDD();
+  ZDDDG* dg = new ZDDDG();
   if(dg == 0) return 1;
   bddword ndx = dg->Decomp(f);
-  if(ndx == ZBDDDG_NIL) { delete dg; return 1; }
+  if(ndx == ZDDDG_NIL) { delete dg; return 1; }
 
   bout << "digraph G {";
   bout.Return();

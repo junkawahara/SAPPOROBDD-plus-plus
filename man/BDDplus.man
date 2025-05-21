@@ -35,8 +35,8 @@
 　 |　  |-- BtoI      ２値入力整数値出力の論理関数を表すクラス
    |
 　 |-- BDDDG          BDDを単純直交分解した結果を表すクラス
-　 |- ZBDD            ゼロサプレス型BDDで表現された組合せ集合を指すクラス
- 　    |-- ZBDDV      ZBDDの配列（組合せ集合の配列）を表すクラス
+　 |- ZDD            ゼロサプレス型BDDで表現された組合せ集合を指すクラス
+ 　    |-- ZDDV      ZDDの配列（組合せ集合の配列）を表すクラス
        |    |-- CtoI  整数値組合せ集合（整係数ユネイト論理式）を表すクラス
        |
  　    |-- SOP        正負のリテラルからなる積和形論理式を表現するクラス
@@ -44,8 +44,8 @@
        |
        |-- PiDD       順列集合を表現するクラス
        |-- SeqBDD     系列集合を表現するクラス
-       |-- GBase      ZBDDでパス/サイクル列挙を行うためのクラス
-       |-- BDDCT      BDD/ZBDDでコスト制約付き変数を扱うためのクラス
+       |-- GBase      ZDDでパス/サイクル列挙を行うためのクラス
+       |-- BDDCT      BDD/ZDDでコスト制約付き変数を扱うためのクラス
 
 ・BDDクラスの使用例
 　int x = BDD_NewVar();
@@ -973,10 +973,10 @@ void BtoI::Print(void) const
 
 
 **************************************************************************
-クラス名: ZBDD  --- ゼロサプレス型BDDで表現された組合せ集合を指すクラス
+クラス名: ZDD  --- ゼロサプレス型BDDで表現された組合せ集合を指すクラス
 **************************************************************************
-ヘッダーファイル名: "ZBDD.h"
-ソースファイル名: ZBDD.cc
+ヘッダーファイル名: "ZDD.h"
+ソースファイル名: ZDD.cc
 内部から呼び出しているクラス: BDD
 
 ゼロサプレス型BDD 表現を用いて、組合せ集合を抽象化したクラスである。
@@ -990,10 +990,10 @@ int v1 = BDD_NewVar();
 int v2 = BDD_NewVar();
 int v3 = BDD_NewVar();
 int v4 = BDD_NewVar();
-ZBDD x = ZBDD(1).Change(v1);
-ZBDD y = ZBDD(1).Change(v2);
-ZBDD f = x + y;
-ZBDD g = f.Change(v3) + f.Change(v4);
+ZDD x = ZDD(1).Change(v1);
+ZDD y = ZDD(1).Change(v2);
+ZDD f = x + y;
+ZDD g = f.Change(v3) + f.Change(v4);
 f.Print();
 g.Print();
 
@@ -1002,62 +1002,62 @@ extern const bddword BDD_MaxNode
 extern const int BDD_MaxVar 
 
 ---------------------関連する外部関数---------------------
-ZBDD operator&(const ZBDD& f, const ZBDD& g)
-f と g の交わり(intersection)を表すZBDDオブジェクトを生成し、それを返す。
+ZDD operator&(const ZDD& f, const ZDD& g)
+f と g の交わり(intersection)を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた
 場合にはnullを返す。
 
-ZBDD operator+(const ZBDD& f, const ZBDD& g)
-f と g の結び(union)を表すZBDDオブジェクトを生成し、それを返す。
+ZDD operator+(const ZDD& f, const ZDD& g)
+f と g の結び(union)を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた
 場合にはnullを返す。
 
-ZBDD operator-(const ZBDD& f, const ZBDD& g)
-f から g を引いた差分集合を表すZBDDオブジェクトを生成し、それを返す。
+ZDD operator-(const ZDD& f, const ZDD& g)
+f から g を引いた差分集合を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた
 場合にはnullを返す。
 
-ZBDD operator*(const ZBDD& f, const ZBDD& g)
-f と g の直積集合を表すZBDDオブジェクトを生成し、それを返す。記憶
+ZDD operator*(const ZDD& f, const ZDD& g)
+f と g の直積集合を表すZDDオブジェクトを生成し、それを返す。記憶
 あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた
 場合にはnullを返す。
 
-ZBDD operator/(const ZBDD& f, const ZBDD& g)
-f を g で割った集合(Weak-division)を表すZBDDオブジェクトを生成し、
+ZDD operator/(const ZDD& f, const ZDD& g)
+f を g で割った集合(Weak-division)を表すZDDオブジェクトを生成し、
 それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。
 引数にnullを与えた場合にはnullを返す。
 
-ZBDD operator%(const ZBDD& f, const ZBDD& g);
-f を g で割った剰余の集合を表すZBDDオブジェクトを生成し、それを返す。
+ZDD operator%(const ZDD& f, const ZDD& g);
+f を g で割った剰余の集合を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた
 場合にはnullを返す。
 
-int operator==(const ZBDD& f, const ZBDD& g)
+int operator==(const ZDD& f, const ZDD& g)
 f と g が同じ集合かどうかの真偽(1/0)を返す。
 
-int operator!=(const ZBDD& f, const ZBDD& g)
+int operator!=(const ZDD& f, const ZDD& g)
 f と g が異なる集合かどうかの真偽(1/0)を返す。
 
-ZBDD BDD_CacheZBDD(char op, bddword f, bddword g);
-f と g の演算結果が ZBDD 型のとき、演算結果を演算キャッシュから参照する。op 
+ZDD BDD_CacheZDD(char op, bddword f, bddword g);
+f と g の演算結果が ZDD 型のとき、演算結果を演算キャッシュから参照する。op 
 は演算の種類を表す番号で、20 以上の値を入れる。演算結果が登録されて
-いる場合はその ZBDD を返し、見つからなかった場合は、null を表すオブジェ
-クトを返す。f, g が ZBDD 型の演算の場合は、GetID()で bddword 型に変換して
+いる場合はその ZDD を返し、見つからなかった場合は、null を表すオブジェ
+クトを返す。f, g が ZDD 型の演算の場合は、GetID()で bddword 型に変換して
 与える。
 
-ZBDD ZBDD_Import(FILE *strm = stdin)
-strmで指定するファイルからZBDDの構造を読み込み、ZBDDオブジェクトを生成して、それを返す。ただし、ファイルに書かれているデータが多出力であった場合は、最初の出力の構造のみ読み込む。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
+ZDD ZDD_Import(FILE *strm = stdin)
+strmで指定するファイルからZDDの構造を読み込み、ZDDオブジェクトを生成して、それを返す。ただし、ファイルに書かれているデータが多出力であった場合は、最初の出力の構造のみ読み込む。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
 
-ZBDD ZBDD_Random(int dim, int density = 50)
-次数 dim の乱数集合を表すZBDDオブジェクトを生成し、それを返す。
+ZDD ZDD_Random(int dim, int density = 50)
+次数 dim の乱数集合を表すZDDオブジェクトを生成し、それを返す。
 変数順位(level)が1からdimまでの値を持つアイテム変数を使用する。
 アイテム変数はあらかじめ宣言されていなければならない。density によって、
 濃度（要素数／全体集合％）を指定することができる。記憶あふれの場合は
 nullを返す。
 
-ZBDD_Meet(const ZBDD& f, const ZBDD& g)
+ZDD_Meet(const ZDD& f, const ZDD& g)
 f と g のMeet演算（Knuth本4巻1分冊141頁: 演習問題203参照）により得られる
-集合を表すZBDDオブジェクトを生成し、それを返す。記憶あふれの場合は、null を
+集合を表すZDDオブジェクトを生成し、それを返す。記憶あふれの場合は、null を
 表すオブジェクトを返す。引数にnullを与えた場合にはnullを返す。
 
 （再掲）
@@ -1072,211 +1072,211 @@ bddword BDD_Used(void)
 void BDD_GC(void)
 
 ---------------------公開クラスメソッド---------------------
-ZBDD::ZBDD(void)
+ZDD::ZDD(void)
 constructer。初期値として空集合を表すオブジェクトを生成する。
 
-ZBDD::ZBDD(int val)
-定数を表すZBDDオブジェクトを作り出す constructer。v == 0 ならば
+ZDD::ZDD(int val)
+定数を表すZDDオブジェクトを作り出す constructer。v == 0 ならば
 空集合、v > 0 ならば単位元集合、v < 0 ならば null を表すオブジェクトを
 生成する。
 
-ZBDD::ZBDD(const ZBDD& f)
+ZDD::ZDD(const ZDD& f)
 引数 f を複製する constructer。
 
-ZBDD::~ZBDD(void)
+ZDD::~ZDD(void)
 destructer。
 
-ZBDD& ZBDD::operator=(const ZBDD& f)
+ZDD& ZDD::operator=(const ZDD& f)
 自分自身に f を代入し、そのコピーを返す。
 
-ZBDD ZBDD::operator&=(const ZBDD& f)
+ZDD ZDD::operator&=(const ZDD& f)
 自分自身と f との交わり(intersection)を求め、自分自身に代入し、
 そのコピーを返す。記憶あふれの場合は、null を表すオブジェクトを
 代入する。自分自身または引数が null の場合も null となる。
 
-ZBDD ZBDD::operator+=(const ZBDD& f)
+ZDD ZDD::operator+=(const ZDD& f)
 自分自身と f との結び(union)を求め、自分自身に代入し、そのコピーを
 返す。記憶あふれの場合は、null を表すオブジェクトを代入する。
 自分自身または引数が null の場合も null となる。
 
-ZBDD ZBDD::operator-=(const ZBDD& f)
+ZDD ZDD::operator-=(const ZDD& f)
 自分自身から f を引いた差分集合を求め、自分自身に代入し、そのコピーを
 返す。記憶あふれの場合は、null を表すオブジェクトを代入する。
 自分自身または引数が null の場合も null となる。
 
-ZBDD ZBDD::operator*=(const ZBDD& f)
+ZDD ZDD::operator*=(const ZDD& f)
 自分自身と f との直積集合を求め、自分自身に代入し、そのコピーを返す。
 記憶あふれの場合は、null を表すオブジェクトを代入する。
 自分自身または引数が null の場合も null となる。
 
-ZBDD ZBDD::operator/=(const ZBDD& f)
+ZDD ZDD::operator/=(const ZDD& f)
 自分自身を f で割った集合(Weak division)を求め、自分自身に代入し、
 そのコピーを返す。記憶あふれの場合は、null を表すオブジェクトを代入する。
 自分自身または引数が null の場合も null となる。
 
-ZBDD ZBDD::operator%=(const ZBDD& f)
+ZDD ZDD::operator%=(const ZDD& f)
 自分自身を f で割った余りの集合を求め、自分自身に代入し、そのコピーを返す。
 記憶あふれの場合は、null を表すオブジェクトを代入する。
 自分自身または引数が null の場合も null となる。
 
-ZBDD ZBDD::operator<<=(int s)
+ZDD ZDD::operator<<=(int s)
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
-大きい（上位にある）変数の変数番号(VarID)にそれぞれ書き換えてZBDDを複製した
+大きい（上位にある）変数の変数番号(VarID)にそれぞれ書き換えてZDDを複製した
 組合せ集合を、自分自身に代入する。また演算結果を関数値として返す。
 実行結果において未定義の入力変数が必要になるようなsを与えてはならない。
 必要な入力変数はあらかじめ宣言しておくこと。記憶あふれの場合は、null を表す
 オブジェクトを返す。自分自身が null のときは何もしない。sに負の値を指定する
 ことはできない。
 
-ZBDD ZBDD::operator>>=(int s)
+ZDD ZDD::operator>>=(int s)
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
-小さい（下位にある）変数の変数番号(VarID)にそれぞれ書き換えてZBDDを複製した
+小さい（下位にある）変数の変数番号(VarID)にそれぞれ書き換えてZDDを複製した
 組合せ集合を、自分自身に代入する。また演算結果を関数値として返す。
 実行結果において未定義の入力変数が必要になるようなsを与えてはならない。
 必要な入力変数はあらかじめ宣言しておくこと。記憶あふれの場合は、null を表す
 オブジェクトを返す。自分自身が null のときは何もしない。sに負の値を指定する
 ことはできない。
 
-ZBDD ZBDD::operator<<(int) const 
+ZDD ZDD::operator<<(int) const 
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
-大きい（上位にある）変数の変数番号(VarID)にそれぞれ書き換えてZBDDを複製した
+大きい（上位にある）変数の変数番号(VarID)にそれぞれ書き換えてZDDを複製した
 オブジェクトを生成し、それを返す。実行結果において未定義の入力変数が必要に
 なるようなsを与えてはならない。必要な入力変数はあらかじめ宣言しておくこと。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。sに負の値を指定することはできない。
 
-ZBDD ZBDD::operator>>(int s) const 
+ZDD ZDD::operator>>(int s) const 
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
-小さい（下位にある）変数の変数番号(VarID)にそれぞれ書き換えてZBDDを複製した
+小さい（下位にある）変数の変数番号(VarID)にそれぞれ書き換えてZDDを複製した
 オブジェクトを生成し、それを返す。実行結果において未定義の入力変数が必要に
 なるようなsを与えてはならない。必要な入力変数はあらかじめ宣言しておくこと。
 記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が null のときは
 何もしない。sに負の値を指定することはできない。
 
-ZBDD ZBDD::OffSet(int var) const 
+ZDD ZDD::OffSet(int var) const 
 自分自身のグラフに対して、変数番号varのアイテムを含まない組合せからなる
-部分集合を表すZBDDオブジェクトを生成し、それを返す。記憶あふれの場合は、
+部分集合を表すZDDオブジェクトを生成し、それを返す。記憶あふれの場合は、
 nullを表すオブジェクトを返す。自分自身がnullだった場合はnullを返す。
 
-ZBDD ZBDD::OnSet(int var) const 
+ZDD ZDD::OnSet(int var) const 
 自分自身のグラフに対して、変数番号varのアイテムを含む組合せからなる
-部分集合を表すZBDDオブジェクトを生成し、それを返す。記憶あふれの場合は、
+部分集合を表すZDDオブジェクトを生成し、それを返す。記憶あふれの場合は、
 nullを表すオブジェクトを返す。自分自身がnullだった場合はnullを返す。
 
-ZBDD ZBDD::OnSet0(int var) const 
+ZDD ZDD::OnSet0(int var) const 
 Onset(var)を実行した後、変数番号varのアイテムを除去した集合を表す
-ZBDDオブジェクトを生成し、それを返す。Onset(var).Change(var)と等価。
+ZDDオブジェクトを生成し、それを返す。Onset(var).Change(var)と等価。
 varがグラフの最上位の変数番号の場合は、1-エッジ が指しているサブグラフ
 をそのまま返すことになる。記憶あふれの場合は、null を表すオブジェクトを
 返す。自分自身がnull だった場合は null を返す。
 
-ZBDD ZBDD::Change(int) const 
+ZDD ZDD::Change(int) const 
 自分自身のグラフに対して、変数番号varのアイテムの有無を反転させた集合
-を表すZBDDオブジェクトを生成し、それを返す。記憶あふれの場合は、null を
+を表すZDDオブジェクトを生成し、それを返す。記憶あふれの場合は、null を
 表すオブジェクトを返す。自分自身がnull だった場合は null を返す。
 
-ZBDD Swap(int var1, int var2) const 
+ZDD Swap(int var1, int var2) const 
 自分自身のグラフに対して、変数番号var1とvar2のアイテム変数を
-入れ換えたときの論理関数を表すZBDDオブジェクトを生成し、それを返す。引数は
+入れ換えたときの論理関数を表すZDDオブジェクトを生成し、それを返す。引数は
 levelではなく、変数番号で与えることに注意。記憶あふれの場合は、nullを
 表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
 
-ZBDD ZBDD::Restrict(ZBDD f) const 
+ZDD ZDD::Restrict(ZDD f) const 
 自分自身の組合せ集合の要素となっている組合せの中で、fの中の少なくとも
 １つの組合せを包含しているような組合せだけを抽出し、抽出した組合せ集合を表す
-ZBDDオブジェクトを生成してそれを返す。記憶あふれの場合は、nullを返す。
+ZDDオブジェクトを生成してそれを返す。記憶あふれの場合は、nullを返す。
 自分自身または引数がnullの場合もnullを返す
 
-ZBDD ZBDD::Permit(ZBDD f) const 
+ZDD ZDD::Permit(ZDD f) const 
 自分自身の組合せ集合の要素となっている組合せの中で、fの中の少なくとも
 １つの組合せに包含されているような組合せだけを抽出し、抽出した組合せ集合を表す
-ZBDDオブジェクトを生成してそれを返す。記憶あふれの場合は、nullを返す。
+ZDDオブジェクトを生成してそれを返す。記憶あふれの場合は、nullを返す。
 自分自身または引数がnullの場合もnullを返す
 
-ZBDD ZBDD::PermitSym(int n) const 
+ZDD ZDD::PermitSym(int n) const 
 自分自身の組合せ集合の要素となっている組合せの中で、アイテム個数がn個以下の
-組合せだけを抽出した組合せ集合を表すZBDDオブジェクトを生成してそれを返す。
+組合せだけを抽出した組合せ集合を表すZDDオブジェクトを生成してそれを返す。
 記憶あふれの場合は、nullを返す。自分自身または引数がnullの場合もnullを返す
 
-ZBDD ZBDD::Support(void) const 
+ZDD ZDD::Support(void) const 
 自分自身の集合に現れるアイテムを抽出し、それらのアイテム１個ずつを要
 素とする集合を表すオブジェクトを生成し、それを返す。記憶あふれの場合は、
 null を表すオブジェクトを返す。
 
-ZBDD ZBDD::Always(void) const 
+ZDD ZDD::Always(void) const 
 自分自身の集合に属する組合せ全てに共通して現れるアイテムを抽出し、
 それらのアイテム１個ずつを要素とする集合を表すオブジェクトを生成し、
 それを返す。記憶あふれの場合は、null を表すオブジェクトを返す。
 
-int ZBDD::IsPoly(void) const 
+int ZDD::IsPoly(void) const 
 自分自身の集合に組合せが複数個含まれるかどうかの真偽を返す。
 
-int ZBDD::Top(void) const 
+int ZDD::Top(void) const 
 自分自身の組合せ集合に関係するアイテム変数のうち、最上位の順位を持つ
 アイテムの変数番号を返す。null に対しては 0 を返す。
 
-bddword ZBDD::GetID(void) const 
+bddword ZDD::GetID(void) const 
 集合を一意に表現する 1-word の識別番号を返す。
 
-bddword ZBDD::Size(void) const 
+bddword ZDD::Size(void) const 
 自分自身のグラフの節点数を返す。null に対しては 0 を返す。
 
-bddword ZBDD::Card(void) const 
+bddword ZDD::Card(void) const 
 自分自身が表す集合の要素数(cardinality)を返す。null に対しては 0 を返す。
 
-char* ZBDD::CardMP16(char* s) const 
+char* ZDD::CardMP16(char* s) const 
 自分自身が表す集合の要素数(cardinality)を最大16ワード長までの
 多倍長整数でカウントする。結果は16進数文字列としてsから始まる
 記憶領域に格納する。（詳細はC言語版の bddcardmp16 を参照）
 
-bddword ZBDD::Lit(void) const 
+bddword ZDD::Lit(void) const 
 自分自身が表す集合中の総リテラル数（各組合せのアイテム個数の総和）を返す。
 null に対しては 0 を返す。
 
-bddword ZBDD::Len(void) const 
+bddword ZDD::Len(void) const 
 自分自身が表す集合の中で、最もアイテム数を多く含む組合せを探し出して、
 そのアイテム数を返す。null に対しては 0 を返す。
 
-void ZBDD::Export(FILE *strm = stdout) const 
-ZBDDの内部データ構造を、strmで指定するファイルに出力する。
+void ZDD::Export(FILE *strm = stdout) const 
+ZDDの内部データ構造を、strmで指定するファイルに出力する。
 
-void ZBDD::PrintPla(void) const 
+void ZDD::PrintPla(void) const 
 自分自身が表す集合を表形式（pla format）で標準出力に出力する。
 
-void ZBDD::XPrint(void) const 
+void ZDD::XPrint(void) const 
 自分自身のグラフを、X-Window に描画する。
 
-void ZBDD::XPrint0(void) const 
+void ZDD::XPrint0(void) const 
 自分自身のグラフを、X-Window に描画する。（否定エッジなし）
 
 void Print(void) const 
 インデックスの値、最上位のリテラル番号、節点数の情報を標準出力に出力する。
 
-bddword ZBDD::ZLev(int lev, int last = 0) const 
-自分自身のZBDDについて、最上位節点から0-枝を順にたどって行って、アイテム変数のレベルがちょうどlev となっている節点があれば、それを最上位節点とするZBDDオブジェクトをコピーして返す。変数レベルがちょうどlevとなっている節点がなければ、lastがゼロのときは、lev以下となる最初の節点を最上位節点とするZBDDオブジェクトをコピーして返す。lastが非ゼロのときは、lev以上である最後の節点を最上位節点とするZBDDオブジェクトをコピーして返す。nullに対してはnullを返す。なお、ZBDDオブジェクトに対してあらかじめSetZSkip()を1回実行しておくと、補助リンクのおかげでZLevメソッドが高速に行える。
+bddword ZDD::ZLev(int lev, int last = 0) const 
+自分自身のZDDについて、最上位節点から0-枝を順にたどって行って、アイテム変数のレベルがちょうどlev となっている節点があれば、それを最上位節点とするZDDオブジェクトをコピーして返す。変数レベルがちょうどlevとなっている節点がなければ、lastがゼロのときは、lev以下となる最初の節点を最上位節点とするZDDオブジェクトをコピーして返す。lastが非ゼロのときは、lev以上である最後の節点を最上位節点とするZDDオブジェクトをコピーして返す。nullに対してはnullを返す。なお、ZDDオブジェクトに対してあらかじめSetZSkip()を1回実行しておくと、補助リンクのおかげでZLevメソッドが高速に行える。
 
-void ZBDD::SetZSkip(void) const 
-自分自身のZBDDについて、0-枝を高速にたどるための補助リンクを張る。それ以外には基本的に変化しない。
+void ZDD::SetZSkip(void) const 
+自分自身のZDDについて、0-枝を高速にたどるための補助リンクを張る。それ以外には基本的に変化しない。
 
-bddword ZBDD::Intersec(ZBDD g) const 
-自分自身とgとの共通集合を表すZBDDオブジェクトを生成し、それを返す。どちらかがnullならばnullを返す。あらかじめSetZSkip()を1回実行しておくと、補助リンクのおかげで高速に実行できる。特に、自分自身のZBDDオブジェクトが含むアイテム変数の個数が非常に多く、gに出現するアイテム変数の個数が非常に少ないときに有効である。
+bddword ZDD::Intersec(ZDD g) const 
+自分自身とgとの共通集合を表すZDDオブジェクトを生成し、それを返す。どちらかがnullならばnullを返す。あらかじめSetZSkip()を1回実行しておくと、補助リンクのおかげで高速に実行できる。特に、自分自身のZDDオブジェクトが含むアイテム変数の個数が非常に多く、gに出現するアイテム変数の個数が非常に少ないときに有効である。
 
 
 
 
 **************************************************************************
-クラス名: ZBDDV  --- ZBDDの配列（組合せ集合の配列）を表すクラス
+クラス名: ZDDV  --- ZDDの配列（組合せ集合の配列）を表すクラス
 **************************************************************************
-ヘッダーファイル名: "ZBDD.h"
-ソースファイル名: ZBDD.cc
-内部から呼び出しているクラス: BDD, BDDV, ZBDD
+ヘッダーファイル名: "ZDD.h"
+ソースファイル名: ZDD.cc
+内部から呼び出しているクラス: BDD, BDDV, ZDD
 
-ZBDDV の配列を表すクラス。配列要素の番号は 0 から始まる整数である。
+ZDDV の配列を表すクラス。配列要素の番号は 0 から始まる整数である。
 内部ではBDDVと同様に出力選択変数を用いた二分木で処理している。
 出力選択変数とユーザ変数の取り扱いはBDDVの場合と同様で、BDDV_Init()を
-最初に実行する必要がある。ZBDDVはBDDVと異なり、、あらかじめ配列長を宣言する
+最初に実行する必要がある。ZDDVはBDDVと異なり、、あらかじめ配列長を宣言する
 必要はなく、要素にアクセスした瞬間にその要素の分だけのメモリが確保される。
-ZBDDV同士の演算で配列長が一致していない場合、足りない方の要素は0が仮定
+ZDDV同士の演算で配列長が一致していない場合、足りない方の要素は0が仮定
 される。未使用の要素を参照した場合も0が返される。
 
 ---------------------関連する定数値---------------------
@@ -1286,29 +1286,29 @@ extern const bddword BDD_MaxNode
 extern const int BDD_MaxVar 
 
 ---------------------関連する外部関数---------------------
-ZBDDV operator&(const ZBDDV& fv, const ZBDDV& gv)
-fvとgvの各配列要素同士の交わり(intersection)を表すZBDDVオブジェクトを
+ZDDV operator&(const ZDDV& fv, const ZDDV& gv)
+fvとgvの各配列要素同士の交わり(intersection)を表すZDDVオブジェクトを
 生成し、それを返す。記憶あふれの場合は 長さ1のnullを返す。自分自身が
 nullの場合には、長さ1のnullを返す。
 
-ZBDDV operator+(const ZBDDV& fv, const ZBDDV& gv)
-fvとgvの各配列要素同士の結び(union)を表すZBDDVオブジェクトを生成し、
+ZDDV operator+(const ZDDV& fv, const ZDDV& gv)
+fvとgvの各配列要素同士の結び(union)を表すZDDVオブジェクトを生成し、
 それを返す。記憶あふれの場合は 長さ1のnullを返す。自分自身がnullの
 場合には、長さ1のnullを返す。
 
-ZBDDV operator-(const ZBDDV& fv, const ZBDDV& gv)
-fvの各配列要素 からgvの各配列要素を引いた差分集合を表すZBDDVオブジェクトを
+ZDDV operator-(const ZDDV& fv, const ZDDV& gv)
+fvの各配列要素 からgvの各配列要素を引いた差分集合を表すZDDVオブジェクトを
 生成し、それを返す。記憶あふれの場合は 長さ1のnullを返す。自分自身が
 nullの場合には、長さ1のnullを返す。
 
-int operator==(const ZBDDV& fv, const ZBDDV& gv)
+int operator==(const ZDDV& fv, const ZDDV& gv)
 fvとgvの各配列要素が同じ集合かどうかの真偽(1/0)を返す。
 
-int operator!=(const ZBDDV& fv, const ZBDDV& gv)
+int operator!=(const ZDDV& fv, const ZDDV& gv)
 fvとgvが各配列要素のうち少なくとも１つが異なる集合かどうかの真偽(1/0)を返す。
 
-ZBDDV ZBDDV_Import(FILE *strm = stdin)
-strmで指定するファイルからZBDDVの構造を読み込み、ZBDDVオブジェクトを生成して、それを返す。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
+ZDDV ZDDV_Import(FILE *strm = stdin)
+strmで指定するファイルからZDDVの構造を読み込み、ZDDVオブジェクトを生成して、それを返す。ファイルに文法誤りが合った場合等、異常終了時はnullを返す。
 
 （再掲）
 void BDDV_Init(bddword init, bddword limit)
@@ -1321,139 +1321,139 @@ int BDD_TopLev(void)
 bddword BDD_Used(void)
 void BDD_GC(void)
 ---------------------公開クラスメソッド---------------------
-ZBDDV::ZBDDV(void)
-基本constructer。初期値として空集合を表すZBDDVオブジェクトを生成する。
+ZDDV::ZDDV(void)
+基本constructer。初期値として空集合を表すZDDVオブジェクトを生成する。
 
-ZBDDV::ZBDDV(const ZBDDV& fv)
+ZDDV::ZDDV(const ZDDV& fv)
 引数fvを複製するconstructer。
 
-ZBDDV::ZBDDV(const ZBDD& f, int location = 0)
-第location番目の配列要素がfで、それ以外の要素が0となっているZBDDV
+ZDDV::ZDDV(const ZDD& f, int location = 0)
+第location番目の配列要素がfで、それ以外の要素が0となっているZDDV
 オブジェクトを生成するconstructer。fがnullだった場合は、locationの値に
 関わらず、0番目の要素がnullとなっているオブジェクトを返す。
 
-ZBDDV::~ZBDDV(void)
+ZDDV::~ZDDV(void)
 destructer。
 
-ZBDDV& ZBDDV::operator=(const ZBDDV& fv)
+ZDDV& ZDDV::operator=(const ZDDV& fv)
 自分自身にfvを代入し、fvを返す。
 
-ZBDDV ZBDDV::operator&=(const ZBDDV& fv)
+ZDDV ZDDV::operator&=(const ZDDV& fv)
 自分自身とfvとの各配列要素同士の交わり(intersection)を求め、自分自身に
 代入する。記憶あふれの場合は 長さ1のnullを代入する。自分自身または
 引数にnullが含まれていた場合も、長さ1のnullとなる。
 
-ZBDDV ZBDDV::operator+=(const ZBDDV& fv)
+ZDDV ZDDV::operator+=(const ZDDV& fv)
 自分自身とfvとの各配列要素同士の結び(union)を求め、自分自身に代入する。
 記憶あふれの場合は 長さ1のnullを代入する。自分自身または引数にnullが
 含まれていた場合には、長さ1のnullをとなる。
 
-ZBDDV ZBDDV::operator-=(const ZBDDV& fv)
+ZDDV ZDDV::operator-=(const ZDDV& fv)
 自分自身の各配列要素からfvの各配列要素を引いた差分集合を求め、自分自身
 に代入する。記憶あふれの場合は 長さ1のnullを代入する。自分自身または引
 数にnullが含まれていた場合には、長さ1のnullとなる。
 
-ZBDDV ZBDDV::operator<<=(int s)
+ZDDV ZDDV::operator<<=(int s)
 自分自身の各配列要素に対して、関係する全てのアイテム変数を、展開順位
 (level)がsずつ大きい（上位にある）変数の変数番号(VarID)にそれぞれ書き換えて
-ZBDDVを複製した組合せ集合を、自分自身に代入する。また演算結果を関数値として返す。
+ZDDVを複製した組合せ集合を、自分自身に代入する。また演算結果を関数値として返す。
 実行結果において未定義の入力変数が必要になるようなsを与えてはならない。
 必要な入力変数はあらかじめ宣言しておくこと。記憶あふれの場合は、nullを表す
 オブジェクトを返す。自分自身がnullのときは何もしない。sに負の値を指定する
 ことはできない。
 
-ZBDDV ZBDDV::operator>>=(int s)
+ZDDV ZDDV::operator>>=(int s)
 自分自身の各配列要素に対して、関係する全てのアイテム変数を、展開順位
 (level)がsずつ小さい（下位にある）変数の変数番号(VarID)にそれぞれ書き換えて
-ZBDDVを複製した組合せ集合を、自分自身に代入する。また演算結果を関数値として返す。
+ZDDVを複製した組合せ集合を、自分自身に代入する。また演算結果を関数値として返す。
 実行結果において未定義の入力変数が必要になるようなsを与えてはならない。
 必要な入力変数はあらかじめ宣言しておくこと。記憶あふれの場合は、nullを表す
 オブジェクトを返す。自分自身がnullのときは何もしない。sに負の値を指定する
 ことはできない。
 
-ZBDDV ZBDDV::operator<<(int s) const 
+ZDDV ZDDV::operator<<(int s) const 
 自分自身の各配列要素に対して、関係する全てのアイテム変数を、展開順位
 (level)がsずつ大きい（上位にある）変数の変数番号(VarID)にそれぞれ書き換えて
-ZBDDVを複製した組合せ集合を生成し、それを返す。実行結果において未定義の入力
+ZDDVを複製した組合せ集合を生成し、それを返す。実行結果において未定義の入力
 変数が必要になるようなsを与えてはならない。必要な入力変数はあらかじめ宣言
 しておくこと。記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が
 nullのときは何もしない。sに負の値を指定することはできない。
 
-ZBDDV ZBDDV::operator>>(int s) const 
+ZDDV ZDDV::operator>>(int s) const 
 自分自身の各配列要素に対して、関係する全てのアイテム変数を、展開順位
 (level)がsずつ小さい（下位にある）変数の変数番号(VarID)にそれぞれ書き換えて
-ZBDDVを複製した組合せ集合を生成し、それを返す。実行結果において未定義の入力
+ZDDVを複製した組合せ集合を生成し、それを返す。実行結果において未定義の入力
 変数が必要になるようなsを与えてはならない。必要な入力変数はあらかじめ宣言
 しておくこと。記憶あふれの場合は、null を表すオブジェクトを返す。自分自身が
 nullのときは何もしない。sに負の値を指定することはできない。
 
-ZBDDV ZBDDV::OffSet(int var) const 
+ZDDV ZDDV::OffSet(int var) const 
 自分自身の各配列要素について、変数番号varのアイテムを含まない組合せからなる
-部分集合を表すZBDDVオブジェクトを生成し、それを返す。記憶あふれの場合は、
+部分集合を表すZDDVオブジェクトを生成し、それを返す。記憶あふれの場合は、
 nullを表すオブジェクトを返す。自分自身がnullだった場合はnullを返す。
 
-ZBDDV ZBDDV::OnSet(int var) const 
+ZDDV ZDDV::OnSet(int var) const 
 自分自身の各配列要素に対して、変数番号varのアイテムを含む組合せからなる
-部分集合を表すZBDDVオブジェクトを生成し、それを返す。記憶あふれの場合は、
+部分集合を表すZDDVオブジェクトを生成し、それを返す。記憶あふれの場合は、
 nullを表すオブジェクトを返す。自分自身がnullだった場合はnullを返す。
 
-ZBDDV ZBDDV::OnSet0(int var) const 
+ZDDV ZDDV::OnSet0(int var) const 
 Onset(var)を実行した後、変数番号varのアイテムを除去した集合のベクトルを
-表すZBDDVオブジェクトを生成し、それを返す。Onset(var).Change(var)と等価。
+表すZDDVオブジェクトを生成し、それを返す。Onset(var).Change(var)と等価。
 varがグラフの最上位の変数番号の場合は、1-エッジ が指しているサブグラフ
 をそのまま返すことになる。記憶あふれの場合は、nullを表すオブジェクトを
 返す。自分自身がnullだった場合はnullを返す。
 
-ZBDDV ZBDDV::Change(int var) const 
+ZDDV ZDDV::Change(int var) const 
 自分自身のグラフに対して、変数番号varのアイテムの有無を反転させた集合
-を表すZBDDVオブジェクトを生成し、それを返す。記憶あふれの場合は、nullを
+を表すZDDVオブジェクトを生成し、それを返す。記憶あふれの場合は、nullを
 表すオブジェクトを返す。自分自身がnullだった場合はnullを返す。
 
-ZBDDV ZBDDV::Swap(int var1, int var2) const 
+ZDDV ZDDV::Swap(int var1, int var2) const 
 自分自身のグラフに対して、変数番号var1とvar2のアイテム変数を
-入れ換えたときの論理関数を表すZBDDVオブジェクトを生成し、それを返す。引数は
+入れ換えたときの論理関数を表すZDDVオブジェクトを生成し、それを返す。引数は
 levelではなく、変数番号で与えることに注意。記憶あふれの場合は、nullを
 表すオブジェクトを返す。自分自身がnullのときは、nullを返す。
 
-int ZBDDV::Top(void) const 
+int ZDDV::Top(void) const 
 自分自身の配列要素の中で、関係するアイテム変数のうち最上位の順位を持つ
 アイテムの変数番号を返す。nullに対しては0を返す。
 
-ZBDDV ZBDDV::Mask(int start, int length = 1) const 
+ZDDV ZDDV::Mask(int start, int length = 1) const 
 自分自身の第 start 番目から 第(start+length)番目までの配列要素を残し、
-その他の配列要素を0（空集合）としたZBDDVオブジェクトを生成し、それを返す。
+その他の配列要素を0（空集合）としたZDDVオブジェクトを生成し、それを返す。
 記憶あふれの場合は 長さ1のnullを返す。自分自身がnullの場合には、長さ
 1のnullを返す。
 
-ZBDD ZBDDV::GetZBDD(int index) const 
-自分自身の第 index 番目の配列要素のZBDDオブジェクトを生成し、それを返す。
+ZDD ZDDV::GetZDD(int index) const 
+自分自身の第 index 番目の配列要素のZDDオブジェクトを生成し、それを返す。
 
-ZBDD ZBDDV::GetMetaZBDD(void) const 
-自分自身の内部構造を表すZBDDオブジェクト（出力選択変数を含む）を返す。
+ZDD ZDDV::GetMetaZDD(void) const 
+自分自身の内部構造を表すZDDオブジェクト（出力選択変数を含む）を返す。
 
-int ZBDDV::Last(void) const 
+int ZDDV::Last(void) const 
 自分自身の（意味のある）配列要素の中の、最大の要素番号を返す。nullに対
 しては0を返す
 
-bddword ZBDDV::Size(void) const 
+bddword ZDDV::Size(void) const 
 自分自身のグラフの節点数を返す（出力選択変数に関する節点は含まない）。
 nullに対しては0を返す。
 
-void ZBDDV::Print(void) const 
+void ZDDV::Print(void) const 
 インデックスの値、最上位のリテラル番号、ノード数の情報を標準出力に出力する。
 
-void ZBDDV::Export(FILE *strm = stdout) const 
-ZBDDの内部データ構造を、strmで指定するファイルに出力する。
+void ZDDV::Export(FILE *strm = stdout) const 
+ZDDの内部データ構造を、strmで指定するファイルに出力する。
 
-int ZBDDV::PrintPla(void) const 
+int ZDDV::PrintPla(void) const 
 自分自身が表す集合を表形式（pla format）で標準出力に出力する。関数の値は、
 通常0を返す。記憶あふれの場合は、出力を中断し1を返す。自分自身がnullの
 場合には、何も出力せず1を返す。
 
-void ZBDDV::XPrint(void) const 
+void ZDDV::XPrint(void) const 
 自分自身のグラフを、X-Window に描画する。
 
-void ZBDDV::XPrint0(void) const
+void ZDDV::XPrint0(void) const
 自分自身のグラフを、X-Window に描画する。（否定エッジなし）
 
 
@@ -1463,11 +1463,11 @@ void ZBDDV::XPrint0(void) const
 **************************************************************************
 ヘッダーファイル名: "CtoI.h"
 ソースファイル名: CtoI.cc
-内部から呼び出しているクラス: ZBDD, ZBDDV
+内部から呼び出しているクラス: ZDD, ZDDV
 
 整数値組合せ集合を表すクラス。整数値組合せ集合は、複数個のアイテムの有無の
 組合せを要素とする集合であって、なおかつ各要素が整数の値を持つことができる。
-内部データは整数値を符号化し、ZBDDを用いて表現されている。(-2)進数を採用して
+内部データは整数値を符号化し、ZDDを用いて表現されている。(-2)進数を採用して
 いるため、負数も正数と同様に表現される。整数値の桁数の上限は約100万となっており、
 実質的には青天井である。（ただし桁数が大きくなると処理速度は低下する）。
 記憶あふれの場合は、CtoI_Null()を返す（以下、nullと呼ぶ）。
@@ -1529,7 +1529,7 @@ CtoI operator%(const CtoI& a, const CtoI& b)
 
 CtoI CtoI_Null(void)
 エラーや記憶あふれを表すCtoIオブジェクト(null)を生成し、それを値として返す。
-実際の内容はZBDD(-1)である。
+実際の内容はZDD(-1)である。
 
 CtoI CtoI_ITE(CtoI a, CtoI b, CtoI c)
 if-then-elseの演算。すなわち、aに含まれる組合せ要素に対してはbのデータを複製し、
@@ -1656,8 +1656,8 @@ CtoI::CtoI(void)
 CtoI::CtoI(const CtoI& a)
 CtoIオブジェクトのコピーを生成するconstructer。
 
-CtoI::CtoI(const ZBDD& f)
-自分自身の内部データのZBDDオブジェクトfを与えるconstructor。
+CtoI::CtoI(const ZDD& f)
+自分自身の内部データのZDDオブジェクトfを与えるconstructor。
 
 CtoI::CtoI(int n)
 値nの定数項（アイテム変数に依存しない組合せ）のみからなる組合せ集合を表す
@@ -1818,8 +1818,8 @@ CtoI CtoI::TotalVal(void) const
 新しく生成し、それを値として返す。記憶あふれの場合はnullを返す。
 自分自身がnullの場合はnullを返す。
 
-ZBDD CtoI::GetZBDD(void) const 
-自分自身の内部データのZBDDオブジェクトを複製して、それを返す。
+ZDD CtoI::GetZDD(void) const 
+自分自身の内部データのZDDオブジェクトを複製して、それを返す。
 
 CtoI CtoI::CountTerms(void) const 
 自分自身が含む組合せ要素の総数を表す、定数項のCtoIオブジェクトを新しく生成し、
@@ -1930,9 +1930,9 @@ void CtoI::XPrint0(void) const
 **************************************************************************
 ヘッダーファイル名: "SOP.h"
 ソースファイル名: SOP.cc
-内部から呼び出しているクラス: BDD, ZBDD
+内部から呼び出しているクラス: BDD, ZDD
 
-ZBDD を用いて、積和形論理式を表したクラスである。積和形論理式は積項の
+ZDD を用いて、積和形論理式を表したクラスである。積和形論理式は積項の
 和集合であり、積項はリテラルの積集合である。リテラルはそれぞれの入力
 変数について、正リテラルと負リテラルの２種類を使用する。１つの積項に、
 同じ入力変数の正負両方のリテラルが同時に含まれることはない。SOP_NewVar()を
@@ -1961,7 +1961,7 @@ int SOP_NewVar(void)
 新しいリテラル（正負１組）を生成し、正リテラルの変数番号(通称VarID)を返す。
 負リテラルのVarIDは正リテラルよりも1小さい数値となる。VarIDは1から
 始まる整数で、SOP_NewVar()またはSOP_NewVarOfLev()を1回実行するごとに
-2ずつ大きな値が返る。生成したリテラルのZBDD展開順位(通称level)は、VarIDと
+2ずつ大きな値が返る。生成したリテラルのZDD展開順位(通称level)は、VarIDと
 同じ値となる。リテラルの個数が最大値BDD_MaxVarを超えるとエラーを出力して
 異常終了する。なお、最初にBDDV_Init()で初期化した場合（SOPVクラスを扱う場合
 には、最初にシステム用に変数が使われるので、VarIDは (BDDV_SysVarTop + 1)から
@@ -2038,8 +2038,8 @@ val < 0 ならば null を表すSOPオブジェクトを生成する。
 SOP::SOP(const SOP& f)
 引数fを複製する constructer。
 
-SOP::SOP(const ZBDD& zbdd)
-内部表現の ZBDD 表現 zbdd を引数として、それを複製する constructer。
+SOP::SOP(const ZDD& zdd)
+内部表現の ZDD 表現 zdd を引数として、それを複製する constructer。
 
 SOP::~SOP(void)
 destructer。
@@ -2188,8 +2188,8 @@ void SOP::Print(void) const
 int SOP::PrintPla(void) const 
 自分自身が表す集合を表形式（pla format）で標準出力に出力する。
 
-ZBDD SOP::GetZBDD(void) const 
-内部表現の ZBDD を複製したオブジェクトを生成して、それを返す。
+ZDD SOP::GetZDD(void) const 
+内部表現の ZDD を複製したオブジェクトを生成して、それを返す。
 
 BDD SOP::GetBDD(void) const 
 自分自身の積項集合が表す論理関数のBDDオブジェクトを生成し、それを返す。
@@ -2211,9 +2211,9 @@ nullのときにはnullを返す。
 **************************************************************************
 ヘッダーファイル名: "SOP.h"
 ソースファイル名: SOP.cc
-内部から呼び出しているクラス: BDD, ZBDD, SOP
+内部から呼び出しているクラス: BDD, ZDD, SOP
 
-SOP の配列を表すクラス。配列要素の番号は 0 から始まる整数である。ZBDDVと
+SOP の配列を表すクラス。配列要素の番号は 0 から始まる整数である。ZDDVと
 同様に、内部では出力選択変数を用いた二分木で処理している。あらかじめ
 配列長を宣言する必要はなく、要素にアクセスした瞬間にその要素の分だけの
 メモリが確保される。SOPV 同士の演算で配列長が一致していない場合、足りない方
@@ -2309,8 +2309,8 @@ SOPV::SOPV(void)
 SOPV::SOPV(const SOPV& fv)
 引数fvを複製するconstructer。
 
-SOPV::SOPV(const ZBDDV& fv)
-内部表現の ZBDDV 表現fvを引数として、それを複製する constructer。
+SOPV::SOPV(const ZDDV& fv)
+内部表現の ZDDV 表現fvを引数として、それを複製する constructer。
 
 SOPV::SOPV(const SOP& f, int location = 0)
 第location番目の配列要素がfで、それ以外の要素が空集合となっている
@@ -2432,8 +2432,8 @@ SOPV SOPV::Mask(int start, int length = 1) const
 SOP SOPV::GetSOP(int ix) const 
 自分自身の第ix番目の配列要素を返す。
 
-ZBDDV SOPV::GetZBDDV(void) const 
-内部表現の ZBDDV を複製し、それを返す。
+ZDDV SOPV::GetZDDV(void) const 
+内部表現の ZDDV を複製し、それを返す。
 
 int SOPV::Last(void) const 
 自分自身の（意味のある）配列要素の中の、最大の要素番号を返す。
@@ -2461,7 +2461,7 @@ nullを返す。
 **************************************************************************
 ヘッダーファイル名: "PiDD.h"
 ソースファイル名: PiDD.cc
-内部から呼び出しているクラス: BDD, ZBDD
+内部から呼び出しているクラス: BDD, ZDD
 
 順列集合を表すPiDDを扱うクラスである。順列集合は順列の和集合であり、
 順列は互換演算の積集合である。PiDD_NewVar()を用いて変数を宣言することにより、
@@ -2487,7 +2487,7 @@ int PiDD_NewVar(void)
 新しいアイテム変数を生成し変数番号（PiVarID）を返す。
 PiVarIDは1から始まる整数で、PiDD_NewVar()を1回実行するごとに1ずつ
 大きな値が返る。その値をXとすると、実際には(X,1)(X,2)…(X,X-1)の互換を
-区別するためのZBDDのIDが内部で自動的に確保される。
+区別するためのZDDのIDが内部で自動的に確保される。
 アイテム変数の個数が最大値PiDD_MaxVarを超えるとエラーを出力して異常終了する。
 
 int PiDD_VarUsed(void)
@@ -2538,8 +2538,8 @@ val < 0 ならば null を表すPiDDオブジェクトを生成する。
 PiDD::PiDD(const PiDD& P)
 引数Pを複製する constructer。
 
-PiDD::PiDD(const ZBDD& zbdd)
-内部表現の ZBDD 表現 zbdd を引数として、それを複製する constructer。
+PiDD::PiDD(const ZDD& zdd)
+内部表現の ZDD 表現 zdd を引数として、それを複製する constructer。
 
 PiDD::~PiDD(void)
 destructer。
@@ -2604,8 +2604,8 @@ void PiDD::Enum(void) const
 void PiDD::Enum2(void) const 
 自分自身が表す順列集合を、互換標準形を列挙する形式で標準出力に出力する。
 
-ZBDD PiDD::GetZBDD(void) const 
-内部表現の ZBDD を複製したオブジェクトを生成して、それを返す。
+ZDD PiDD::GetZDD(void) const 
+内部表現の ZDD を複製したオブジェクトを生成して、それを返す。
 
 
 
@@ -2620,7 +2620,7 @@ ZBDD PiDD::GetZBDD(void) const
 **************************************************************************
 ヘッダーファイル名: "SeqBDD.h"
 ソースファイル名: SeqBDD.cc
-内部から呼び出しているクラス: BDD, ZBDD
+内部から呼び出しているクラス: BDD, ZDD
 
 系列集合を表すSeqBDDを扱うクラスである。
 
@@ -2688,8 +2688,8 @@ SeqBDD::SeqBDD(int val)
 SeqBDD::SeqBDD(const SeqBDD& F)
 引数Fを複製する constructer。
 
-SeqBDD::SeqBDD(const ZBDD& zbdd)
-内部表現の ZBDD 表現 zbdd を引数として、それを複製する constructer。
+SeqBDD::SeqBDD(const ZDD& zdd)
+内部表現の ZDD 表現 zdd を引数として、それを複製する constructer。
 
 SeqBDD::~SeqBDD(void)
 destructer。
@@ -2748,8 +2748,8 @@ bddword SeqBDD::Len(void) const
 void SeqBDD::PrintSeq(void) const 
 自分自身が含む系列を辞書順に標準出力に出力する。
 
-ZBDD SeqBDD::GetZBDD(void) const 
-内部表現の ZBDD を複製したオブジェクトを生成して、それを返す。
+ZDD SeqBDD::GetZDD(void) const 
+内部表現の ZDD を複製したオブジェクトを生成して、それを返す。
 
 
 
@@ -2760,13 +2760,13 @@ ZBDD SeqBDD::GetZBDD(void) const
 
 
 **************************************************************************
-クラス名: GBase  ---ZBDDでパス/サイクル列挙を行うためのクラス
+クラス名: GBase  ---ZDDでパス/サイクル列挙を行うためのクラス
 **************************************************************************
 ヘッダーファイル名: "GBase.h"
 ソースファイル名: GBase.cc
-内部から呼び出しているクラス: BDD, ZBDD
+内部から呼び出しているクラス: BDD, ZDD
 
-ZBDDでパス/サイクル列挙を行うためのクラスである。n頂点、m辺からなる
+ZDDでパス/サイクル列挙を行うためのクラスである。n頂点、m辺からなる
 グラフを表現する。頂点番号は1からnまでの自然数、辺番号は
 0からm-1までの自然数とする。
 
@@ -2825,27 +2825,27 @@ void GBase::Print(void) const
 自分自身の内容を標準出力に書き出す。Importメソッドで読み込み
 可能なフォーマットで出力する。
 
-ZBDD SimPaths(const GS_v s, const GS_v t)
+ZDD SimPaths(const GS_v s, const GS_v t)
 頂点番号sとtを結び同じ頂点を二度通らないパス(Simple Paths)を
-列挙したZBDDを生成し、生成したZBDDオブジェクトを返す。
+列挙したZDDを生成し、生成したZDDオブジェクトを返す。
 記憶あふれ等の異常終了時は-1（NULL）を返す。GS_vは頂点番号を
 格納するデータ型で、8bit charまたは16bit shortである。
 自分自身の頂点数が2未満のときや辺数が1未満のときは0を返す。
 範囲外の頂点番号を指定した場合は-1(NULL)を返す。
 
-ZBDD SimCycles(void)
+ZDD SimCycles(void)
 同じ頂点を二度通らないサイクル(Simple Cycles)を
-列挙したZBDDを生成し、生成したZBDDオブジェクトを返す。
+列挙したZDDを生成し、生成したZDDオブジェクトを返す。
 記憶あふれ等の異常終了時は-1（NULL）を返す。
 自分自身の頂点数が3未満のときや辺数が3未満のときは0を返す。
 
 int GBase::BDDvarOfEdge(const GS_e ix) const
-辺番号ix に対応するBDD/ZBDDの変数IDを返す。
-辺番号が若い方から順にZBDDの上位に割り当てられている。
+辺番号ix に対応するBDD/ZDDの変数IDを返す。
+辺番号が若い方から順にZDDの上位に割り当てられている。
 GS_eは辺番号を格納するデータ型で16bit shortである。
 
 GS_e GBase::EdgeOfBDDvar(const int var) const
-BDD/ZBDDの変数ID varに対応する辺番号(0～_m-1)を返す。
+BDD/ZDDの変数ID varに対応する辺番号(0～_m-1)を返す。
 
 void GBase::FixEdge(const GS_e ix, const char fixcode)
 辺番号ixの辺を必ず使う（または決して使わない）ことを
@@ -2859,9 +2859,9 @@ SimPaths/SimCycleメソッドを呼び出す際に、すべての頂点に立ち
 パス/サイクルのみに制限するかどうかを設定する。xが真であれば全ての頂点に
 立ち寄るような辺集合（ハミルトン路/閉路）だけを列挙する。初期値は偽。
 
-void GBase::SetCond(ZBDD f)
+void GBase::SetCond(ZDD f)
 SimPaths/SimCycleメソッドを呼び出す際に、列挙するパス/サイクルが
-満たすべき条件をセットする。ZBDDにより任意の制約条件を組合せ集合
+満たすべき条件をセットする。ZDDにより任意の制約条件を組合せ集合
 として記述できる。
 
 
@@ -2873,15 +2873,15 @@ SimPaths/SimCycleメソッドを呼び出す際に、列挙するパス/サイ�
 
 
 **************************************************************************
-クラス名: BDDCT --- BDD/ZBDDでコスト制約付き変数を扱うためのクラス
+クラス名: BDDCT --- BDD/ZDDでコスト制約付き変数を扱うためのクラス
 **************************************************************************
 ヘッダーファイル名: "BDDCT.h"
 ソースファイル名: BDDCT.cc
-内部から呼び出しているクラス: BDD, ZBDD
+内部から呼び出しているクラス: BDD, ZDD
 
-BDDCTはBDD Cost Tableの略で BDD/ZBDDでコスト制約付き変数を扱うための
+BDDCTはBDD Cost Tableの略で BDD/ZDDでコスト制約付き変数を扱うための
 クラスである。内部で 1～nまでのlevel のBDD変数に対応する整数値のコストを
-保持するテーブルを備えていて、それに基づいてZBDDのコスト最小または最大と
+保持するテーブルを備えていて、それに基づいてZDDのコスト最小または最大と
 なる解（入力値組合せ）を求めるメソッドを提供する。
 
 typedef bddcost 
@@ -2949,11 +2949,11 @@ int BDDCT::CacheClear(void)
 int BDDCT::CacheEnlarge(void)
 演算キャッシュのサイズを拡大する。正常終了した場合は0を返す。メモリ不足で異常終了した場合は1を返す。
 
-ZBDD BDDCT::CacheRef(const ZBDD& f, const bddcost bound, bddcost& acc_worst, bddcost& rej_best)
-ZBDD fとコスト閾値boundをキーとして演算キャッシュを参照し、ヒットすれば受理解の最悪コスト値を acc_worstに代入し、拒絶解の最良コスト値をrej_bestに代入し、演算結果のZBDDを戻り値として返す。受理解が空の場合はacc_worstにはbddcost_nullが代入される。拒絶解が空の場合は、rej_bestにbddcost_nullが代入される。演算結果がヒットしなければacc_worst, rej_bestには何も代入せず、戻り値としてbddnullを返す。
+ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound, bddcost& acc_worst, bddcost& rej_best)
+ZDD fとコスト閾値boundをキーとして演算キャッシュを参照し、ヒットすれば受理解の最悪コスト値を acc_worstに代入し、拒絶解の最良コスト値をrej_bestに代入し、演算結果のZDDを戻り値として返す。受理解が空の場合はacc_worstにはbddcost_nullが代入される。拒絶解が空の場合は、rej_bestにbddcost_nullが代入される。演算結果がヒットしなければacc_worst, rej_bestには何も代入せず、戻り値としてbddnullを返す。
 
-int BDDCT::CacheEnt(const ZBDD& f, const ZBDD& h, const bddcost acc_worst, const bddcost rej_best)
-ZBDD fをキーとして、演算結果のZBDD h、受理解の最悪コスト値 acc_worst、拒絶解の最良コスト値rej_bestを演算キャッシュに登録する。正常終了した場合は0を返す。メモリが不足した場合は異常終了し1を返す。
+int BDDCT::CacheEnt(const ZDD& f, const ZDD& h, const bddcost acc_worst, const bddcost rej_best)
+ZDD fをキーとして、演算結果のZDD h、受理解の最悪コスト値 acc_worst、拒絶解の最良コスト値rej_bestを演算キャッシュに登録する。正常終了した場合は0を返す。メモリが不足した場合は異常終了し1を返す。
 
 int BDDCT::Cache0Clear(void)
 旧版の演算キャッシュを初期化する。正常終了した場合は0を返す。異常終了した場合は1を返す。（最新版では使用しない）
@@ -2962,24 +2962,24 @@ int BDDCT::Cache0Enlarge(void)
 旧版の演算キャッシュのサイズを拡大する。正常終了した場合は0を返す。メモリ不足で異常終了した場合は1を返す。（最新版では使用しない）
 
 bddcost BDDCT::Cache0Ref(const unsigned char op, const bddword id) const
-演算種類op とBDDまたはZBDDのIDキーとして旧版の演算キャッシュを参照し、ヒットすれば値を返す。ヒットしなければbddcost_nullを返す。（最新版では使用しない）
+演算種類op とBDDまたはZDDのIDキーとして旧版の演算キャッシュを参照し、ヒットすれば値を返す。ヒットしなければbddcost_nullを返す。（最新版では使用しない）
 
 int BDDCT::Cache0Ent(const unsigned char op, const bddword id, const bddcost cost)
-演算種類op とBDDまたはZBDDのIDキーとして旧版の演算キャッシュにcost登録する。正常終了した場合は0を返す。メモリが不足した場合は異常終了し1を返す。（最新版では使用しない）
+演算種類op とBDDまたはZDDのIDキーとして旧版の演算キャッシュにcost登録する。正常終了した場合は0を返す。メモリが不足した場合は異常終了し1を返す。（最新版では使用しない）
 
-ZBDD BDDCT::ZBDD_CostLE(count ZBDD& f, const bddcost bound)
-ZBDD fに含まれる入力組合せ（解集合）の中で、コストがbound以下である解のみを集めた組合せ集合を表すZBDDを生成し、それを返す。メモリあふれの場合はZBDD(-1)を返す。
+ZDD BDDCT::ZDD_CostLE(count ZDD& f, const bddcost bound)
+ZDD fに含まれる入力組合せ（解集合）の中で、コストがbound以下である解のみを集めた組合せ集合を表すZDDを生成し、それを返す。メモリあふれの場合はZDD(-1)を返す。
 
-ZBDD BDDCT::ZBDD_CostLE(count ZBDD& f, const bddcost bound, bddcost& acc_worst, bddcost& rej_best)
-ZBDD fに含まれる入力組合せ（解集合）の中で、コストがbound以下である解のみを集めた組合せ集合を表すZBDDを生成し、それを返す。受理解の最悪コスト値を acc_worstに代入し、拒絶解の最良コスト値をrej_bestに代入する。受理解が空の場合はacc_worstにはbddcost_nullが代入される。拒絶解が空の場合は、rej_bestにbddcost_nullが代入される。メモリあふれの場合はZBDD(-1)を返す。
+ZDD BDDCT::ZDD_CostLE(count ZDD& f, const bddcost bound, bddcost& acc_worst, bddcost& rej_best)
+ZDD fに含まれる入力組合せ（解集合）の中で、コストがbound以下である解のみを集めた組合せ集合を表すZDDを生成し、それを返す。受理解の最悪コスト値を acc_worstに代入し、拒絶解の最良コスト値をrej_bestに代入する。受理解が空の場合はacc_worstにはbddcost_nullが代入される。拒絶解が空の場合は、rej_bestにbddcost_nullが代入される。メモリあふれの場合はZDD(-1)を返す。
 
-ZBDD BDDCT::ZBDD_CostLE0(count ZBDD& f, const bddcost bound)
-ZBDD fに含まれる入力組合せ（解集合）の中で、コストがbound以下である解のみを集めた組合せ集合を表すZBDDを生成し、それを返す。メモリあふれの場合はZBDD(-1)を返す。
+ZDD BDDCT::ZDD_CostLE0(count ZDD& f, const bddcost bound)
+ZDD fに含まれる入力組合せ（解集合）の中で、コストがbound以下である解のみを集めた組合せ集合を表すZDDを生成し、それを返す。メモリあふれの場合はZDD(-1)を返す。
 （旧版プログラムで最新版では使用しない）
 
-bddcost BDDCT::MinCost(count ZBDD& f)
-ZBDD fに含まれる入力組合せ（解集合）の中でコスト最小の値を返す。fが空集合の場合はbddcost_nullを返す。fのすべてのサブグラフに対する部分計算結果を旧版の演算キャッシュに残す。（ZBDD_CostLE0()で使用しているが、ZBDD_CostLE()では使用しない）
+bddcost BDDCT::MinCost(count ZDD& f)
+ZDD fに含まれる入力組合せ（解集合）の中でコスト最小の値を返す。fが空集合の場合はbddcost_nullを返す。fのすべてのサブグラフに対する部分計算結果を旧版の演算キャッシュに残す。（ZDD_CostLE0()で使用しているが、ZDD_CostLE()では使用しない）
 
-bddcost BDDCT::MaxCost(count ZBDD& f)
-ZBDD fに含まれる入力組合せ（解集合）の中でコスト最大の値を返す。fが空集合の場合はbddcost_nullを返す。fのすべてのサブグラフに対する部分計算結果を旧版の演算キャッシュに残す。（ZBDD_CostLE0()で使用しているが、ZBDD_CostLE()では使用しない）
+bddcost BDDCT::MaxCost(count ZDD& f)
+ZDD fに含まれる入力組合せ（解集合）の中でコスト最大の値を返す。fが空集合の場合はbddcost_nullを返す。fのすべてのサブグラフに対する部分計算結果を旧版の演算キャッシュに残す。（ZDD_CostLE0()で使用しているが、ZDD_CostLE()では使用しない）
 

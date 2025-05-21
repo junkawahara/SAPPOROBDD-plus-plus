@@ -1,7 +1,7 @@
-# ZBDD  --- ゼロサプレス型BDDで表現された組合せ集合を指すクラス
+# ZDD  --- ゼロサプレス型BDDで表現された組合せ集合を指すクラス
 
-ヘッダーファイル名: "ZBDD.h"  
-ソースファイル名: ZBDD.cc  
+ヘッダーファイル名: "ZDD.h"  
+ソースファイル名: ZDD.cc  
 内部から呼び出しているクラス: BDD
 
 ゼロサプレス型BDD 表現を用いて、組合せ集合を抽象化したクラスである。
@@ -17,10 +17,10 @@ int v1 = BDD_NewVar();
 int v2 = BDD_NewVar();
 int v3 = BDD_NewVar();
 int v4 = BDD_NewVar();
-ZBDD f1 = ZBDD(v1) + ZBDD(v2);
-ZBDD f2 = ZBDD(v3) * ZBDD(v4);
-ZBDD f3 = f1 * f2;
-ZBDD f4 = f3.Change(v1);
+ZDD f1 = ZDD(v1) + ZDD(v2);
+ZDD f2 = ZDD(v3) * ZDD(v4);
+ZDD f3 = f1 * f2;
+ZDD f4 = f3.Change(v1);
 f3.Print();
 f4.Print();
 ```
@@ -30,57 +30,57 @@ f4.Print();
 ### operator*
 
 ```cpp
-ZBDD operator*(const ZBDD& f, const ZBDD& g)
+ZDD operator*(const ZDD& f, const ZDD& g)
 ```
 
-積集合（intersection）を表すZBDDオブジェクトを生成し、それを返す。
+積集合（intersection）を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
 ### operator&
 
 ```cpp
-ZBDD operator&(const ZBDD& f, const ZBDD& g)
+ZDD operator&(const ZDD& f, const ZDD& g)
 ```
 
-積集合（intersection）を表すZBDDオブジェクトを生成し、それを返す。
+積集合（intersection）を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。演算子 operator* と同じ操作である。
 
 ### operator+
 
 ```cpp
-ZBDD operator+(const ZBDD& f, const ZBDD& g)
+ZDD operator+(const ZDD& f, const ZDD& g)
 ```
 
-和集合（union）を表すZBDDオブジェクトを生成し、それを返す。
+和集合（union）を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
 ### operator|
 
 ```cpp
-ZBDD operator|(const ZBDD& f, const ZBDD& g)
+ZDD operator|(const ZDD& f, const ZDD& g)
 ```
 
-和集合（union）を表すZBDDオブジェクトを生成し、それを返す。
+和集合（union）を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。演算子 operator+ と同じ操作である。
 
 ### operator-
 
 ```cpp
-ZBDD operator-(const ZBDD& f, const ZBDD& g)
+ZDD operator-(const ZDD& f, const ZDD& g)
 ```
 
-差集合を表すZBDDオブジェクトを生成し、それを返す。
+差集合を表すZDDオブジェクトを生成し、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。引数にnullを与えた場合には
 nullを返す。
 
 ### operator==
 
 ```cpp
-int operator==(const ZBDD& f, const ZBDD& g)
+int operator==(const ZDD& f, const ZDD& g)
 ```
 
 f と g が同じ集合かどうかの真偽(1/0)を返す。
@@ -88,53 +88,53 @@ f と g が同じ集合かどうかの真偽(1/0)を返す。
 ### operator!=
 
 ```cpp
-int operator!=(const ZBDD& f, const ZBDD& g)
+int operator!=(const ZDD& f, const ZDD& g)
 ```
 
 f と g が異なる集合かどうかの真偽(1/0)を返す。
 
 ### 公開クラスメソッド
 
-### ZBDD
+### ZDD
 
 ```cpp
-ZBDD::ZBDD(void)
+ZDD::ZDD(void)
 ```
 
-基本constructer。初期値として空集合を表すZBDDオブジェクトを生成する。
+基本constructer。初期値として空集合を表すZDDオブジェクトを生成する。
 
-### ZBDD
+### ZDD
 
 ```cpp
-ZBDD::ZBDD(int v)
+ZDD::ZDD(int v)
 ```
 
 定数式を作り出す constructer。v == 0 ならば空集合、v > 0 ならば単位元集合、
-v < 0 ならば null を表すZBDDオブジェクトを生成する。
+v < 0 ならば null を表すZDDオブジェクトを生成する。
 
-### ZBDD
+### ZDD
 
 ```cpp
-ZBDD::ZBDD(const ZBDD& f)
+ZDD::ZDD(const ZDD& f)
 ```
 
 引数 f を複製する constructer。
 
-### ZBDD
+### ZDD
 
 ```cpp
-ZBDD::ZBDD(const BDD& bdd, int offset)
+ZDD::ZDD(const BDD& bdd, int offset)
 ```
 
 BDDオブジェクトから変換する constructer。各変数をoffset だけシフトして
-ZBDD変数に割り当てる。offsetに0を指定すると、0シフト（元の変数番号のまま）
+ZDD変数に割り当てる。offsetに0を指定すると、0シフト（元の変数番号のまま）
 となる。記憶あふれの場合は null オブジェクトを生成する。
-例外として、変数の値が0のBDDの場合は空集合のZBDDとなる。
+例外として、変数の値が0のBDDの場合は空集合のZDDとなる。
 
-### ~ZBDD
+### ~ZDD
 
 ```cpp
-ZBDD::~ZBDD(void)
+ZDD::~ZDD(void)
 ```
 
 destructer。内部のBDD節点の記憶管理は自動化されており、使用済みの節点は適当なタイミングで回収され、再利用される。
@@ -142,7 +142,7 @@ destructer。内部のBDD節点の記憶管理は自動化されており、使�
 ### operator=
 
 ```cpp
-ZBDD& ZBDD::operator=(const ZBDD& f)
+ZDD& ZDD::operator=(const ZDD& f)
 ```
 
 自分自身に f を代入し、f を関数値として返す。
@@ -150,7 +150,7 @@ ZBDD& ZBDD::operator=(const ZBDD& f)
 ### operator+=
 
 ```cpp
-ZBDD ZBDD::operator+=(const ZBDD& f)
+ZDD ZDD::operator+=(const ZDD& f)
 ```
 
 自分自身と f との和集合を求め、自分自身に代入する。演算結果を関数値として返す。
@@ -159,7 +159,7 @@ ZBDD ZBDD::operator+=(const ZBDD& f)
 ### operator-=
 
 ```cpp
-ZBDD ZBDD::operator-=(const ZBDD& f)
+ZDD ZDD::operator-=(const ZDD& f)
 ```
 
 自分自身から f を除いた差集合を求め、自分自身に代入する。演算結果を関数値として返す。
@@ -168,7 +168,7 @@ ZBDD ZBDD::operator-=(const ZBDD& f)
 ### operator*=
 
 ```cpp
-ZBDD ZBDD::operator*=(const ZBDD& f)
+ZDD ZDD::operator*=(const ZDD& f)
 ```
 
 自分自身と f との積集合を求め、自分自身に代入する。演算結果を関数値として返す。
@@ -177,11 +177,11 @@ ZBDD ZBDD::operator*=(const ZBDD& f)
 ### Change
 
 ```cpp
-ZBDD ZBDD::Change(int v) const 
+ZDD ZDD::Change(int v) const 
 ```
 
 自分自身が表す組合せ集合から、変数番号 v の要素の 0/1 を反転
-（含む→含まない、含まない→含む）させた集合を表すZBDDオブジェクトを
+（含む→含まない、含まない→含む）させた集合を表すZDDオブジェクトを
 生成して、それを返す。v が含まれない項と含まれる項が同時に含まれて
 いると、Change(v) 操作を実行すると節点数が指数的に増加する可能性
 があるので注意すべきである。記憶あふれの場合は、null を表すオブジェクトを
@@ -190,22 +190,22 @@ ZBDD ZBDD::Change(int v) const
 ### Swap
 
 ```cpp
-ZBDD ZBDD::Swap(int v1, int v2) const 
+ZDD ZDD::Swap(int v1, int v2) const 
 ```
 
 自分自身が表す組合せ集合から、変数番号 v1 と変数番号 v2 を
-入れ替えた集合を表すZBDDオブジェクトを生成して、それを返す。
+入れ替えた集合を表すZDDオブジェクトを生成して、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
 
 ### SymmetricDifference
 
 ```cpp
-ZBDD ZBDD::SymmetricDifference(const ZBDD& g) const 
+ZDD ZDD::SymmetricDifference(const ZDD& g) const 
 ```
 
 自分自身が表す組合せ集合と g が表す組合せ集合の、対称差
-（ f ⊖ g = (f - g) ⋃ (g - f) ）を表すZBDDオブジェクトを
+（ f ⊖ g = (f - g) ⋃ (g - f) ）を表すZDDオブジェクトを
 生成して、それを返す。記憶あふれの場合は、null を表す
 オブジェクトを返す。自分自身が null のとき、または g が null
 のときは、null を返す。
@@ -213,7 +213,7 @@ ZBDD ZBDD::SymmetricDifference(const ZBDD& g) const
 ### Support
 
 ```cpp
-BDD ZBDD::Support(void) const 
+BDD ZDD::Support(void) const 
 ```
 
 自分自身の集合要素が用いているアイテム変数を集め、その変数の
@@ -223,11 +223,11 @@ nullを表すオブジェクトを返す。自分自身がnullのときは、nul
 ### Restrict
 
 ```cpp
-ZBDD ZBDD::Restrict(const ZBDD& g) const 
+ZDD ZDD::Restrict(const ZDD& g) const 
 ```
 
 自分自身が表す組合せ集合から、g が表す集合に含まれる集合を
-抽出した集合を表すZBDDオブジェクトを生成して、それを返す。
+抽出した集合を表すZDDオブジェクトを生成して、それを返す。
 集合の包含関係についての filter を適用したことになる。この演算は
 1の元が < の関係にある場合のみ高速に計算できる。
 記憶あふれの場合は、null を表すオブジェクトを返す。
@@ -236,11 +236,11 @@ ZBDD ZBDD::Restrict(const ZBDD& g) const
 ### Permit
 
 ```cpp
-ZBDD ZBDD::Permit(const ZBDD& g) const 
+ZDD ZDD::Permit(const ZDD& g) const 
 ```
 
 自分自身が表す組合せ集合から、g が表す集合に包含される集合を
-抽出した集合を表すZBDDオブジェクトを生成して、それを返す。
+抽出した集合を表すZDDオブジェクトを生成して、それを返す。
 集合の包含関係についての filter を適用したことになる。この演算は
 それほど計算効率がよくないことが多い。
 記憶あふれの場合は、null を表すオブジェクトを返す。
@@ -249,11 +249,11 @@ ZBDD ZBDD::Permit(const ZBDD& g) const
 ### PermitSym
 
 ```cpp
-ZBDD ZBDD::PermitSym(const ZBDD& g) const 
+ZDD ZDD::PermitSym(const ZDD& g) const 
 ```
 
 自分自身が表す組合せ集合から、g が表すいずれかの集合に包含される集合を
-抽出した集合を表すZBDDオブジェクトを生成して、それを返す。
+抽出した集合を表すZDDオブジェクトを生成して、それを返す。
 集合の包含関係についての、複数集合に関する symmetrical な
 filter を適用したことになる。この演算は特殊ケースについて高速に計算できる。
 記憶あふれの場合は、null を表すオブジェクトを返す。
@@ -262,11 +262,11 @@ filter を適用したことになる。この演算は特殊ケースについ�
 ### PermitNot
 
 ```cpp
-ZBDD ZBDD::PermitNot(const ZBDD& g) const 
+ZDD ZDD::PermitNot(const ZDD& g) const 
 ```
 
 自分自身が表す組合せ集合から、g が表すいずれの集合にも被包含されない集合を
-抽出した集合を表すZBDDオブジェクトを生成して、それを返す。
+抽出した集合を表すZDDオブジェクトを生成して、それを返す。
 集合の包含関係についての、複数集合に関する filter を
 適用したことになる。この演算は多くの場合効率的に計算できない。
 記憶あふれの場合は、null を表すオブジェクトを返す。
@@ -275,29 +275,29 @@ ZBDD ZBDD::PermitNot(const ZBDD& g) const
 ### Always
 
 ```cpp
-ZBDD ZBDD::Always(int v) const 
+ZDD ZDD::Always(int v) const 
 ```
 
 自分自身が表す組合せ集合から、変数番号 v を必ず含む集合を
-抽出した部分集合を表すZBDDオブジェクトを生成して、それを返す。
+抽出した部分集合を表すZDDオブジェクトを生成して、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
 
 ### Never
 
 ```cpp
-ZBDD ZBDD::Never(int v) const 
+ZDD ZDD::Never(int v) const 
 ```
 
 自分自身が表す組合せ集合から、変数番号 v を含まない集合を
-抽出した部分集合を表すZBDDオブジェクトを生成して、それを返す。
+抽出した部分集合を表すZDDオブジェクトを生成して、それを返す。
 記憶あふれの場合は、null を表すオブジェクトを返す。
 自分自身が null のときは、nullを返す。
 
 ### Top
 
 ```cpp
-int ZBDD::Top(void) const 
+int ZDD::Top(void) const 
 ```
 
 自分自身のグラフに関係する入力変数の中で、最上位の変数番号を返す。
@@ -306,7 +306,7 @@ int ZBDD::Top(void) const
 ### Card
 
 ```cpp
-bddword ZBDD::Card(void) const 
+bddword ZDD::Card(void) const 
 ```
 
 自分自身が表す集合の要素数を返す。
@@ -316,7 +316,7 @@ bddnull（BDD_MaxNodeよりも大きな数値）を返す。
 ### Size
 
 ```cpp
-bddword ZBDD::Size(void) const 
+bddword ZDD::Size(void) const 
 ```
 
 自分自身のグラフの節点数を返す。nullに対しては0を返す。
@@ -324,7 +324,7 @@ bddword ZBDD::Size(void) const
 ### Print
 
 ```cpp
-void ZBDD::Print(void) const 
+void ZDD::Print(void) const 
 ```
 
 インデックスの値、最上位のリテラル番号、節点数の情報を標準出力に出力する。
@@ -332,11 +332,11 @@ void ZBDD::Print(void) const
 ### ZLev
 
 ```cpp
-bddword ZBDD::ZLev(int lev, int last = 0) const 
+bddword ZDD::ZLev(int lev, int last = 0) const 
 ```
 
 最上位の変数のレベルがlev、最下位の変数のレベルがlastである集合の
-みを取り出した集合を表すZBDDオブジェクトを生成して、それを返す。
+みを取り出した集合を表すZDDオブジェクトを生成して、それを返す。
 レベルの小さな変数を含む集合だけを取り出して、簡単な部分問題を
 解くのに用いることができる。
 記憶あふれの場合は、null を表すオブジェクトを返す。

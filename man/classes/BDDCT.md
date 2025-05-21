@@ -1,23 +1,23 @@
-# BDDCT --- BDD/ZBDDでコスト制約付き変数を扱うためのクラス
+# BDDCT --- BDD/ZDDでコスト制約付き変数を扱うためのクラス
 
 ヘッダーファイル名: "BDDCT.h"  
 ソースファイル名: BDDCT.cc  
-内部から呼び出しているクラス: BDD, ZBDD, (FILE)
+内部から呼び出しているクラス: BDD, ZDD, (FILE)
 
-各変数（BDDの変数やZBDDの要素）にコスト値が付けられている場合に、
+各変数（BDDの変数やZDDの要素）にコスト値が付けられている場合に、
 変数の選び方に対してコスト制約や最適化などを扱えるようにするクラスである。
 整数のコスト値は正または負の値を持ちうる（bddcost型; int型と等価）。
 
 ### 関連する外部関数
 
-### ZBDDCT_ImportRQE
+### ZDDCT_ImportRQE
 
 ```cpp
-ZBDD ZBDDCT_ImportRQE(BDDCT& bddct, FILE *strm = stdin)
+ZDD ZDDCT_ImportRQE(BDDCT& bddct, FILE *strm = stdin)
 ```
 
 strmで指定するファイルから、リレーショナル代数クエリ記述を読み込み、
-指定した問合せの結果を表すZBDDオブジェクトを生成して、それを返す。
+指定した問合せの結果を表すZDDオブジェクトを生成して、それを返す。
 またbddctオブジェクトには、関連するラベル情報やリレーショナル変数の
 情報などが保持される。ファイル文法について詳しくは別途マニュアルを
 参照せよ。ファイルに構文上の誤りがあった場合等、異常終了時にはnullを返す。
@@ -110,7 +110,7 @@ fname が NULL のときは標準入力、それ以外は指定されたファ�
 大きければ昇順の読み込み、dir が 0 より小さければ降順（レベル値大→小）に
 読み込みながらラベルを設定し、変数(VarID)のソートを行う。
 ソートなしなら変数(VarID)とレベル値の一致を保つ。VarIDを１から順に割り当てる。
-（特に、ZBDDの分配テーブル用には昇順、つまりレベル値の小さな方から割り振る。
+（特に、ZDDの分配テーブル用には昇順、つまりレベル値の小さな方から割り振る。
 レベル値は視覚的な問題で大きいほど上位、つまり値の影響が大きいとする。）
 ファイルから正しく読み込めれば 0 を返し、エラーだと 1 を返す。
 
@@ -134,12 +134,12 @@ int BDDCT::GetVarID(const int var) const
 ### Weight
 
 ```cpp
-bddcost BDDCT::Weight(const ZBDD& zbdd) const
+bddcost BDDCT::Weight(const ZDD& zdd) const
 ```
 
-ZBDDの各組合せ要素にコスト値を乗じた重み付き和を計算し、それを返す。
-ただし、組合せの個数は高々 ZBDDCT_CARDS_SUM 個（通常 10000）とする。
-ZBDDCT_CARDS_SUM を超えた場合は、ZBDD_NILを返す。
+ZDDの各組合せ要素にコスト値を乗じた重み付き和を計算し、それを返す。
+ただし、組合せの個数は高々 ZDDCT_CARDS_SUM 個（通常 10000）とする。
+ZDDCT_CARDS_SUM を超えた場合は、ZDD_NILを返す。
 
 ### AllocRand
 

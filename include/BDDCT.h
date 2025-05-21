@@ -11,7 +11,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -19,7 +19,7 @@ typedef int bddcost;
 #define bddcost_null 0x7FFFFFFF
 #define CT_STRLEN 15
 
-typedef std::map<bddcost, ZBDD> Zmap;
+typedef std::map<bddcost, ZDD> Zmap;
 
 class BDDCT;
 
@@ -95,21 +95,31 @@ public:
 
   int CacheClear(void);
   int CacheEnlarge(void);
-  ZBDD CacheRef(const ZBDD &, const bddcost, bddcost &, bddcost &);
-  int CacheEnt(const ZBDD &, const ZBDD &, const bddcost, const bddcost);
+  ZDD CacheRef(const ZDD &, const bddcost, bddcost &, bddcost &);
+  int CacheEnt(const ZDD &, const ZDD &, const bddcost, const bddcost);
 
   int Cache0Clear(void);
   int Cache0Enlarge(void);
   bddcost Cache0Ref(const unsigned char, const bddword) const;
   int Cache0Ent(const unsigned char, const bddword, const bddcost);
 
-  ZBDD ZBDD_CostLE(const ZBDD& f, const bddcost bound)
-  { bddcost aw, rb; return ZBDD_CostLE(f, bound, aw, rb); }
-  ZBDD ZBDD_CostLE(const ZBDD &, const bddcost, bddcost &, bddcost &);
+  ZDD ZDD_CostLE(const ZDD& f, const bddcost bound)
+  { bddcost aw, rb; return ZDD_CostLE(f, bound, aw, rb); }
+  ZDD ZDD_CostLE(const ZDD &, const bddcost, bddcost &, bddcost &);
 
-  ZBDD ZBDD_CostLE0(const ZBDD &, const bddcost);
-  bddcost MinCost(const ZBDD &);
-  bddcost MaxCost(const ZBDD &);
+  // For backward compatibility
+  ZDD ZBDD_CostLE(const ZDD& f, const bddcost bound)
+  { return ZDD_CostLE(f, bound); }
+  ZDD ZBDD_CostLE(const ZDD& f, const bddcost bound,
+    bddcost& aw, bddcost& rb)
+  { return ZDD_CostLE(f, bound, aw, rb); }
+
+  ZDD ZDD_CostLE0(const ZDD &, const bddcost);
+  // For backward compatibility
+  ZDD ZBDD_CostLE0(const ZDD& f, const bddcost bound)
+  { return ZDD_CostLE0(f, bound); }
+  bddcost MinCost(const ZDD &);
+  bddcost MaxCost(const ZDD &);
 };
 
 } // namespace sapporobdd

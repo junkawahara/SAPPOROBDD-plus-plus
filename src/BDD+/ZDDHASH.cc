@@ -1,34 +1,34 @@
 /****************************************
- * ZBDD+ Manipulator (SAPPORO-1.82)     *
+ * ZDD+ Manipulator (SAPPORO-1.82)     *
  * (Hash table methods)                 *
  * (C) Shin-ichi MINATO (Mar. 20, 2017) *
  ****************************************/
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 using std::cerr;
 
 namespace sapporobdd {
 
 
-ZBDD_Hash::ZBDD_Hash()
+ZDD_Hash::ZDD_Hash()
 {
   _hashSize = 16;
-  _wheel = new ZBDD_Entry[_hashSize];
+  _wheel = new ZDD_Entry[_hashSize];
   _amount = 0;
 }
 
-ZBDD_Hash::~ZBDD_Hash() { delete[] _wheel; }
+ZDD_Hash::~ZDD_Hash() { delete[] _wheel; }
 
-void ZBDD_Hash::Clear()
+void ZDD_Hash::Clear()
 {
   if(_hashSize != 0) delete[] _wheel;
   _hashSize = 16;
-  _wheel = new ZBDD_Entry[_hashSize];
+  _wheel = new ZDD_Entry[_hashSize];
   _amount = 0;
 }
 
-ZBDD_Hash::ZBDD_Entry* ZBDD_Hash::GetEntry(ZBDD key)
+ZDD_Hash::ZDD_Entry* ZDD_Hash::GetEntry(ZDD key)
 {
   bddword id = key.GetID();
   bddword hash = (id+(id>>10)+(id>>20)) & (_hashSize - 1);
@@ -49,17 +49,17 @@ ZBDD_Hash::ZBDD_Entry* ZBDD_Hash::GetEntry(ZBDD key)
   return & _wheel[i];
 }
 
-void ZBDD_Hash::Enlarge()
+void ZDD_Hash::Enlarge()
 {
   bddword oldSize = _hashSize;
-  ZBDD_Entry* oldWheel = _wheel;
+  ZDD_Entry* oldWheel = _wheel;
   
   _hashSize <<= 2;
   _wheel = 0;
-  _wheel = new ZBDD_Entry[_hashSize];
+  _wheel = new ZDD_Entry[_hashSize];
   if(_wheel == 0)
   {
-    cerr << "<ERROR> ZBDD_Hash::Enlarge(): Memory overflow (";
+    cerr << "<ERROR> ZDD_Hash::Enlarge(): Memory overflow (";
     cerr << _hashSize << ")\n";
     exit(1);
   }
@@ -71,10 +71,10 @@ void ZBDD_Hash::Enlarge()
   delete[] oldWheel;
 }
 
-void ZBDD_Hash::Enter(ZBDD key, void* ptr)
+void ZDD_Hash::Enter(ZDD key, void* ptr)
 // ptr = 0 means deleting.
 {
-  ZBDD_Entry* ent = GetEntry(key);
+  ZDD_Entry* ent = GetEntry(key);
   if(ent -> _key == -1) _amount++;
   else if(ent -> _ptr == 0) _amount++;
   if(ptr == 0) _amount--;
@@ -83,15 +83,15 @@ void ZBDD_Hash::Enter(ZBDD key, void* ptr)
   if(_amount >= (_hashSize>>1)) Enlarge();
 }
 
-void* ZBDD_Hash::Refer(ZBDD key)
+void* ZDD_Hash::Refer(ZDD key)
 // returns 0 if not found.
 {
-  ZBDD_Entry* ent = GetEntry(key);
+  ZDD_Entry* ent = GetEntry(key);
   if(ent -> _key == -1) return 0;
   return ent -> _ptr;
 }
 
-bddword ZBDD_Hash::Amount() { return _amount; }
+bddword ZDD_Hash::Amount() { return _amount; }
 
 } // namespace sapporobdd
 

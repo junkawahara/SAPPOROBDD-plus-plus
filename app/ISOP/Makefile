@@ -42,16 +42,16 @@ $(PRG_ST): $(OBJ_ST) $(LIB)
 $(PRG64_ST): $(OBJ64_ST) $(LIB64)
 	$(CC) $(OPT64_ST) $(OBJ64_ST) $(LIB64) -o $(PRG64_ST)
 
-isop.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+isop.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT) -c isop.cc
 
-isop_64.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+isop_64.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c isop.cc -o isop_64.o
 
-isop_st.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+isop_st.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT_ST) -c isop.cc -o isop_st.o
 
-isop_64_st.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+isop_64_st.o: isop.cc isop.h $(INCL)/PiDD.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64_ST) -c isop.cc -o isop_64_st.o
 
 clean:

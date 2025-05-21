@@ -43,8 +43,8 @@ typedef unsigned int bddvar;
 #define bddfalse  B_CST_MASK /* bddp of constant false (0) */
 #define bddtrue   (bddfalse ^ B_INV_MASK)
                     /* bddp of constant true (1) */
-#define bddempty  bddfalse /* bddp of empty ZBDD (0) */
-#define bddsingle bddtrue  /* bddp of single unit ZBDD (1) */
+#define bddempty  bddfalse /* bddp of empty ZDD (0) */
+#define bddsingle bddtrue  /* bddp of single unit ZDD (1) */
 #define bddconst(c) (((c) & B_VAL_MASK) | B_CST_MASK)
                     /* bddp of a constant valued node */
 #define bddvalmax B_VAL_MASK  /* Max constant value */
@@ -105,7 +105,7 @@ extern bddp   bddrcache(unsigned char op, bddp f, bddp g);
 extern void   bddwcache
               (unsigned char op, bddp f, bddp g, bddp h);
 
-/************** ZBDD operations *************/
+/************** ZDD operations *************/
 extern bddp   bddoffset(bddp f, bddvar v);
 extern bddp   bddonset(bddp f, bddvar v);
 extern bddp   bddonset0(bddp f, bddvar v);
@@ -119,7 +119,8 @@ extern bddp   bddlen(bddp f);
 extern int    bddimportz(FILE* strm, bddp* p, int lim);
 extern char  *bddcardmp16(bddp f, char *s);
 extern int    bddisbdd(bddp f);
-extern int    bddiszbdd(bddp f);
+extern int    bddiszdd(bddp f);
+extern int    bddiszbdd(bddp f); // for compatibility
 
 /************** SeqBDD operations *************/
 extern bddp   bddpush(bddp f, bddvar v);

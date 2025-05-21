@@ -1,10 +1,10 @@
 /****************************************
- * ZBDD+ Manipulator (SAPPORO-1.87)     *
+ * ZDD+ Manipulator (SAPPORO-1.87)     *
  * (Main part)                          *
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 #define BDD_CPP
 #include "bddc.h"
@@ -13,34 +13,34 @@ using std::cout;
 
 namespace sapporobdd {
 
-static const char BC_ZBDD_MULT = 20;
-static const char BC_ZBDD_DIV = 21;
-static const char BC_ZBDD_RSTR = 22;
-static const char BC_ZBDD_PERMIT = 23;
-static const char BC_ZBDD_PERMITSYM = 24;
-static const char BC_ZBDD_SYMCHK = 25;
-static const char BC_ZBDD_ALWAYS = 26;
-static const char BC_ZBDD_SYMSET = 27;
-static const char BC_ZBDD_COIMPSET = 28;
-static const char BC_ZBDD_MEET = 29;
+static const char BC_ZDD_MULT = 20;
+static const char BC_ZDD_DIV = 21;
+static const char BC_ZDD_RSTR = 22;
+static const char BC_ZDD_PERMIT = 23;
+static const char BC_ZDD_PERMITSYM = 24;
+static const char BC_ZDD_SYMCHK = 25;
+static const char BC_ZDD_ALWAYS = 26;
+static const char BC_ZDD_SYMSET = 27;
+static const char BC_ZDD_COIMPSET = 28;
+static const char BC_ZDD_MEET = 29;
 
-static const char BC_ZBDD_ZSkip = 65;
-static const char BC_ZBDD_INTERSEC = 66;
+static const char BC_ZDD_ZSkip = 65;
+static const char BC_ZDD_INTERSEC = 66;
 
 extern "C"
 {
 	int rand();
 };
 
-// class ZBDD ---------------------------------------------
+// class ZDD ---------------------------------------------
 
-void ZBDD::Export(FILE *strm) const
+void ZDD::Export(FILE *strm) const
 {
-  bddword p = _zbdd;
+  bddword p = _zdd;
   bddexport(strm, &p, 1);
 }
 
-void ZBDD::Print() const
+void ZDD::Print() const
 {
   cout << "[ " << GetID();
   cout << " Var:" << Top() << "(" << BDD_LevOfVar(Top()) << ")";
@@ -49,28 +49,28 @@ void ZBDD::Print() const
   cout.flush();
 }
 
-void ZBDD::PrintPla() const { ZBDDV(*this).PrintPla(); }
+void ZDD::PrintPla() const { ZDDV(*this).PrintPla(); }
 
-#define ZBDD_CACHE_CHK_RETURN(op, fx, gx) \
-  { ZBDD h = BDD_CacheZBDD(op, fx, gx); \
+#define ZDD_CACHE_CHK_RETURN(op, fx, gx) \
+  { ZDD h = BDD_CacheZDD(op, fx, gx); \
     if(h != -1) return h; \
     BDD_RECUR_INC; }
 
-#define ZBDD_CACHE_ENT_RETURN(op, fx, gx, h) \
+#define ZDD_CACHE_ENT_RETURN(op, fx, gx, h) \
   { BDD_RECUR_DEC; \
     if(h != -1) BDD_CacheEnt(op, fx, gx, h.GetID()); \
     return h; }
 
-ZBDD ZBDD::Swap(int v1, int v2) const
+ZDD ZDD::Swap(int v1, int v2) const
 {
   if(v1 == v2) return *this;
-  ZBDD f00 = this->OffSet(v1).OffSet(v2);
-  ZBDD f11 = this->OnSet(v1).OnSet(v2);
-  ZBDD h = *this - f00 - f11;
+  ZDD f00 = this->OffSet(v1).OffSet(v2);
+  ZDD f11 = this->OnSet(v1).OnSet(v2);
+  ZDD h = *this - f00 - f11;
   return h.Change(v1).Change(v2) + f00 + f11;
 }
 
-ZBDD ZBDD::Restrict(const ZBDD& g) const
+ZDD ZDD::Restrict(const ZDD& g) const
 {
   if(*this == -1) return -1;
   if(g == -1) return -1;
@@ -78,25 +78,25 @@ ZBDD ZBDD::Restrict(const ZBDD& g) const
   if(g == 0) return 0;
   if(*this == g) return g;
   if((g & 1) == 1) return *this;
-  ZBDD f = *this - 1;
+  ZDD f = *this - 1;
 
   int top = f.Top();
   if(BDD_LevOfVar(top) < BDD_LevOfVar(g.Top())) top = g.Top();
 
   bddword fx = f.GetID();
   bddword gx = g.GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_RSTR, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_RSTR, fx, gx);
 
-  ZBDD f1 = f.OnSet0(top);
-  ZBDD f0 = f.OffSet(top);
-  ZBDD g1 = g.OnSet0(top);
-  ZBDD g0 = g.OffSet(top);
-  ZBDD h = f1.Restrict(g1 + g0).Change(top) + f0.Restrict(g0);
+  ZDD f1 = f.OnSet0(top);
+  ZDD f0 = f.OffSet(top);
+  ZDD g1 = g.OnSet0(top);
+  ZDD g0 = g.OffSet(top);
+  ZDD h = f1.Restrict(g1 + g0).Change(top) + f0.Restrict(g0);
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_RSTR, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_RSTR, fx, gx, h);
 }
 
-ZBDD ZBDD::Permit(const ZBDD& g) const
+ZDD ZDD::Permit(const ZDD& g) const
 {
   if(*this == -1) return -1;
   if(g == -1) return -1;
@@ -111,18 +111,18 @@ ZBDD ZBDD::Permit(const ZBDD& g) const
 
   bddword fx = GetID();
   bddword gx = g.GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_PERMIT, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_PERMIT, fx, gx);
 
-  ZBDD f1 = OnSet0(top);
-  ZBDD f0 = OffSet(top);
-  ZBDD g1 = g.OnSet0(top);
-  ZBDD g0 = g.OffSet(top);
-  ZBDD h = f1.Permit(g1).Change(top) + f0.Permit(g0 + g1);
+  ZDD f1 = OnSet0(top);
+  ZDD f0 = OffSet(top);
+  ZDD g1 = g.OnSet0(top);
+  ZDD g0 = g.OffSet(top);
+  ZDD h = f1.Permit(g1).Change(top) + f0.Permit(g0 + g1);
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_PERMIT, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_PERMIT, fx, gx, h);
 }
 
-ZBDD ZBDD::PermitSym(int n) const
+ZDD ZDD::PermitSym(int n) const
 {
   if(*this == -1) return -1;
   if(*this == 0) return 0;
@@ -132,46 +132,46 @@ ZBDD ZBDD::PermitSym(int n) const
   int top = Top();
 
   bddword fx = GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_PERMITSYM, fx, n);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_PERMITSYM, fx, n);
 
-  ZBDD f1 = OnSet0(top);
-  ZBDD f0 = OffSet(top);
-  ZBDD h = f1.PermitSym(n - 1).Change(top) + f0.PermitSym(n);
+  ZDD f1 = OnSet0(top);
+  ZDD f0 = OffSet(top);
+  ZDD h = f1.PermitSym(n - 1).Change(top) + f0.PermitSym(n);
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_PERMITSYM, fx, n, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_PERMITSYM, fx, n, h);
 }
 
-ZBDD ZBDD::Always() const
+ZDD ZDD::Always() const
 {
   if(*this == -1) return -1;
   if(*this == 0 || *this == 1) return 0;
 
   bddword fx = GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_ALWAYS, fx, 0);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_ALWAYS, fx, 0);
 
   int t = Top();
-  ZBDD f1 = OnSet0(t);
-  ZBDD f0 = OffSet(t);
-  ZBDD h = f1.Always();
-  if(f0 == 0) h += ZBDD(1).Change(t);
+  ZDD f1 = OnSet0(t);
+  ZDD f0 = OffSet(t);
+  ZDD h = f1.Always();
+  if(f0 == 0) h += ZDD(1).Change(t);
   else if(h != 0) h &= f0.Always();
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_ALWAYS, fx, 0, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_ALWAYS, fx, 0, h);
 }
 
-int ZBDD::SymChk(int v1, int v2) const
+int ZDD::SymChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZBDD::SymChk(): invalid v1.", v1);
-  if(v2 <= 0) BDDerr("ZBDD::SymChk(): invalid v2.", v2);
+  if(v1 <= 0) BDDerr("ZDD::SymChk(): invalid v1.", v1);
+  if(v2 <= 0) BDDerr("ZDD::SymChk(): invalid v2.", v2);
   if(*this == 0 || *this == 1) return 1;
   if(v1 == v2) return 1;
   if(v1 < v2) { int tmp = v1; v1 = v2; v2 = tmp; }
 
-  ZBDD S = ZBDD(1).Change(v1) + ZBDD(1).Change(v2);
+  ZDD S = ZDD(1).Change(v1) + ZDD(1).Change(v2);
   bddword fx = GetID();
   bddword gx = S.GetID();
-  int Y = BDD_CacheInt(BC_ZBDD_SYMCHK, fx, gx);
+  int Y = BDD_CacheInt(BC_ZDD_SYMCHK, fx, gx);
   if(Y != -1) return Y;
   BDD_RECUR_INC;
 
@@ -183,8 +183,8 @@ int ZBDD::SymChk(int v1, int v2) const
   }
   else
   {
-    ZBDD f0 = OffSet(v1);
-    ZBDD f1 = OnSet0(v1);
+    ZDD f0 = OffSet(v1);
+    ZDD f1 = OnSet0(v1);
     int t0 = f0.Top();
     int t1 = f1.Top();
     int t2 = (BDD_LevOfVar(t0) > BDD_LevOfVar(t1))? t0: t1;
@@ -192,29 +192,29 @@ int ZBDD::SymChk(int v1, int v2) const
       Y = (f0.OnSet0(v2) == f1.OffSet(v2));
     else
     {
-      ZBDD g0 = f0.OffSet(t2) + f1.OffSet(t2).Change(t2);
-      ZBDD g1 = f0.OnSet0(t2) + f1.OnSet0(t2).Change(t2);
+      ZDD g0 = f0.OffSet(t2) + f1.OffSet(t2).Change(t2);
+      ZDD g1 = f0.OnSet0(t2) + f1.OnSet0(t2).Change(t2);
       Y = g1.SymChk(t2, v2);
       if(Y == 1) Y = g0.SymChk(t2, v2);
     }
   }
 
   BDD_RECUR_DEC;
-  if(Y != -1) BDD_CacheEnt(BC_ZBDD_SYMCHK, fx, gx, Y);
+  if(Y != -1) BDD_CacheEnt(BC_ZDD_SYMCHK, fx, gx, Y);
   return Y;
 }
 
-ZBDD ZBDD::SymGrp() const
+ZDD ZDD::SymGrp() const
 {
-  ZBDD h = 0;
-  ZBDD g = Support();
+  ZDD h = 0;
+  ZDD g = Support();
   while(g != 0)
   {
     int t = g.Top();
-    ZBDD hh = ZBDD(1).Change(t);
+    ZDD hh = ZDD(1).Change(t);
     g = g.OffSet(t);
 
-    ZBDD g2 = g;
+    ZDD g2 = g;
     while(g2 != 0)
     {
       int t2 = g2.Top();
@@ -232,19 +232,19 @@ ZBDD ZBDD::SymGrp() const
   return h;
 }
 
-ZBDD ZBDD::SymGrpNaive() const
+ZDD ZDD::SymGrpNaive() const
 {
-  ZBDD h = 0;
-  ZBDD g = Support();
+  ZDD h = 0;
+  ZDD g = Support();
   while(g != 0)
   {
     int t = g.Top();
-    ZBDD hh = ZBDD(1).Change(t);
+    ZDD hh = ZDD(1).Change(t);
     g = g.OffSet(t);
-    ZBDD f0 = OffSet(t);
-    ZBDD f1 = OnSet0(t);
+    ZDD f0 = OffSet(t);
+    ZDD f1 = OnSet0(t);
 
-    ZBDD g2 = g;
+    ZDD g2 = g;
     while(g2 != 0)
     {
       int t2 = g2.Top();
@@ -260,8 +260,8 @@ ZBDD ZBDD::SymGrpNaive() const
   return h;
 }
 
-static ZBDD ZBDD_SymSet(const ZBDD&, const ZBDD&);
-static ZBDD ZBDD_SymSet(const ZBDD& f0, const ZBDD& f1)
+static ZDD ZDD_SymSet(const ZDD&, const ZDD&);
+static ZDD ZDD_SymSet(const ZDD& f0, const ZDD& f1)
 {
   if(f0 == -1) return -1;
   if(f1 == -1) return -1;
@@ -270,80 +270,80 @@ static ZBDD ZBDD_SymSet(const ZBDD& f0, const ZBDD& f1)
 
   bddword fx = f0.GetID();
   bddword gx = f1.GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_SYMSET, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_SYMSET, fx, gx);
 
   int t0 = f0.Top();
   int t1 = f1.Top();
   int t = (BDD_LevOfVar(t0) > BDD_LevOfVar(t1))? t0: t1;
 
-  ZBDD f00 = f0.OffSet(t);
-  ZBDD f01 = f0.OnSet0(t);
-  ZBDD f10 = f1.OffSet(t);
-  ZBDD f11 = f1.OnSet0(t);
+  ZDD f00 = f0.OffSet(t);
+  ZDD f01 = f0.OnSet0(t);
+  ZDD f10 = f1.OffSet(t);
+  ZDD f11 = f1.OnSet0(t);
   
-  ZBDD h;
-  if(f11 == 0) h = ZBDD_SymSet(f00, f10) - f01.Support();
-  else if(f10 == 0) h = ZBDD_SymSet(f01, f11) - f00.Support();
+  ZDD h;
+  if(f11 == 0) h = ZDD_SymSet(f00, f10) - f01.Support();
+  else if(f10 == 0) h = ZDD_SymSet(f01, f11) - f00.Support();
   else
   {
-    h = ZBDD_SymSet(f01, f11);
-    if(h != 0) h &= ZBDD_SymSet(f00, f10);
+    h = ZDD_SymSet(f01, f11);
+    if(h != 0) h &= ZDD_SymSet(f00, f10);
   }
-  if(f10 == f01) h += ZBDD(1).Change(t);
+  if(f10 == f01) h += ZDD(1).Change(t);
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_SYMSET, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_SYMSET, fx, gx, h);
 }
 
-ZBDD ZBDD::SymSet(int v) const
+ZDD ZDD::SymSet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZBDD::SymSet(): invalid v.", v);
-  ZBDD f0 = OffSet(v);
-  ZBDD f1 = OnSet0(v);
-  return ZBDD_SymSet(f0, f1);
+  if(v <= 0) BDDerr("ZDD::SymSet(): invalid v.", v);
+  ZDD f0 = OffSet(v);
+  ZDD f1 = OnSet0(v);
+  return ZDD_SymSet(f0, f1);
 }
 
-int ZBDD::ImplyChk(int v1, int v2) const
+int ZDD::ImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZBDD::IndImplyChk(): invalid v1.", v1);
-  if(v2 <= 0) BDDerr("ZBDD::IndImplyChk(): invalid v2.", v2);
+  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1);
+  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
-  ZBDD f10 = OnSet0(v1).OffSet(v2);
+  ZDD f10 = OnSet0(v1).OffSet(v2);
   if(f10 == -1) return -1;
   return (f10 == 0);
 }
 
-ZBDD ZBDD::ImplySet(int v) const
+ZDD ZDD::ImplySet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZBDD::ImplySet(): invalid v.", v);
-  ZBDD f1 = OnSet0(v);
+  if(v <= 0) BDDerr("ZDD::ImplySet(): invalid v.", v);
+  ZDD f1 = OnSet0(v);
   if(f1 == 0) return Support();
   return f1.Always();
 }
 
-int ZBDD::CoImplyChk(int v1, int v2) const
+int ZDD::CoImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZBDD::IndImplyChk(): invalid v1.", v1);
-  if(v2 <= 0) BDDerr("ZBDD::IndImplyChk(): invalid v2.", v2);
+  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1);
+  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
-  ZBDD f10 = OnSet0(v1).OffSet(v2);
+  ZDD f10 = OnSet0(v1).OffSet(v2);
   if(f10 == 0) return 1;
 
-  ZBDD f01 = OffSet(v1).OnSet0(v2);
-  ZBDD chk = f10 - f01;
+  ZDD f01 = OffSet(v1).OnSet0(v2);
+  ZDD chk = f10 - f01;
   if(chk == -1) return -1;
   return (chk == 0) ;
 }
 
-static ZBDD ZBDD_CoImplySet(const ZBDD&, const ZBDD&);
-static ZBDD ZBDD_CoImplySet(const ZBDD& f0, const ZBDD& f1)
+static ZDD ZDD_CoImplySet(const ZDD&, const ZDD&);
+static ZDD ZDD_CoImplySet(const ZDD& f0, const ZDD& f1)
 {
   if(f0 == -1) return -1;
   if(f1 == -1) return -1;
@@ -352,72 +352,72 @@ static ZBDD ZBDD_CoImplySet(const ZBDD& f0, const ZBDD& f1)
 
   bddword fx = f0.GetID();
   bddword gx = f1.GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_COIMPSET, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_COIMPSET, fx, gx);
 
   int t0 = f0.Top();
   int t1 = f1.Top();
   int t = (BDD_LevOfVar(t0) > BDD_LevOfVar(t1))? t0: t1;
 
-  ZBDD f00 = f0.OffSet(t);
-  ZBDD f01 = f0.OnSet0(t);
-  ZBDD f10 = f1.OffSet(t);
-  ZBDD f11 = f1.OnSet0(t);
+  ZDD f00 = f0.OffSet(t);
+  ZDD f01 = f0.OnSet0(t);
+  ZDD f10 = f1.OffSet(t);
+  ZDD f11 = f1.OnSet0(t);
   
-  ZBDD h;
-  if(f11 == 0) h = ZBDD_CoImplySet(f00, f10);
-  else if(f10 == 0) h = ZBDD_CoImplySet(f01, f11);
+  ZDD h;
+  if(f11 == 0) h = ZDD_CoImplySet(f00, f10);
+  else if(f10 == 0) h = ZDD_CoImplySet(f01, f11);
   else
   {
-    h = ZBDD_CoImplySet(f01, f11);
-    if(h != 0) h &= ZBDD_CoImplySet(f00, f10);
+    h = ZDD_CoImplySet(f01, f11);
+    if(h != 0) h &= ZDD_CoImplySet(f00, f10);
   }
-  if(f10 - f01 == 0) h += ZBDD(1).Change(t);
+  if(f10 - f01 == 0) h += ZDD(1).Change(t);
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_COIMPSET, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_COIMPSET, fx, gx, h);
 }
 
-ZBDD ZBDD::CoImplySet(int v) const
+ZDD ZDD::CoImplySet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZBDD::CoImplySet(): invalid v.", v);
-  ZBDD f0 = OffSet(v);
-  ZBDD f1 = OnSet0(v);
+  if(v <= 0) BDDerr("ZDD::CoImplySet(): invalid v.", v);
+  ZDD f0 = OffSet(v);
+  ZDD f1 = OnSet0(v);
   if(f1 == 0) return Support();
-  return ZBDD_CoImplySet(f0, f1);
+  return ZDD_CoImplySet(f0, f1);
 }
 
-int ZBDD::IsPoly() const
+int ZDD::IsPoly() const
 {
   int top = Top();
   if(top == 0) return 0;
-  ZBDD f1 = OnSet0(top);
-  ZBDD f0 = OffSet(top);
+  ZDD f1 = OnSet0(top);
+  ZDD f0 = OffSet(top);
   if(f0 != 0) return 1;
   return f1.IsPoly();
 }
 
-ZBDD ZBDD::Divisor() const
+ZDD ZDD::Divisor() const
 {
   if(*this == -1) return -1;
   if(*this == 0) return 0;
   if(! IsPoly()) return 1;
-  ZBDD f = *this;
-  ZBDD g = Support();
+  ZDD f = *this;
+  ZDD g = Support();
   int t;
   while(g != 0)
   {
     t = g.Top();
     g = g.OffSet(t);
-    ZBDD f1 = f.OnSet0(t);
+    ZDD f1 = f.OnSet0(t);
     if(f1.IsPoly()) f = f1;
   }
   return f;
 }
 
 
-//--------- External functions for ZBDD ------------
+//--------- External functions for ZDD ------------
 
-ZBDD operator*(const ZBDD& fc, const ZBDD& gc)
+ZDD operator*(const ZDD& fc, const ZDD& gc)
 {
   if(fc == -1) return -1;
   if(gc == -1) return -1;
@@ -426,7 +426,7 @@ ZBDD operator*(const ZBDD& fc, const ZBDD& gc)
   if(fc == 1) return gc;
   if(gc == 1) return fc;
 
-  ZBDD f = fc; ZBDD g = gc;
+  ZDD f = fc; ZDD g = gc;
   int ftop = f.Top(); int gtop = g.Top();
   if(BDD_LevOfVar(ftop) < BDD_LevOfVar(gtop))
   {
@@ -442,11 +442,11 @@ ZBDD operator*(const ZBDD& fc, const ZBDD& gc)
     fx = f.GetID(); gx = g.GetID();
   }
 
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_MULT, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_MULT, fx, gx);
 
-  ZBDD f1 = f.OnSet0(ftop);
-  ZBDD f0 = f.OffSet(ftop);
-  ZBDD h;
+  ZDD f1 = f.OnSet0(ftop);
+  ZDD f0 = f.OffSet(ftop);
+  ZDD h;
   if(ftop != gtop)
   {
     h = f1 * g;
@@ -454,16 +454,16 @@ ZBDD operator*(const ZBDD& fc, const ZBDD& gc)
   }
   else
   {
-    ZBDD g1 = g.OnSet0(ftop);
-    ZBDD g0 = g.OffSet(ftop);
+    ZDD g1 = g.OnSet0(ftop);
+    ZDD g0 = g.OffSet(ftop);
     h = (f1 * g1)+(f1 * g0)+(f0 * g1);
     h = h.Change(ftop) + (f0 * g0);
   }
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_MULT, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_MULT, fx, gx, h);
 }
 
-ZBDD operator/(const ZBDD& f, const ZBDD& p)
+ZDD operator/(const ZDD& f, const ZDD& p)
 {
   if(f == -1) return -1;
   if(p == -1) return -1;
@@ -475,19 +475,19 @@ ZBDD operator/(const ZBDD& f, const ZBDD& p)
 
   bddword fx = f.GetID();
   bddword px = p.GetID();
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_DIV, fx, px);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_DIV, fx, px);
   
-  ZBDD q = f.OnSet0(top) / p.OnSet0(top);
+  ZDD q = f.OnSet0(top) / p.OnSet0(top);
   if(q != 0)
   {
-    ZBDD p0 = p.OffSet(top);
+    ZDD p0 = p.OffSet(top);
     if(p0 != 0) q &= f.OffSet(top) / p0;
   }
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_DIV, fx, px, q);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_DIV, fx, px, q);
 }
 
-ZBDD ZBDD_Meet(const ZBDD& fc, const ZBDD& gc)
+ZDD ZDD_Meet(const ZDD& fc, const ZDD& gc)
 {
   if(fc == -1) return -1;
   if(gc == -1) return -1;
@@ -496,7 +496,7 @@ ZBDD ZBDD_Meet(const ZBDD& fc, const ZBDD& gc)
   if(fc == 1) return 1;
   if(gc == 1) return 1;
 
-  ZBDD f = fc; ZBDD g = gc;
+  ZDD f = fc; ZDD g = gc;
   int ftop = f.Top();
   int gtop = g.Top();
   if(BDD_LevOfVar(ftop) < BDD_LevOfVar(gtop))
@@ -513,155 +513,155 @@ ZBDD ZBDD_Meet(const ZBDD& fc, const ZBDD& gc)
     fx = f.GetID(); gx = g.GetID();
   }
 
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_MEET, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_MEET, fx, gx);
 
-  ZBDD f1 = f.OnSet0(ftop);
-  ZBDD f0 = f.OffSet(ftop);
-  ZBDD h;
+  ZDD f1 = f.OnSet0(ftop);
+  ZDD f0 = f.OffSet(ftop);
+  ZDD h;
   if(ftop != gtop)
   {
-    h = ZBDD_Meet(f0, g) + ZBDD_Meet(f1, g);
+    h = ZDD_Meet(f0, g) + ZDD_Meet(f1, g);
   }
   else
   {
-    ZBDD g1 = g.OnSet0(ftop);
-    ZBDD g0 = g.OffSet(ftop);
-    h = ZBDD_Meet(f1, g1);
-    h = h.Change(ftop) + ZBDD_Meet(f0, g0)
-      + ZBDD_Meet(f1, g0) + ZBDD_Meet(f0, g1);
+    ZDD g1 = g.OnSet0(ftop);
+    ZDD g0 = g.OffSet(ftop);
+    h = ZDD_Meet(f1, g1);
+    h = h.Change(ftop) + ZDD_Meet(f0, g0)
+      + ZDD_Meet(f1, g0) + ZDD_Meet(f0, g1);
   }
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_MEET, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_MEET, fx, gx, h);
 }
 
-ZBDD ZBDD_Random(int lev, int density)
+ZDD ZDD_Random(int lev, int density)
 {
-  if(lev < 0) BDDerr("ZBDD_Random(): lev < 0.", lev);
+  if(lev < 0) BDDerr("ZDD_Random(): lev < 0.", lev);
   if(lev == 0) return ((rand()%100) < density)? 1: 0;
-  return ZBDD_Random(lev-1, density) +
-         ZBDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
+  return ZDD_Random(lev-1, density) +
+         ZDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
 }
 
-ZBDD ZBDD_Import(FILE *strm)
+ZDD ZDD_Import(FILE *strm)
 {
-  bddword zbdd;
-  if(bddimportz(strm, &zbdd, 1)) return -1;
-  return ZBDD_ID(zbdd);
+  bddword zdd;
+  if(bddimportz(strm, &zdd, 1)) return -1;
+  return ZDD_ID(zdd);
 }
 
 
-// class ZBDDV ---------------------------------------------
+// class ZDDV ---------------------------------------------
 
-ZBDDV::ZBDDV(const ZBDD& f, int location)
+ZDDV::ZDDV(const ZDD& f, int location)
 {
-  if(location < 0) BDDerr("ZBDDV::ZBDDV(): location < 0.", location);
+  if(location < 0) BDDerr("ZDDV::ZDDV(): location < 0.", location);
   if(location >= BDDV_MaxLen)
-    BDDerr("ZBDDV::ZBDDV(): Too large location.", location);
+    BDDerr("ZDDV::ZDDV(): Too large location.", location);
   if(BDD_LevOfVar(f.Top()) > BDD_TopLev())
-    BDDerr("ZBDDV::ZBDDV(): Invalid top var.", f.Top());
-  _zbdd = f;
+    BDDerr("ZDDV::ZDDV(): Invalid top var.", f.Top());
+  _zdd = f;
   int var = 1;
   for(int i=location; i>0; i>>=1)
   {
-    if((i & 1)!= 0) _zbdd = _zbdd.Change(var);
+    if((i & 1)!= 0) _zdd = _zdd.Change(var);
     var++;
   }
 }
 
-ZBDDV ZBDDV::operator<<(int shift) const
+ZDDV ZDDV::operator<<(int shift) const
 {
-  ZBDDV fv1 = *this;
-  ZBDDV fv2;
-  while(fv1 != ZBDDV())
+  ZDDV fv1 = *this;
+  ZDDV fv2;
+  while(fv1 != ZDDV())
   {
-    if(fv1 == ZBDDV(-1)) return fv1;
+    if(fv1 == ZDDV(-1)) return fv1;
     int last = fv1.Last();
-    fv2 += ZBDDV(fv1.GetZBDD(last) << shift, last);
+    fv2 += ZDDV(fv1.GetZDD(last) << shift, last);
     fv1 -= fv1.Mask(last);
   }
   return fv2;
 }
 
-ZBDDV ZBDDV::operator>>(int shift) const
+ZDDV ZDDV::operator>>(int shift) const
 {
-  ZBDDV fv1 = *this;
-  ZBDDV fv2;
-  while(fv1 != ZBDDV())
+  ZDDV fv1 = *this;
+  ZDDV fv2;
+  while(fv1 != ZDDV())
   {
-    if(fv1 == ZBDDV(-1)) return fv1;
+    if(fv1 == ZDDV(-1)) return fv1;
     int last = fv1.Last();
-    fv2 += ZBDDV(fv1.GetZBDD(last) >> shift, last);
+    fv2 += ZDDV(fv1.GetZDD(last) >> shift, last);
     fv1 -= fv1.Mask(last);
   }
   return fv2;
 }
 
-ZBDDV ZBDDV::OffSet(int v) const
+ZDDV ZDDV::OffSet(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZBDDV::OffSet(): Invalid VarID.", v);
-  ZBDDV tmp;
-  tmp._zbdd = _zbdd.OffSet(v);
+    BDDerr("ZDDV::OffSet(): Invalid VarID.", v);
+  ZDDV tmp;
+  tmp._zdd = _zdd.OffSet(v);
   return tmp;
 }
 
-ZBDDV ZBDDV::OnSet(int v) const
+ZDDV ZDDV::OnSet(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZBDDV::OnSet(): Invalid VarID.", v);
-  ZBDDV tmp;
-  tmp._zbdd = _zbdd.OnSet(v);
+    BDDerr("ZDDV::OnSet(): Invalid VarID.", v);
+  ZDDV tmp;
+  tmp._zdd = _zdd.OnSet(v);
   return tmp;
 }
 
-ZBDDV ZBDDV::OnSet0(int v) const
+ZDDV ZDDV::OnSet0(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZBDDV::OnSet0(): Invalid VarID.", v);
-  ZBDDV tmp;
-  tmp._zbdd = _zbdd.OnSet0(v);
+    BDDerr("ZDDV::OnSet0(): Invalid VarID.", v);
+  ZDDV tmp;
+  tmp._zdd = _zdd.OnSet0(v);
   return tmp;
 }
 
-ZBDDV ZBDDV::Change(int v) const
+ZDDV ZDDV::Change(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZBDDV::Change(): Invalid VarID.", v);
-  ZBDDV tmp;
-  tmp._zbdd = _zbdd.Change(v);
+    BDDerr("ZDDV::Change(): Invalid VarID.", v);
+  ZDDV tmp;
+  tmp._zdd = _zdd.Change(v);
   return tmp;
 }
 
-ZBDDV ZBDDV::Swap(int v1, int v2) const
+ZDDV ZDDV::Swap(int v1, int v2) const
 {
   if(BDD_LevOfVar(v1) > BDD_TopLev())
-    BDDerr("ZBDDV::Swap(): Invalid VarID.", v1);
+    BDDerr("ZDDV::Swap(): Invalid VarID.", v1);
   if(BDD_LevOfVar(v1) > BDD_TopLev())
-    BDDerr("ZBDDV::Swap(): Invalid VarID.", v2);
-  ZBDDV tmp;
-  tmp._zbdd = _zbdd.Swap(v1, v2);
+    BDDerr("ZDDV::Swap(): Invalid VarID.", v2);
+  ZDDV tmp;
+  tmp._zdd = _zdd.Swap(v1, v2);
   return tmp;
 }
 
-int ZBDDV::Top() const
+int ZDDV::Top() const
 {
-  ZBDDV fv1 = *this;
-  if(fv1 == ZBDDV(-1)) return 0;
+  ZDDV fv1 = *this;
+  if(fv1 == ZDDV(-1)) return 0;
   int top = 0;
-  while(fv1 != ZBDDV())
+  while(fv1 != ZDDV())
   {
     int last = fv1.Last();
-    int t = fv1.GetZBDD(last).Top();
+    int t = fv1.GetZDD(last).Top();
     if(BDD_LevOfVar(t) > BDD_LevOfVar(top)) top = t;
     fv1 -= fv1.Mask(last);
   }
   return top;
 }
 
-int ZBDDV::Last() const
+int ZDDV::Last() const
 {
   int last = 0;
-  ZBDD f = _zbdd;
+  ZDD f = _zdd;
   while(BDD_LevOfVar(f.Top()) > BDD_TopLev())
   {
     int t = f.Top();
@@ -671,26 +671,26 @@ int ZBDDV::Last() const
   return last;
 }
 
-ZBDDV ZBDDV::Mask(int start, int len) const
+ZDDV ZDDV::Mask(int start, int len) const
 {
   if(start < 0 || start >= BDDV_MaxLen)
-    BDDerr("ZBDDV::Mask(): Illegal start index.", start);
+    BDDerr("ZDDV::Mask(): Illegal start index.", start);
   if(len <= 0 || start+len > BDDV_MaxLen)
-    BDDerr("ZBDDV::Mask(): Illegal len.", len);
-  ZBDDV tmp;
+    BDDerr("ZDDV::Mask(): Illegal len.", len);
+  ZDDV tmp;
   for(int i=start; i<start+len; i++)
-  	tmp += ZBDDV(this -> GetZBDD(i), i);
+  	tmp += ZDDV(this -> GetZDD(i), i);
   return tmp;
 }
 
-ZBDD ZBDDV::GetZBDD(int index) const
+ZDD ZDDV::GetZDD(int index) const
 {
   if(index < 0 || index >= BDDV_MaxLen)
-    BDDerr("ZBDDV::GetZBDD(): Illegal index.",index);
+    BDDerr("ZDDV::GetZDD(): Illegal index.",index);
   int level = 0;
   for(int i=1; i<=index; i<<=1) level++;
 
-  ZBDD f = _zbdd;
+  ZDD f = _zdd;
   while(BDD_LevOfVar(f.Top()) > BDD_TopLev() + level)
     f = f.OffSet(f.Top());
   while(level > 0)
@@ -703,64 +703,64 @@ ZBDD ZBDDV::GetZBDD(int index) const
   return f;
 }
 
-bddword ZBDDV::Size() const
+bddword ZDDV::Size() const
 {
   int len = this -> Last() + 1;
   bddword* bddv = new bddword[len];
-  for(int i=0; i<len; i++) bddv[i] = GetZBDD(i).GetID(); 
+  for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
   bddword s = bddvsize(bddv, len);
   delete[] bddv;
   return s;
 }
 
-void ZBDDV::Print() const
+void ZDDV::Print() const
 {
   int len = this -> Last() + 1;
   for(int i=0; i<len; i++)
   {
     cout << "f" << i << ": ";
-    GetZBDD(i).Print();
+    GetZDD(i).Print();
   }
   cout << "Size= " << Size() << "\n\n";
   cout.flush();
 }
 
-void ZBDDV::Export(FILE *strm) const
+void ZDDV::Export(FILE *strm) const
 {
   int len = this -> Last() + 1;
   bddword* bddv = new bddword[len];
-  for(int i=0; i<len; i++) bddv[i] = GetZBDD(i).GetID(); 
+  for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
   bddexport(strm, bddv, len);
   delete[] bddv;
 }
 
 static int Len;
 static char* Cube;
-static int ZBDDV_PLA(const ZBDDV&, int);
-static int ZBDDV_PLA(const ZBDDV& fv, int tlev)
+static int ZDDV_PLA(const ZDDV&, int);
+static int ZDDV_PLA(const ZDDV& fv, int tlev)
 {
-  if(fv == ZBDDV(-1)) return 1;
-  if(fv == ZBDDV()) return 0;
+  if(fv == ZDDV(-1)) return 1;
+  if(fv == ZDDV()) return 0;
   if(tlev == 0)
   {
     cout << Cube << " ";
     for(int i=0; i<Len; i++)
-      if(fv.GetZBDD(i) == 0) cout << "~";
+      if(fv.GetZDD(i) == 0) cout << "~";
       else cout << "1";
     cout << "\n";
     cout.flush();
     return 0;
   }
   Cube[tlev-1] = '1';
-  if(ZBDDV_PLA(fv.OnSet0(BDD_VarOfLev(tlev)), tlev-1) == 1)
+  if(ZDDV_PLA(fv.OnSet0(BDD_VarOfLev(tlev)), tlev-1) == 1)
     return 1;
   Cube[tlev-1] = '0';
-  return ZBDDV_PLA(fv.OffSet(BDD_VarOfLev(tlev)), tlev-1);
+  return ZDDV_PLA(fv.OffSet(BDD_VarOfLev(tlev)), tlev-1);
 }
 
-int ZBDDV::PrintPla() const
+int ZDDV::PrintPla() const
 {
-  if(*this == ZBDDV(-1)) return 1;
+  if(*this == ZDDV(-1)) return 1;
   int tlev = BDD_LevOfVar(Top());
   Len = Last() + 1;
   cout << ".i " << tlev << "\n";
@@ -768,7 +768,7 @@ int ZBDDV::PrintPla() const
   if(tlev == 0)
   {
     for(int i=0; i<Len; i++)
-    if(GetZBDD(i) == 0) cout << "0";
+    if(GetZDD(i) == 0) cout << "0";
     else cout << "1";
     cout << "\n";
   }
@@ -776,7 +776,7 @@ int ZBDDV::PrintPla() const
   {
     Cube = new char[tlev + 1];
     Cube[tlev] = 0;
-    int err = ZBDDV_PLA(*this, tlev);
+    int err = ZDDV_PLA(*this, tlev);
     delete[] Cube;
     if(err == 1) return 1;
   }
@@ -793,37 +793,37 @@ int ZBDDV::PrintPla() const
 #  define B_STRTOI strtoll
 #endif
 
-ZBDDV ZBDDV_Import(FILE *strm)
+ZDDV ZDDV_Import(FILE *strm)
 {
   int inv, e;
   bddword hashsize;
-  ZBDD f, f0, f1;
+  ZDD f, f0, f1;
   char s[256];
   bddword *hash1 = 0;
-  ZBDD *hash2 = 0;
+  ZDD *hash2 = 0;
 
-  if(fscanf(strm, "%s", s) == EOF) return ZBDDV(-1);
-  if(strcmp(s, "_i") != 0) return ZBDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return ZBDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
+  if(strcmp(s, "_i") != 0) return ZDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
   int n = strtol(s, NULL, 10);
   while(n > BDD_TopLev()) BDD_NewVar();
 
-  if(fscanf(strm, "%s", s) == EOF) return ZBDDV(-1);
-  if(strcmp(s, "_o") != 0) return ZBDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return ZBDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
+  if(strcmp(s, "_o") != 0) return ZDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
   int m = strtol(s, NULL, 10);
 
-  if(fscanf(strm, "%s", s) == EOF) return ZBDDV(-1);
-  if(strcmp(s, "_n") != 0) return ZBDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return ZBDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
+  if(strcmp(s, "_n") != 0) return ZDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
   bddword n_nd = B_STRTOI(s, NULL, 10);
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
   hash1 = new bddword[hashsize];
-  if(hash1 == 0) return ZBDDV(-1);
-  hash2 = new ZBDD[hashsize];
-  if(hash2 == 0) { delete[] hash1; return ZBDDV(-1); }
+  if(hash1 == 0) return ZDDV(-1);
+  hash2 = new ZDD[hashsize];
+  if(hash2 == 0) { delete[] hash1; return ZDDV(-1); }
   for(bddword ix=0; ix<hashsize; ix++)
   {
     hash1[ix] = B_VAL_MASK;
@@ -851,7 +851,7 @@ ZBDDV ZBDDV_Import(FILE *strm)
       while(hash1[ixx] != nd0)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("ZBDDV_Import(): internal error", ixx);
+          BDDerr("ZDDV_Import(): internal error", ixx);
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -871,7 +871,7 @@ ZBDDV ZBDDV_Import(FILE *strm)
       while(hash1[ixx] != nd1)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("ZBDDV_Import(): internal error", ixx);
+          BDDerr("ZDDV_Import(): internal error", ixx);
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -885,7 +885,7 @@ ZBDDV ZBDDV_Import(FILE *strm)
     while(hash1[ixx] != B_VAL_MASK)
     {
       if(hash1[ixx] == nd)
-        BDDerr("ZBDDV_Import(): internal error", ixx);
+        BDDerr("ZDDV_Import(): internal error", ixx);
       ixx++;
       ixx &= (hashsize-1);
     }
@@ -897,21 +897,21 @@ ZBDDV ZBDDV_Import(FILE *strm)
   {
     delete[] hash2;
     delete[] hash1;
-    return ZBDDV(-1);
+    return ZDDV(-1);
   }
 
-  ZBDDV v = ZBDDV();
+  ZDDV v = ZDDV();
   for(int i=0; i<m; i++)
   {
     if(fscanf(strm, "%s", s) == EOF)
     {
       delete[] hash2;
       delete[] hash1;
-      return ZBDDV(-1);
+      return ZDDV(-1);
     }
     bddword nd = B_STRTOI(s, NULL, 10);
-    if(strcmp(s, "F") == 0) v += ZBDDV(0, i);
-    else if(strcmp(s, "T") == 0) v += ZBDDV(1, i);
+    if(strcmp(s, "F") == 0) v += ZDDV(0, i);
+    else if(strcmp(s, "T") == 0) v += ZDDV(1, i);
     else
     {
       if(nd & 1) { inv = 1; nd ^= 1; }
@@ -921,11 +921,11 @@ ZBDDV ZBDDV_Import(FILE *strm)
       while(hash1[ixx] != nd)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("ZBDDV_Import(): internal error", ixx);
+          BDDerr("ZDDV_Import(): internal error", ixx);
         ixx++;
         ixx &= (hashsize-1);
       }
-      v += ZBDDV((inv? (hash2[ixx] + 1): hash2[ixx]), i);
+      v += ZDDV((inv? (hash2[ixx] + 1): hash2[ixx]), i);
     }
   }
 
@@ -941,11 +941,11 @@ ZBDDV ZBDDV_Import(FILE *strm)
   : (n<1024)?4:(n<32768)?8:16 \
   ))
 
-ZBDD ZBDD::ZLev(int lev, int last) const
+ZDD ZDD::ZLev(int lev, int last) const
 {
   if(lev <= 0) return *this & 1;
-  ZBDD f = *this;
-  ZBDD u = *this & 1;
+  ZDD f = *this;
+  ZDD u = *this & 1;
   int ftop = Top();
   int flev = BDD_LevOfVar(ftop);
   while(flev > lev)
@@ -968,7 +968,7 @@ ZBDD ZBDD::ZLev(int lev, int last) const
       if(n < flev - 1)
       {
         bddword fx = f.GetID();
-        ZBDD g = BDD_CacheZBDD(BC_ZBDD_ZSkip, fx, fx);
+        ZDD g = BDD_CacheZDD(BC_ZDD_ZSkip, fx, fx);
         if(g != -1)
         {
           int gtop = g.Top();
@@ -991,24 +991,24 @@ ZBDD ZBDD::ZLev(int lev, int last) const
   return (last == 0 || lev == flev)? f: u;
 }
 
-void ZBDD::SetZSkip() const
+void ZDD::SetZSkip() const
 {
   int t = Top();
   int lev = BDD_LevOfVar(t);
   if(lev <= 4) return;
   bddword fx = GetID();
-  ZBDD g = BDD_CacheZBDD(BC_ZBDD_ZSkip, fx, fx);
+  ZDD g = BDD_CacheZDD(BC_ZDD_ZSkip, fx, fx);
   if(g != -1) return;
-  ZBDD f0 = OffSet(t);
+  ZDD f0 = OffSet(t);
   f0.SetZSkip();
   g = ZLev(ZLevNum(lev), 1);
   if(g == *this) g = f0;
   bddword gx = g.GetID();
-  BDD_CacheEnt(BC_ZBDD_ZSkip, fx, fx, gx);
+  BDD_CacheEnt(BC_ZDD_ZSkip, fx, fx, gx);
   OnSet0(t).SetZSkip();
 }
 
-ZBDD ZBDD::Intersec(const ZBDD& g) const
+ZDD ZDD::Intersec(const ZDD& g) const
 {
   if(g == 0) return 0;
   if(g == 1) return *this & 1;
@@ -1019,11 +1019,11 @@ ZBDD ZBDD::Intersec(const ZBDD& g) const
   bddword fx = GetID();
   bddword gx = g.GetID();
   if(fx < gx) { fx = g.GetID(); gx = GetID(); }
-  ZBDD_CACHE_CHK_RETURN(BC_ZBDD_INTERSEC, fx, gx);
+  ZDD_CACHE_CHK_RETURN(BC_ZDD_INTERSEC, fx, gx);
 
   int flev = BDD_LevOfVar(ftop);
   int glev = BDD_LevOfVar(gtop);
-  ZBDD h;
+  ZDD h;
   if(flev > glev) h = ZLev(glev).Intersec(g);
   else if(flev < glev) h = Intersec(g.OffSet(gtop));
   else
@@ -1032,7 +1032,7 @@ ZBDD ZBDD::Intersec(const ZBDD& g) const
       + OffSet(ftop).Intersec(g.OffSet(ftop));
   }
 
-  ZBDD_CACHE_ENT_RETURN(BC_ZBDD_INTERSEC, fx, gx, h);
+  ZDD_CACHE_ENT_RETURN(BC_ZDD_INTERSEC, fx, gx, h);
 }
 
 } // namespace sapporobdd

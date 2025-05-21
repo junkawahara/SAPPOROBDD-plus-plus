@@ -1,36 +1,36 @@
 /*****************************************
- * ZZBDDDG - Decomposition Graph         *
+ * ZZDDDG - Decomposition Graph         *
  * (SAPPORO-1.87) - Header               *
  * (C) Shin-ichi MINATO  (May 14, 2021)  *
  *****************************************/
 
-#ifndef _ZBDDDG_
-#define _ZBDDDG_
+#ifndef _ZDDDG_
+#define _ZDDDG_
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
 
-#define ZBDDDG_InitSize 4
+#define ZDDDG_InitSize 4
 
-#define ZBDDDG_NIL   BDD_MaxNode
+#define ZDDDG_NIL   BDD_MaxNode
 
-#define ZBDDDG_C0    1
-#define ZBDDDG_P1    2
-#define ZBDDDG_LIT   3
-#define ZBDDDG_AND   4
-#define ZBDDDG_OR    5
-#define ZBDDDG_OTHER 6
+#define ZDDDG_C0    1
+#define ZDDDG_P1    2
+#define ZDDDG_LIT   3
+#define ZDDDG_AND   4
+#define ZDDDG_OR    5
+#define ZDDDG_OTHER 6
 
-class ZBDDDG
+class ZDDDG
 {
   struct Node;
   struct NodeLink
   {
     bddword _ndx;
     bddword _nxt;
-    NodeLink(void){ _ndx = ZBDDDG_NIL; _nxt = ZBDDDG_NIL; }
+    NodeLink(void){ _ndx = ZDDDG_NIL; _nxt = ZDDDG_NIL; }
   };
 
   bddword _nodeSize;
@@ -43,19 +43,19 @@ class ZBDDDG
   bddword _c0;
   bddword _c1;
 
-  bddword HashIndex(ZBDD);
-  bddword NewNdx(ZBDD, char);
+  bddword HashIndex(ZDD);
+  bddword NewNdx(ZDD, char);
   int EnlargeNode(void);
   bddword NewLkx(bddword);
   int EnlargeLink(void);
   int LinkNodes(bddword, bddword);
   int Merge3(bddword, bddword, bddword);
-  ZBDD Func0(ZBDD, ZBDD);
-  ZBDD Func1(ZBDD, ZBDD);
+  ZDD Func0(ZDD, ZDD);
+  ZDD Func1(ZDD, ZDD);
   int LinkNodesC3(bddword, bddword);
   void Print0(bddword);
-  bddword Merge(ZBDD, bddword, bddword);
-  bddword ReferNdx(ZBDD);
+  bddword Merge(ZDD, bddword, bddword);
+  bddword ReferNdx(ZDD);
   int PhaseSweep(bddword);
   void MarkSweep(bddword);
   void MarkSweepR(bddword);
@@ -71,39 +71,43 @@ class ZBDDDG
   struct Node
   {
     bddword _lkx;
-    ZBDD _f;
+    ZDD _f;
     bddword _ndxP;
     char _type;  // NULL, C1, P1, LIT, OR, XOR, OTHER
     char _mark;
     Node(void);
-    Node(ZBDD, char);
+    Node(ZDD, char);
   };
 
 public:
-  ZBDDDG(void);
-  ~ZBDDDG(void);
+  ZDDDG(void);
+  ~ZDDDG(void);
   void Clear(void);
   bddword NodeUsed(void);
-  int PrintDecomp(ZBDD);
-  bddword Decomp(ZBDD);
+  int PrintDecomp(ZDD);
+  bddword Decomp(ZDD);
 
-  friend class ZBDDDG_Tag;
+  friend class ZDDDG_Tag;
 };
 
-class ZBDDDG_Tag
+typedef ZDDDG ZBDDDG; // for backward compatibility
+
+class ZDDDG_Tag
 {
-  ZBDDDG* _dg;
+  ZDDDG* _dg;
   bddword _ndx;
   bddword _lkx;
 public:
-  ZBDDDG_Tag(void);
-  int Set(ZBDDDG *, bddword);
+  ZDDDG_Tag(void);
+  int Set(ZDDDG *, bddword);
   bddword TopNdx(void);
   bddword NextNdx(void);
   char Type(void);
-  ZBDD Func(void);
+  ZDD Func(void);
 };
+
+typedef ZDDDG_Tag ZBDDDG_Tag; // for backward compatibility
 
 } // namespace sapporobdd
 
-#endif // _ZBDDDG_
+#endif // _ZDDDG_

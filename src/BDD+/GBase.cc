@@ -35,7 +35,7 @@ void GBase::FixEdge(const GB_e ix, const char fix)
 
 void GBase::SetHamilton(const int hm) { _hamilton = hm; }
 
-void GBase::SetCond(ZBDD f) { _f = f; }
+void GBase::SetCond(ZDD f) { _f = f; }
   // for ZDD-constrained enumeration
 
 GBase::Edge::Edge()
@@ -288,8 +288,8 @@ bddword Hash(const GB_e ix)
   return k;
 }
 
-static ZBDD CacheCheck(const GB_e);
-ZBDD CacheCheck(const GB_e ix)
+static ZDD CacheCheck(const GB_e);
+ZDD CacheCheck(const GB_e ix)
 {
   if(_e[ix]._casize == 0) return -1;
 
@@ -325,8 +325,8 @@ ZBDD CacheCheck(const GB_e ix)
   return -1;
 }
 
-static void CacheEnter(const GB_e, ZBDD);
-void CacheEnter(const GB_e ix, ZBDD h)
+static void CacheEnter(const GB_e, ZDD);
+void CacheEnter(const GB_e ix, ZDD h)
 {
   if(_e[ix]._casize == 0) return;
 
@@ -496,8 +496,8 @@ int EnumCyclesInit()
   return 0;
 }
 
-static ZBDD EnumCycles(const GB_e);
-ZBDD EnumCycles(const GB_e ix)
+static ZDD EnumCycles(const GB_e);
+ZDD EnumCycles(const GB_e ix)
 {
 #ifdef DEBUG
   _count++;
@@ -505,8 +505,8 @@ ZBDD EnumCycles(const GB_e ix)
 
   if(_e[ix]._f == 0) return 0; // ZDD-constrained enumeration
 
-  ZBDD h = 0;
-  ZBDD h0, h1;
+  ZDD h = 0;
+  ZDD h0, h1;
   if(ix > 0 && (h = CacheCheck(ix-1)) != -1)
     return h; // cache hit
 
@@ -609,7 +609,7 @@ skip1:
   return h;
 }
 
-ZBDD GBase::SimPaths(const GB_v s, const GB_v t)
+ZDD GBase::SimPaths(const GB_v s, const GB_v t)
 {
   //if(_n >= 255) return -1; // 8bit-v;
   if(_n >= 65535) return -1; // 16bit-v;
@@ -647,12 +647,12 @@ ZBDD GBase::SimPaths(const GB_v s, const GB_v t)
   gp->SetHamilton(_hamilton);
   gp->FixEdge(st, GB_fix1);
   int v = gp->BDDvarOfEdge(st);
-  ZBDD h = gp->SimCycles().OnSet0(v);
-  if(gp == this) h += ZBDD(1).Change(v);
+  ZDD h = gp->SimCycles().OnSet0(v);
+  if(gp == this) h += ZDD(1).Change(v);
   return h;
 }
 
-ZBDD GBase::SimCycles()
+ZDD GBase::SimCycles()
 {
   //if(_n >= 255) return -1; // 8bit-v;
   if(_n >= 65535) return -1; // 16bit-v;
@@ -661,7 +661,7 @@ ZBDD GBase::SimCycles()
   G = this;
   if(EnumCyclesInit()) return -1;
 
-  ZBDD h = EnumCycles(0);
+  ZDD h = EnumCycles(0);
 
 #ifdef DEBUG
   bddword a = 0;

@@ -16,26 +16,26 @@ static const char BC_SeqBDD_DIV = 71;
 
 //----------- Macros for operation cache -----------
 #define SeqBDD_CACHE_CHK_RETURN(op, fx, gx) \
-  { ZBDD z = BDD_CacheZBDD(op, fx, gx); \
+  { ZDD z = BDD_CacheZDD(op, fx, gx); \
     if(z != -1) return SeqBDD(z); \
     BDD_RECUR_INC; }
 
 #define SeqBDD_CACHE_ENT_RETURN(op, fx, gx, h) \
   { BDD_RECUR_DEC; \
-    if(h != -1) BDD_CacheEnt(op, fx, gx, h.GetZBDD().GetID()); \
+    if(h != -1) BDD_CacheEnt(op, fx, gx, h.GetZDD().GetID()); \
     return h; }
 
 // class SeqBDD ---------------------------------------------
 
 SeqBDD SeqBDD::OffSet(int v) const
 {
-  if(_zbdd.Top() == v) return SeqBDD(_zbdd.OffSet(v));
+  if(_zdd.Top() == v) return SeqBDD(_zdd.OffSet(v));
   else return *this - OnSet0(v).Push(v);
 }
 
 SeqBDD SeqBDD::OnSet0(int v) const
 {
-  ZBDD f = _zbdd;
+  ZDD f = _zdd;
   int top = f.Top();
   while(BDD_LevOfVar(v) < BDD_LevOfVar(top))
   {
@@ -45,14 +45,14 @@ SeqBDD SeqBDD::OnSet0(int v) const
   return SeqBDD(f.OnSet0(v));
 }
 
-bddword SeqBDD::Size() const { return _zbdd.Size(); }
-bddword SeqBDD::Card() const { return _zbdd.Card(); }
-bddword SeqBDD::Lit() const { return _zbdd.Lit(); }
-bddword SeqBDD::Len() const { return _zbdd.Len(); }
+bddword SeqBDD::Size() const { return _zdd.Size(); }
+bddword SeqBDD::Card() const { return _zdd.Card(); }
+bddword SeqBDD::Lit() const { return _zdd.Lit(); }
+bddword SeqBDD::Len() const { return _zdd.Len(); }
 
-void SeqBDD::Export(FILE *strm) const { _zbdd.Export(strm); }
+void SeqBDD::Export(FILE *strm) const { _zdd.Export(strm); }
 
-void SeqBDD::Print() const { GetZBDD().Print(); }
+void SeqBDD::Print() const { GetZDD().Print(); }
 
 SeqBDD operator*(const SeqBDD& f, const SeqBDD& g)
 {
@@ -64,8 +64,8 @@ SeqBDD operator*(const SeqBDD& f, const SeqBDD& g)
   if(g == 1) return f;
 
   int ftop = f.Top();
-  bddword fx = f.GetZBDD().GetID();
-  bddword gx = g.GetZBDD().GetID();
+  bddword fx = f.GetZDD().GetID();
+  bddword gx = g.GetZDD().GetID();
 
   SeqBDD_CACHE_CHK_RETURN(BC_SeqBDD_MULT, fx, gx);
 
@@ -87,8 +87,8 @@ SeqBDD operator/(const SeqBDD& f, const SeqBDD& p)
   int top = p.Top();
   if(BDD_LevOfVar(f.Top()) < BDD_LevOfVar(top)) return 0;
 
-  bddword fx = f.GetZBDD().GetID();
-  bddword px = p.GetZBDD().GetID();
+  bddword fx = f.GetZDD().GetID();
+  bddword px = p.GetZDD().GetID();
   SeqBDD_CACHE_CHK_RETURN(BC_SeqBDD_DIV, fx, px);
 
   SeqBDD q = f.OnSet0(top) / p.OnSet0(top);

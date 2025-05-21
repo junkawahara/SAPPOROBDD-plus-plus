@@ -8,7 +8,7 @@ class PiDD;
 #ifndef _PiDD_
 #define _PiDD_
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -37,16 +37,16 @@ extern PiDD operator/(const PiDD&, const PiDD&);
 
 class PiDD
 {
-  ZBDD _zbdd;
+  ZDD _zdd;
 public:
-  PiDD(void) { _zbdd = 0; }
-  PiDD(int a) { _zbdd = a; }
-  PiDD(const PiDD& f) { _zbdd = f._zbdd; }
-  PiDD(const ZBDD& zbdd) { _zbdd = zbdd; }
+  PiDD(void) { _zdd = 0; }
+  PiDD(int a) { _zdd = a; }
+  PiDD(const PiDD& f) { _zdd = f._zdd; }
+  PiDD(const ZDD& zdd) { _zdd = zdd; }
 
   ~PiDD(void) { }
 
-  PiDD& operator=(const PiDD& f) { _zbdd = f._zbdd; return *this; }
+  PiDD& operator=(const PiDD& f) { _zdd = f._zdd; return *this; }
   PiDD& operator&=(const PiDD&); // inline
   PiDD& operator+=(const PiDD&); // inline
   PiDD& operator-=(const PiDD&); // inline
@@ -62,10 +62,10 @@ public:
 
   int TopX(void) const { return PiDD_X_Lev(TopLev()); }
   int TopY(void) const { return PiDD_Y_Lev(TopLev()); }
-  int TopLev(void) const { return BDD_LevOfVar(_zbdd.Top()); }
+  int TopLev(void) const { return BDD_LevOfVar(_zdd.Top()); }
   bddword Size(void) const;
   bddword Card(void) const;
-  ZBDD GetZBDD(void) const { return _zbdd; }
+  ZDD GetZDD(void) const { return _zdd; }
   
   void Print(void) const;
   void Enum(void) const;
@@ -80,19 +80,19 @@ public:
 };
 
 inline PiDD operator&(const PiDD& p, const PiDD& q)
-  { return PiDD(p._zbdd & q._zbdd); }
+  { return PiDD(p._zdd & q._zdd); }
 
 inline PiDD operator+(const PiDD& p, const PiDD& q)
-  { return PiDD(p._zbdd + q._zbdd); }
+  { return PiDD(p._zdd + q._zdd); }
 
 inline PiDD operator-(const PiDD& p, const PiDD& q)
-  { return PiDD(p._zbdd - q._zbdd); }
+  { return PiDD(p._zdd - q._zdd); }
 
 inline PiDD operator%(const PiDD& f, const PiDD& p)
   { return f - (f/p) * p; }
 
 inline int operator==(const PiDD& p, const PiDD& q)
-  { return p._zbdd == q._zbdd; }
+  { return p._zdd == q._zdd; }
 
 inline int operator!=(const PiDD& p, const PiDD& q)
   { return !(p == q); }

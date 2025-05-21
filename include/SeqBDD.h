@@ -6,7 +6,7 @@
 #ifndef _SeqBDD_
 #define _SeqBDD_
 
-#include "ZBDD.h"
+#include "ZDD.h"
 
 namespace sapporobdd {
 
@@ -22,22 +22,22 @@ extern SeqBDD operator%(const SeqBDD&, const SeqBDD&);
 
 class SeqBDD
 {
-  ZBDD _zbdd;
+  ZDD _zdd;
 public:
-  SeqBDD(void){ _zbdd = ZBDD(); }
-  SeqBDD(int val) { _zbdd = ZBDD(val); }
-  SeqBDD(const SeqBDD& f){ _zbdd = f._zbdd; }
-  SeqBDD(const ZBDD& zbdd){ _zbdd = zbdd; }
+  SeqBDD(void){ _zdd = ZDD(); }
+  SeqBDD(int val) { _zdd = ZDD(val); }
+  SeqBDD(const SeqBDD& f){ _zdd = f._zdd; }
+  SeqBDD(const ZDD& zdd){ _zdd = zdd; }
   ~SeqBDD(void){ }
 
-  SeqBDD& operator=(const SeqBDD& f) { _zbdd = f._zbdd; return *this; }
+  SeqBDD& operator=(const SeqBDD& f) { _zdd = f._zdd; return *this; }
   SeqBDD operator&=(const SeqBDD& f)
-    { _zbdd = _zbdd & f._zbdd; return *this; }
+    { _zdd = _zdd & f._zdd; return *this; }
 
   SeqBDD operator+=(const SeqBDD& f)
-    { _zbdd = _zbdd + f._zbdd; return *this; }
+    { _zdd = _zdd + f._zdd; return *this; }
   SeqBDD operator-=(const SeqBDD& f)
-    { _zbdd = _zbdd - f._zbdd; return *this; }
+    { _zdd = _zdd - f._zdd; return *this; }
 
   SeqBDD operator*=(const SeqBDD&); // inline
   SeqBDD operator/=(const SeqBDD&); // inline
@@ -48,10 +48,10 @@ public:
   SeqBDD OnSet(int v) const
     { return OnSet0(v).Push(v); }
   SeqBDD Push(int v) const
-    { return SeqBDD(ZBDD_ID(bddpush(_zbdd.GetID(), v))); }
+    { return SeqBDD(ZDD_ID(bddpush(_zdd.GetID(), v))); }
 
-  int Top(void) const { return _zbdd.Top(); }
-  ZBDD GetZBDD(void) const { return _zbdd; }
+  int Top(void) const { return _zdd.Top(); }
+  ZDD GetZDD(void) const { return _zdd; }
 
   bddword Size(void) const;
   bddword Card(void) const;
@@ -73,19 +73,19 @@ public:
 };
 
 inline SeqBDD operator&(const SeqBDD& f, const SeqBDD& g)
-  { return SeqBDD(f._zbdd & g._zbdd); }
+  { return SeqBDD(f._zdd & g._zdd); }
 
 inline SeqBDD operator+(const SeqBDD& f, const SeqBDD& g)
-  { return SeqBDD(f._zbdd + g._zbdd); }
+  { return SeqBDD(f._zdd + g._zdd); }
 
 inline SeqBDD operator-(const SeqBDD& f, const SeqBDD& g)
-  { return SeqBDD(f._zbdd - g._zbdd); } 
+  { return SeqBDD(f._zdd - g._zdd); } 
 
 inline SeqBDD operator%(const SeqBDD& f, const SeqBDD& p)
   { return f - p * (f/p); }
 
 inline int operator==(const SeqBDD& f, const SeqBDD& g)
-  { return f._zbdd == g._zbdd; }
+  { return f._zdd == g._zdd; }
 
 inline int operator!=(const SeqBDD& f, const SeqBDD& g)
   { return !(f == g); }

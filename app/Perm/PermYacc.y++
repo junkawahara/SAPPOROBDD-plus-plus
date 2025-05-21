@@ -483,12 +483,12 @@ output
       }
       else if(strcmp($3.str, "plot") == 0)
       {
-        $4 -> GetZBDD().XPrint();
+        $4 -> GetZDD().XPrint();
         delete $4;
       }
       else if(strcmp($3.str, "export") == 0)
       {
-        $4 -> GetZBDD().Export();
+        $4 -> GetZDD().Export();
         delete $4;
       }
       else
@@ -506,7 +506,7 @@ output
         FILE *fp;
         fp = fopen($4.str+1, "w");
         if(fp == NULL) yyerror("Can't open the file");
-	else $5 -> GetZBDD().Export(fp);
+	else $5 -> GetZDD().Export(fp);
 	fclose(fp);
       }
       else

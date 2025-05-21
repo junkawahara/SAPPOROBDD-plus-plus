@@ -119,7 +119,7 @@ int BDD_RecurCount = 0;
     err("BDD_RECUR_INC: Recursion Limit", BDD_RecurCount);}
 #define BDD_RECUR_DEC BDD_RecurCount--
 
-/* Conversion of ZBDD node flag */
+/* Conversion of ZDD node flag */
 #define B_Z_NP(p) ((p)->f0_32 & (bddp_32)B_INV_MASK)
 
 /* Hash Functions */
@@ -242,7 +242,7 @@ static int  node_enlarge(void);
 static int  hash_enlarge(bddvar v);
 static bddp getnode(bddvar v, bddp f0, bddp f1);
 static bddp getbddp(bddvar v, bddp f0, bddp f1);
-static bddp getzbddp(bddvar v, bddp f0, bddp f1);
+static bddp getzddp(bddvar v, bddp f0, bddp f1);
 static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip);
 static void gc1(struct B_NodeTable *np);
 static bddp count(bddp f);
@@ -795,7 +795,7 @@ bddp bddand(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddand: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddand: applying ZBDD node", f);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g); }
@@ -804,7 +804,7 @@ bddp bddand(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddand: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddand: applying ZBDD node", g);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g);
   }
 
   return apply(f, g, BC_AND, 0);
@@ -837,7 +837,7 @@ bddp bddxor(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddxor: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddand: applying ZBDD node", f);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g); }
@@ -846,7 +846,7 @@ bddp bddxor(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddxor: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddand: applying ZBDD node", g);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g);
   }
 
   return apply(f, g, BC_XOR, 0);
@@ -892,7 +892,7 @@ bddp bddcofactor(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddcofactor: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddcofactor: applying ZBDD node", f);
+    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddcofactor: Invalid bddp", g); }
@@ -901,7 +901,7 @@ bddp bddcofactor(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddcofactor: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddcofactor: applying ZBDD node", g);
+    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", g);
   }
 
   return apply(f, g, BC_COFACTOR, 0);
@@ -922,7 +922,7 @@ bddp bdduniv(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bdduniv: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bdduniv: applying ZBDD node", f);
+    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bdduniv: Invalid bddp", g); }
@@ -931,7 +931,7 @@ bddp bdduniv(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bdduniv: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bdduniv: applying ZBDD node", g);
+    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", g);
   }
 
   return apply(f, g, BC_UNIV, 0);
@@ -963,7 +963,7 @@ int bddimply(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddimply: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddimply: applying ZBDD node", f);
+    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddimply: Invalid bddp", g); }
@@ -972,7 +972,7 @@ int bddimply(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddimply: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddimply: applying ZBDD node", g);
+    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", g);
   }
 
   return ! andfalse(f, B_NOT(g));
@@ -1071,7 +1071,7 @@ bddp    bddoffset(bddp f, bddvar v)
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
     err("bddoffset: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddoffset: applying non-ZBDD node", f);
+  if(!B_Z_NP(fp)) err("bddoffset: applying non-ZDD node", f);
 
   return apply(f, (bddp)v, BC_OFFSET, 0);
 }
@@ -1088,7 +1088,7 @@ bddp    bddonset0(bddp f, bddvar v)
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
     err("bddonset0: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddonset0: applying non-ZBDD node", f);
+  if(!B_Z_NP(fp)) err("bddonset0: applying non-ZDD node", f);
 
   return apply(f, (bddp)v, BC_ONSET, 0);
 }
@@ -1117,7 +1117,7 @@ bddp    bddchange(bddp f, bddvar v)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddchange: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddchange: applying non-ZBDD node", f);
+    if(!B_Z_NP(fp)) err("bddchange: applying non-ZDD node", f);
   }
 
   return apply(f, (bddp)v, BC_CHANGE, 0);
@@ -1138,7 +1138,7 @@ bddp bddintersec(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddintersec: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZBDD node", f);
+    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddintersec: Invalid bddp", g); }
@@ -1147,7 +1147,7 @@ bddp bddintersec(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddintersec: Invalid bddp", g);
-    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZBDD node", g);
+    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", g);
   }
 
   return apply(f, g, BC_INTERSEC, 0);
@@ -1168,7 +1168,7 @@ bddp bddunion(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddunion: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddunion: applying non-ZBDD node", f);
+    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddunion: Invalid bddp", g); }
@@ -1177,7 +1177,7 @@ bddp bddunion(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddunion: Invalid bddp", g);
-    if(!B_Z_NP(fp)) err("bddunion: applying non-ZBDD node", g);
+    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", g);
   }
 
   return apply(f, g, BC_UNION, 0);
@@ -1198,7 +1198,7 @@ bddp bddsubtract(bddp f, bddp g)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddsubtarct: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZBDD node", f);
+    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", f);
   }
   if(B_CST(g))
   { if(B_ABS(g) != bddfalse) err("bddsubtarct: Invalid bddp", g); }
@@ -1207,7 +1207,7 @@ bddp bddsubtract(bddp f, bddp g)
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddsubtarct: Invalid bddp", g);
-    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZBDD node", g);
+    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", g);
   }
 
   return apply(f, g, BC_SUBTRACT, 0);
@@ -1222,7 +1222,7 @@ bddp bddcard(bddp f)
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
     err("bddcard: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddcard: applying non-ZBDD node", f);
+  if(!B_Z_NP(fp)) err("bddcard: applying non-ZDD node", f);
 
   return apply(f, bddfalse, BC_CARD, 0);
 }
@@ -1236,7 +1236,7 @@ bddp bddlit(bddp f)
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
     err("bddlit: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddlit: applying non-ZBDD node", f);
+  if(!B_Z_NP(fp)) err("bddlit: applying non-ZDD node", f);
 
   return apply(f, bddfalse, BC_LIT, 0);
 }
@@ -1250,7 +1250,7 @@ bddp bddlen(bddp f)
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
     err("bddlen: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddlen: applying non-ZBDD node", f);
+  if(!B_Z_NP(fp)) err("bddlen: applying non-ZDD node", f);
 
   return apply(f, bddfalse, BC_LEN, 0);
 }
@@ -1270,7 +1270,7 @@ char *bddcardmp16(bddp f, char *s)
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddcardmp16: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZBDD node", f);
+    if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZDD node", f);
     h = apply(B_ABS(f), bddfalse, BC_CARD2, 0);
     if(h == B_MP_NULL) mp.len = 0;
     else
@@ -1327,16 +1327,22 @@ int bddisbdd(bddp f)
   return (B_NEG(B_GET_BDDP(fp->f0)) ? 0 : 1);
 }
 
-int bddiszbdd(bddp f)
+int bddiszdd(bddp f)
 {
   struct B_NodeTable* fp;
 
   if(f == bddnull) return 0;
   if(B_CST(f)) return 1;
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddiszbdd: Invalid bddp", f);
+    err("bddiszdd: Invalid bddp", f);
 
   return (B_NEG(B_GET_BDDP(fp->f0)) ? 1 : 0);
+}
+
+// for compatibility
+int bddiszbdd(bddp f)
+{
+  return bddiszdd(f);
 }
 
 bddp    bddpush(bddp f, bddvar v)
@@ -1349,7 +1355,7 @@ bddp    bddpush(bddp f, bddvar v)
   if(f == bddnull) return bddnull;
 
   if(!B_CST(f)) { fp = B_NP(f); B_RFC_INC_NP(fp); }
-  return getzbddp(v, bddfalse, f);
+  return getzddp(v, bddfalse, f);
 }
 
 /* ----------------- Internal functions ------------------ */
@@ -1705,7 +1711,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
   we set them to suppress compiler warnings */
   bddp key, f0, f1, g0 = 0, g1 = 0, h0, h1, h;
   bddvar v = 0, flev, glev;
-  char z = 0; /* flag to check ZBDD node */
+  char z = 0; /* flag to check ZDD node */
 
   /* Check terminal case */
   if(!skip) switch(op)
@@ -1863,14 +1869,14 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
   case BC_CHANGE: 
     /* Check trivial cases */
     if(f == bddfalse) return f;
-    if(B_CST(f)) return getzbddp((bddvar)g, bddfalse, f);
+    if(B_CST(f)) return getzddp((bddvar)g, bddfalse, f);
     /* special cases */
     fp = B_NP(f); flev = Var[B_VAR_NP(fp)].lev;
     glev = Var[(bddvar)g].lev;
     if(flev < glev)
     {
       B_RFC_INC_NP(fp);
-      h = getzbddp((bddvar)g, bddfalse, f);
+      h = getzddp((bddvar)g, bddfalse, f);
       if(h == bddnull) bddfree(f);
       return h;
     }
@@ -1881,7 +1887,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
       if(B_NEG(f)^B_NEG(h1)) h1 = B_NOT(h1);
       if(!B_CST(h0)) { fp = B_NP(h0); B_RFC_INC_NP(fp); }
       if(!B_CST(h1)) { fp = B_NP(h1); B_RFC_INC_NP(fp); }
-      h = getzbddp((bddvar)g, h0, h1);
+      h = getzddp((bddvar)g, h0, h1);
       if(h == bddnull) { bddfree(h0); bddfree(h1); }
       return h;
     }
@@ -2097,7 +2103,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     if(h0 == bddnull) { h = h0; break; } /* Overflow */
     h1 = apply(f1, g1, op, 0);
     if(h1 == bddnull) { bddfree(h0); h = h1; break; } /* Overflow */
-    h = z? getzbddp(v, h0, h1): getbddp(v, h0, h1);
+    h = z? getzddp(v, h0, h1): getbddp(v, h0, h1);
     if(h == bddnull) { bddfree(h0); bddfree(h1); } /* Overflow */
     break;
   
@@ -2151,7 +2157,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     if(h0 == bddnull) { h = h0; break; } /* Overflow */
     h1 = apply(f1, g, op, 0);
     if(h1 == bddnull) { bddfree(h0); h = h1; break; } /* Overflow */
-    h = z? getzbddp(v, h0, h1): getbddp(v, h0, h1);
+    h = z? getzddp(v, h0, h1): getbddp(v, h0, h1);
     if(h == bddnull) { bddfree(h0); bddfree(h1); } /* Overflow */
     break;
 
@@ -2165,7 +2171,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     bddfree(h0); bddfree(h1);
     if(h == bddnull) break; /* Overflow */
     h0 = h;
-    h = z? getzbddp(v, h0, bddtrue):
+    h = z? getzddp(v, h0, bddtrue):
            getbddp(v, B_NOT(h0), bddtrue);
     if(h == bddnull) bddfree(h0); /* Overflow */
     break;
@@ -2195,7 +2201,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     if(h0 == bddnull) { h = h0; break; } /* Overflow */
     h1 = apply(f1, g, op, 0);
     if(h1 == bddnull) { bddfree(h0); h = h1; break; } /* Overflow */
-    h = z? getzbddp(v, h0, h1): getbddp(v, h0, h1);
+    h = z? getzddp(v, h0, h1): getbddp(v, h0, h1);
     if(h == bddnull) { bddfree(h0); bddfree(h1); } /* Overflow */
     break;
     
@@ -2531,7 +2537,7 @@ static void reset(bddp f)
   }
 }
 
-static bddp getzbddp(bddvar v, bddp f0, bddp f1)
+static bddp getzddp(bddvar v, bddp f0, bddp f1)
 /* Returns bddnull if not enough memory */
 {
   /* Check elimination rule */
@@ -2858,7 +2864,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
       f1 = (inv)? bddnot(hash2[ixx]): bddcopy(hash2[ixx]);
     }
 
-    f = (z)? getzbddp(var, f0, f1): getbddp(var, f0, f1);
+    f = (z)? getzddp(var, f0, f1): getbddp(var, f0, f1);
     if(f == bddnull)
     {
       e = 1;

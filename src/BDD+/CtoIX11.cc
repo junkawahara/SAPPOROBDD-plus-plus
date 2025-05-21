@@ -13,7 +13,7 @@ void CtoI::XPrint() const
 {
 	int len = TopDigit() + 1;
 	bddword* bddv = new bddword[len];
-	for(int i=0; i<len; i++) bddv[i] = Digit(i).GetZBDD().GetID(); 
+	for(int i=0; i<len; i++) bddv[i] = Digit(i).GetZDD().GetID(); 
 	bddvgraph(bddv, len);
 	delete[] bddv;
 }
@@ -22,7 +22,7 @@ void CtoI::XPrint0() const
 {
 	int len = TopDigit() + 1;
 	bddword* bddv = new bddword[len];
-	for(int i=0; i<len; i++) bddv[i] = Digit(i).GetZBDD().GetID(); 
+	for(int i=0; i<len; i++) bddv[i] = Digit(i).GetZDD().GetID(); 
 	bddvgraph0(bddv, len);
 	delete[] bddv;
 }

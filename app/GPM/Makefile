@@ -42,16 +42,16 @@ $(PRG_ST): $(OBJ_ST) $(LIB)
 $(PRG64_ST): $(OBJ64_ST) $(LIB64)
 	$(CC) $(OPT64_ST) $(OBJ64_ST) $(LIB64) -o $(PRG64_ST)
 
-gpm.o: gpm.cc gpm.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+gpm.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT) -c gpm.cc
 
-gpm_64.o: gpm.cc gpm.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+gpm_64.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c gpm.cc -o gpm_64.o
 
-gpm_st.o: gpm.cc gpm.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+gpm_st.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT_ST) -c gpm.cc -o gpm_st.o
 
-gpm_64_st.o: gpm.cc gpm.h $(INCL)/ZBDD.h $(INCL)/BDD.h
+gpm_64_st.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64_ST) -c gpm.cc -o gpm_64_st.o
 
 clean:

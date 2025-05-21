@@ -1,10 +1,10 @@
 /*****************************************
- * Multi-Level ZBDDV class (SAPPORO-1.91)*
+ * Multi-Level ZDDV class (SAPPORO-1.91)*
  * (Main part)                           *
  * (C) Shin-ichi MINATO (Sep. 3, 2021)   *
  *****************************************/
 
-#include "MLZBDDV.h"
+#include "MLZDDV.h"
 
 using std::cout;
 using std::cerr;
@@ -12,57 +12,57 @@ using std::cerr;
 namespace sapporobdd {
 
 
-//-------------- Class methods of MLZBDDV -----------------
+//-------------- Class methods of MLZDDV -----------------
 
-MLZBDDV::MLZBDDV()
+MLZDDV::MLZDDV()
 {
   _pin = 0;
   _out = 0;
   _sin = 0;
-  _zbddv = ZBDDV();
+  _zddv = ZDDV();
 }
 
-MLZBDDV::~MLZBDDV() { }
+MLZDDV::~MLZDDV() { }
 
-int MLZBDDV::N_pin() { return _pin; }
-int MLZBDDV::N_out() { return _out; }
-int MLZBDDV::N_sin() { return _sin; }
+int MLZDDV::N_pin() { return _pin; }
+int MLZDDV::N_out() { return _out; }
+int MLZDDV::N_sin() { return _sin; }
 
-MLZBDDV& MLZBDDV::operator=(const MLZBDDV& v)
+MLZDDV& MLZDDV::operator=(const MLZDDV& v)
 {
   _pin = v._pin;
   _out = v._out;
   _sin = v._sin;
-  _zbddv = v._zbddv;
+  _zddv = v._zddv;
   return *this;
 }
 
-MLZBDDV::MLZBDDV(ZBDDV& zbddv)
+MLZDDV::MLZDDV(ZDDV& zddv)
 {
-  int pin = BDD_LevOfVar(zbddv.Top());
-  int out = zbddv.Last()+1;
-  MLZBDDV v = MLZBDDV(zbddv, pin, out);
+  int pin = BDD_LevOfVar(zddv.Top());
+  int out = zddv.Last()+1;
+  MLZDDV v = MLZDDV(zddv, pin, out);
   _pin = v._pin;
   _out = v._out;
   _sin = v._sin;
-  _zbddv = v._zbddv;
+  _zddv = v._zddv;
 }
 
-MLZBDDV::MLZBDDV(ZBDDV& zbddv, int pin, int out)
+MLZDDV::MLZDDV(ZDDV& zddv, int pin, int out)
 {
-  if(zbddv == ZBDDV(-1))
+  if(zddv == ZDDV(-1))
   {
     _pin = 0;
     _out = 0;
     _sin = 0;
-    _zbddv = zbddv;
+    _zddv = zddv;
     return;
   }
 
   _pin = pin;
   _out = out;
   _sin = 0;
-  _zbddv = zbddv;
+  _zddv = zddv;
 
   /* check each output as a divisor */
   for(int i=0; i<_out; i++)
@@ -70,7 +70,7 @@ MLZBDDV::MLZBDDV(ZBDDV& zbddv, int pin, int out)
     _sin++;
     int plev = _pin + _sin;
     if(plev > BDD_TopLev()) BDD_NewVar();
-    ZBDD p = _zbddv.GetZBDD(i);
+    ZDD p = _zddv.GetZDD(i);
     int pt = BDD_LevOfVar(p.Top());
     if(p != 0)
     {
@@ -78,18 +78,18 @@ MLZBDDV::MLZBDDV(ZBDDV& zbddv, int pin, int out)
       {
         if(i != j)
         {
-	  ZBDD f = _zbddv.GetZBDD(j);
+	  ZDD f = _zddv.GetZDD(j);
           int ft = BDD_LevOfVar(f.Top());
 	  if(ft >= pt)
 	  {
-	    ZBDD q = f / p;
+	    ZDD q = f / p;
 	    if(q != 0)
 	    {
 	      int v = BDD_VarOfLev(plev);
-	      _zbddv -= ZBDDV(f, j);
+	      _zddv -= ZDDV(f, j);
 	      f = q.Change(v) + (f % p);
 	      if(f == -1) { cerr << "overflow.\n"; exit(1);}
-	      _zbddv += ZBDDV(f, j);
+	      _zddv += ZDDV(f, j);
 	    }
 	  }
         }
@@ -100,10 +100,10 @@ MLZBDDV::MLZBDDV(ZBDDV& zbddv, int pin, int out)
   /* extract 0-level kernels */
   for(int i=0; i<_out; i++)
   {
-    ZBDD f = _zbddv.GetZBDD(i);
+    ZDD f = _zddv.GetZDD(i);
     while(1)
     {
-      ZBDD p = f.Divisor();
+      ZDD p = f.Divisor();
       int pt = BDD_LevOfVar(p.Top());
       if(p.Top() == 0) break;
       if(p == f) break;
@@ -111,28 +111,28 @@ MLZBDDV::MLZBDDV(ZBDDV& zbddv, int pin, int out)
       cout << _sin << " "; cout.flush();
       int plev = _pin + _sin;
       if(plev > BDD_TopLev()) BDD_NewVar();
-      _zbddv += ZBDDV(p, _sin-1);
+      _zddv += ZDDV(p, _sin-1);
       int v = BDD_VarOfLev(plev);
-      ZBDD q = f / p;
-      _zbddv -= ZBDDV(f, i);
+      ZDD q = f / p;
+      _zddv -= ZDDV(f, i);
       f = q.Change(v) + (f % p);
       if(f == -1) { cerr << "overflow.\n"; exit(1);}
-      _zbddv += ZBDDV(f, i);
+      _zddv += ZDDV(f, i);
       for(int j=0; j<_out; j++)
       {
         if(i != j)
         {
-	  f = _zbddv.GetZBDD(j);
+	  f = _zddv.GetZDD(j);
           int ft = BDD_LevOfVar(f.Top());
 	  if(ft >= pt)
 	  {
 	    q = f / p;
 	    if(q != 0)
 	    {
-	      _zbddv -= ZBDDV(f, j);
+	      _zddv -= ZDDV(f, j);
 	      f = q.Change(v) + (f % p);
               if(f == -1) { cerr << "overflow.\n"; exit(1);}
-	      _zbddv += ZBDDV(f, j);
+	      _zddv += ZDDV(f, j);
 	    }
 	  }
         }
@@ -141,17 +141,17 @@ MLZBDDV::MLZBDDV(ZBDDV& zbddv, int pin, int out)
   }
 }
 
-void MLZBDDV::Print()
+void MLZDDV::Print()
 {
   cout << "pin:" << _pin << "\n";
   cout << "out:" << _out << "\n";
   cout << "sin:" << _sin << "\n";
-  _zbddv.Print();
+  _zddv.Print();
 }
 
-ZBDDV MLZBDDV::GetZBDDV()
+ZDDV MLZDDV::GetZDDV()
 {
-  return _zbddv;
+  return _zddv;
 }
 
 } // namespace sapporobdd
