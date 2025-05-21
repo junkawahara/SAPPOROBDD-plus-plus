@@ -8,6 +8,8 @@
 
 using std::cout;
 
+namespace sapporobdd {
+
 //------------ Internal constant data for SeqBDD ----------
 static const char BC_SeqBDD_MULT = 70;
 static const char BC_SeqBDD_DIV = 71;
@@ -148,3 +150,6 @@ void SeqBDD::PrintSeq() const
   cout << "\n";
   cout.flush();
 }
+
+} // namespace sapporobdd
+

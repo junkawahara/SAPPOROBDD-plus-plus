@@ -9,6 +9,9 @@
 using std::cout;
 using std::cerr;
 
+namespace sapporobdd {
+
+
 //-------------- Class methods of MLZBDDV -----------------
 
 MLZBDDV::MLZBDDV()
@@ -150,4 +153,6 @@ ZBDDV MLZBDDV::GetZBDDV()
 {
   return _zbddv;
 }
+
+} // namespace sapporobdd
 

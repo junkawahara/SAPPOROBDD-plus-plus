@@ -8,6 +8,9 @@
 
 using std::cout;
 
+namespace sapporobdd {
+
+
 static const char BC_CtoI_MULT = 40;
 static const char BC_CtoI_DIV =  41;
 static const char BC_CtoI_TV =  42;
@@ -1069,4 +1072,6 @@ CtoI CtoI_Meet(const CtoI& ac, const CtoI& bc)
 
   CtoI_CACHE_ENT_RETURN(BC_CtoI_MEET, ax, bx, c);
 }
+
+} // namespace sapporobdd
 

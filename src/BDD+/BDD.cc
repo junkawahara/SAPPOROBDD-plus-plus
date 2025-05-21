@@ -9,6 +9,8 @@
 using std::cout;
 using std::cerr;
 
+namespace sapporobdd {
+
 static const char BC_Smooth = 60;
 static const char BC_Spread = 61;
 
@@ -627,3 +629,5 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
   }
   return (onset || dcset);
 }
+
+} // namespace sapporobdd

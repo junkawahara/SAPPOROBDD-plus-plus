@@ -3,8 +3,6 @@
  *  (C) Shin-ichi MINATO (Jan. 2, 2023)  *
  *****************************************/
 
-class BDDCT;
-
 #ifndef _BDDCT_
 #define _BDDCT_
 
@@ -12,14 +10,18 @@ class BDDCT;
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include "ZBDD.h"
+
+namespace sapporobdd {
 
 typedef int bddcost;
 #define bddcost_null 0x7FFFFFFF
 #define CT_STRLEN 15
 
-#include <map>
 typedef std::map<bddcost, ZBDD> Zmap;
+
+class BDDCT;
 
 class BDDCT
 {
@@ -110,5 +112,6 @@ public:
   bddcost MaxCost(const ZBDD &);
 };
 
-#endif // _BDDCT_
+} // namespace sapporobdd
 
+#endif // _BDDCT_

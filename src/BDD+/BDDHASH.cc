@@ -8,6 +8,8 @@
 
 using std::cerr;
 
+namespace sapporobdd {
+
 BDD_Hash::BDD_Hash()
 {
   _hashSize = 16;
@@ -90,3 +92,4 @@ void* BDD_Hash::Refer(BDD key)
 
 bddword BDD_Hash::Amount() { return _amount; }
 
+} // namespace sapporobdd

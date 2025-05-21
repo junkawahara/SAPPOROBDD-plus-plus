@@ -6,6 +6,9 @@
 
 #include "BtoI.h"
 
+namespace sapporobdd {
+
+
 BtoI::BtoI(int n)
 {
   int k = n;
@@ -500,4 +503,6 @@ BtoI BtoI_atoi(char* s)
   }
   return atoi10(s);
 }
+
+} // namespace sapporobdd
 

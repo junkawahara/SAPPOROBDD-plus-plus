@@ -12,6 +12,9 @@ class RotPiDD;
 #include<unordered_map>
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
+
 class RotPiDD;
 
 #define RotPiDD_MaxVar 254
@@ -114,5 +117,7 @@ inline RotPiDD& RotPiDD::operator&=(const RotPiDD& f) { return *this = *this & f
 inline RotPiDD& RotPiDD::operator+=(const RotPiDD& f) { return *this = *this + f; }
 inline RotPiDD& RotPiDD::operator-=(const RotPiDD& f) { return *this = *this - f; }
 inline RotPiDD& RotPiDD::operator*=(const RotPiDD& f) { return *this = *this * f; }
+
+} // namespace sapporobdd
 
 #endif // _RotPiDD_

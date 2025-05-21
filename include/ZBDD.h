@@ -3,15 +3,16 @@
  * (C) Shin-ichi MINATO  (May 14, 2021)      *
  *********************************************/
 
-class ZBDD;
-class ZBDDV;
-
 #ifndef _ZBDD_
 #define _ZBDD_
 
 #include "BDD.h"
 
+namespace sapporobdd {
+
 class SeqBDD;
+class ZBDD;
+class ZBDDV;
 
 class ZBDD
 {
@@ -240,5 +241,7 @@ public:
   void* Refer(ZBDD);
   bddword Amount(void);
 };
+
+} // namespace sapporobdd
 
 #endif // _ZBDD_

@@ -9,6 +9,9 @@
 
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
+
 #define ZBDDDG_InitSize 4
 
 #define ZBDDDG_NIL   BDD_MaxNode
@@ -101,5 +104,6 @@ public:
   ZBDD Func(void);
 };
 
-#endif // _ZBDDDG_
+} // namespace sapporobdd
 
+#endif // _ZBDDDG_

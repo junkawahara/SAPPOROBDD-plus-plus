@@ -8,6 +8,8 @@
 #include <string.h>
 #include "bddc.h"
 
+namespace sapporobdd {
+
 /* ----------------- MACRO Definitions ---------------- */
 /* Operation IDs in Cache */
 #define BC_NULL        0
@@ -2969,3 +2971,4 @@ int mp_add(struct B_MP *p, bddp ix)
   return 0;
 }
 
+} // namespace sapporobdd

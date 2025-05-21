@@ -10,6 +10,9 @@ class GBase;
 
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
+
 //typedef unsigned char GB_v; // up to 254 vertices.
 typedef unsigned short GB_v; // up to 65534 vertices.
 typedef unsigned short GB_e; // up to 65534 edges.
@@ -90,5 +93,6 @@ public:
   void SetCond(ZBDD); // for ZDD-constrained enumeration
 };
 
-#endif // _GBase_
+} // namespace sapporobdd
 
+#endif // _GBase_

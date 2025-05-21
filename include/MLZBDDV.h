@@ -3,12 +3,12 @@
  * (C) Shin-ichi MINATO  (Aug 6, 2008 )            *
  ***************************************************/
 
-class MLZBDDV;
-
 #ifndef _MLZBDDV_
 #define _MLZBDDV_
 
 #include "ZBDD.h"
+
+namespace sapporobdd {
 
 class MLZBDDV;
 
@@ -37,6 +37,8 @@ public:
   void Print(void);
   
 };
+
+} // namespace sapporobdd
 
 #endif // _MLZBDDV_
 

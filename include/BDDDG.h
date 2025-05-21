@@ -9,6 +9,9 @@
 
 #include "BDD.h"
 
+namespace sapporobdd {
+
+
 #define BDDDG_InitSize 4
 
 #define BDDDG_NIL   BDD_MaxNode
@@ -103,5 +106,6 @@ public:
   BDD Func(void);
 };
 
-#endif // _BDDDG_
+} // namespace sapporobdd
 
+#endif // _BDDDG_

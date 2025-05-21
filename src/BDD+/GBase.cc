@@ -9,6 +9,9 @@
 using std::cout;
 using std::cerr;
 
+namespace sapporobdd {
+
+
 //-------------- Class methods of GBase -----------------
 
 GBase::GBase()
@@ -679,4 +682,6 @@ ZBDD GBase::SimCycles()
 
   return h;
 }
+
+} // namespace sapporobdd
 

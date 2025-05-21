@@ -3,9 +3,6 @@
  * (C) Shin-ichi MINATO  (Dec. 6, 2021)     *
  ********************************************/
 
-class BDD;
-class BDDV;
-
 #ifndef _BDD_
 #define _BDD_
 
@@ -17,6 +14,11 @@ class BDDV;
 
 #define BDD_CPP
 #include "bddc.h"
+
+namespace sapporobdd {
+
+class BDD;
+class BDDV;
 
 //--------- Definition of "bddword" type --------
 #ifdef B_64
@@ -351,5 +353,7 @@ public:
   void* Refer(BDD);
   bddword Amount(void);
 };
+
+} // namespace sapporobdd
 
 #endif // _BDD_ 

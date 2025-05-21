@@ -6,6 +6,8 @@
 
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
 void ZBDD::XPrint() const
 {
 	bddgraph(_zbdd);
@@ -35,3 +37,5 @@ void ZBDDV::XPrint0()
 	delete[] bddv;
 }
 */
+} // namespace sapporobdd
+

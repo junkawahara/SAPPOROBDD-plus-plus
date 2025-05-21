@@ -11,6 +11,8 @@
 
 using std::cout;
 
+namespace sapporobdd {
+
 static const char BC_ZBDD_MULT = 20;
 static const char BC_ZBDD_DIV = 21;
 static const char BC_ZBDD_RSTR = 22;
@@ -1032,4 +1034,6 @@ ZBDD ZBDD::Intersec(const ZBDD& g) const
 
   ZBDD_CACHE_ENT_RETURN(BC_ZBDD_INTERSEC, fx, gx, h);
 }
+
+} // namespace sapporobdd
 

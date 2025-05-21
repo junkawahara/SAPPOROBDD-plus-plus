@@ -4,12 +4,14 @@
  * (C) Shin-ichi MINATO  (Dec. 11, 2012)  *
  ******************************************/
 
-class BtoI;
-
 #ifndef _BtoI_
 #define _BtoI_
 
 #include "BDD.h"
+
+namespace sapporobdd {
+
+class BtoI;
 
 class BtoI
 {
@@ -139,6 +141,8 @@ inline BtoI BtoI::Cofact(const BtoI& fv) const {
   BDDV a = BDDV(BtoI_NE(fv, 0).GetBDD(0), Len());
   return BtoI(_bddv.Cofact(a)).Sup();
 }
+
+} // namespace sapporobdd
 
 #endif // _BtoI_
 

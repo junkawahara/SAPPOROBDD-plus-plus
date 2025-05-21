@@ -10,6 +10,9 @@ class PiDD;
 
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
+
 class PiDD;
 
 #define PiDD_MaxVar 254
@@ -101,5 +104,6 @@ inline PiDD& PiDD::operator*=(const PiDD& f) { return *this = *this * f; }
 inline PiDD& PiDD::operator/=(const PiDD& f) { return *this = *this / f; }
 inline PiDD& PiDD::operator%=(const PiDD& f) { return *this = *this % f; }
 
-#endif // _PiDD_
+} // namespace sapporobdd
 
+#endif // _PiDD_

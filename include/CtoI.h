@@ -11,6 +11,9 @@ class CtoI;
 
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
+
 
 class CtoI
 {
@@ -182,5 +185,6 @@ inline CtoI& CtoI::operator%=(const CtoI& a) { return *this = *this % a; }
 
 inline CtoI CtoI::operator-(void) const { return 0 - *this; }
 
-#endif // _CtoI_
+} // namespace sapporobdd
 
+#endif // _CtoI_

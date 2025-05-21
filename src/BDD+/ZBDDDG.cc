@@ -8,6 +8,9 @@
 using std::cout;
 using std::cerr;
 
+namespace sapporobdd {
+
+
 ZBDDDG_Tag::ZBDDDG_Tag()
 {
   _dg = 0;
@@ -1830,4 +1833,6 @@ void ZBDDDG::Print0(bddword ndx)
     exit(1);
   }
 }
+
+} // namespace sapporobdd
 

@@ -9,6 +9,9 @@
 #define BDD_CPP
 #include "bddc.h"
 
+namespace sapporobdd {
+
+
 extern "C"
 {
   /***************** Init. and config. ****************/
@@ -48,4 +51,6 @@ ZBDD ZBDD_LCM_M(char *fname, int th)
   bddfree(z);
   return h;
 }
+
+} // namespace sapporobdd
 

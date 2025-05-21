@@ -7,6 +7,8 @@
 #define bddc_h
 
 
+namespace sapporobdd {
+
 /***************** Internal macro for index *****************/
 #define B_VAR_WIDTH 16U  /* Width of variable index */
 #define B_VAR_MASK       ((1U << B_VAR_WIDTH) - 1U)
@@ -44,7 +46,6 @@ typedef unsigned int bddvar;
 #define bddconst(c) (((c) & B_VAL_MASK) | B_CST_MASK)
                     /* bddp of a constant valued node */
 #define bddvalmax B_VAL_MASK  /* Max constant value */
-
 
 
 /***************** For stack overflow limit *****************/
@@ -121,6 +122,7 @@ extern int    bddiszbdd(bddp f);
 /************** SeqBDD operations *************/
 extern bddp   bddpush(bddp f, bddvar v);
 
+} // namespace sapporobdd
 
 
 #endif /* bddc_h */

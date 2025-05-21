@@ -6,6 +6,9 @@
 
 #include "CtoI.h"
 
+namespace sapporobdd {
+
+
 void CtoI::XPrint() const
 {
 	int len = TopDigit() + 1;
@@ -23,4 +26,6 @@ void CtoI::XPrint0() const
 	bddvgraph0(bddv, len);
 	delete[] bddv;
 }
+
+} // namespace sapporobdd
 

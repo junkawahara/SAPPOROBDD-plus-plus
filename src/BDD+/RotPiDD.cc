@@ -10,6 +10,9 @@
 #include <unordered_map>
 #include "RotPiDD.h"
 
+namespace sapporobdd {
+
+
 //----------- Internal constant data for RotPiDD -----------
 static const char BC_RotPiDD_LeftRot = 100;
 static const char BC_RotPiDD_Swap = 101;
@@ -592,3 +595,5 @@ void RotPiDD::Enum2() const
   std::cout << "\n";
   std::cout.flush();
 }
+} // namespace sapporobdd
+

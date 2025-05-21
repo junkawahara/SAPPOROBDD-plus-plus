@@ -8,6 +8,9 @@
 
 using std::cerr;
 
+namespace sapporobdd {
+
+
 ZBDD_Hash::ZBDD_Hash()
 {
   _hashSize = 16;
@@ -89,4 +92,6 @@ void* ZBDD_Hash::Refer(ZBDD key)
 }
 
 bddword ZBDD_Hash::Amount() { return _amount; }
+
+} // namespace sapporobdd
 

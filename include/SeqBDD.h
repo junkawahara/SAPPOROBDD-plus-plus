@@ -3,13 +3,15 @@
  * (C) Shin-ichi MINATO  (May 14, 2021)      *
  *********************************************/
 
-class SeqBDD;
-class SeqBDDV;
-
 #ifndef _SeqBDD_
 #define _SeqBDD_
 
 #include "ZBDD.h"
+
+namespace sapporobdd {
+
+class SeqBDD;
+class SeqBDDV;
 
 extern SeqBDD operator*(const SeqBDD&, const SeqBDD&);
 extern SeqBDD operator/(const SeqBDD&, const SeqBDD&);
@@ -96,5 +98,7 @@ inline SeqBDD SeqBDD::operator/=(const SeqBDD& f)
 
 inline SeqBDD SeqBDD::operator%=(const SeqBDD& f)
   { return *this = *this % f; }
+
+} // namespace sapporobdd
 
 #endif // _SeqBDD_

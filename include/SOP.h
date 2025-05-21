@@ -3,15 +3,16 @@
  * (C) Shin-ichi MINATO  (May 14, 2021)         *
  ************************************************/
 
-class SOP;
-class SOPV;
-
 #ifndef _SOP_
 #define _SOP_
 
 #include "ZBDD.h"
 
+namespace sapporobdd {
+
 class SOP;
+class SOPV;
+
 extern int SOP_NewVar(void);
 extern int SOP_NewVarOfLev(int);
 
@@ -194,6 +195,8 @@ inline int operator==(const SOPV& v1, const SOPV& v2)
 
 inline int operator!=(const SOPV& v1, const SOPV& v2)
   { return !(v1 == v2); }
+
+} // namespace sapporobdd
 
 #endif // _SOP_
 

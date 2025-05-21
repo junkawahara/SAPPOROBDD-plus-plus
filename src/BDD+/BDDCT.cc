@@ -6,6 +6,9 @@
 #include "BDDCT.h"
 using namespace std;
 
+namespace sapporobdd {
+
+
 BDDCT::BDDCT()
 {
   _n = 0;
@@ -493,4 +496,6 @@ ZBDD BDDCT::ZBDD_CostLE0(const ZBDD& f, const bddcost bound)
   ZBDD h = CLE0(f, 0);
   return h;
 }
+
+} // namespace sapporobdd
 

@@ -8,6 +8,9 @@
 
 using std::cout;
 
+namespace sapporobdd {
+
+
 //----------- Internal constant data for SOP -----------
 static const char BC_SOP_MULT = 30;
 static const char BC_SOP_DIV = 31;
@@ -605,4 +608,6 @@ SOPV SOPV_ISOP2(BDDV on, BDDV dc)
   }
   return csv + phase;
 }
+
+} // namespace sapporobdd
 

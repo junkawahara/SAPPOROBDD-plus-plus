@@ -9,6 +9,9 @@
 
 using std::cout;
 
+namespace sapporobdd {
+
+
 //----------- Internal constant data for PiDD -----------
 static const char BC_PiDD_SWAP = 80;
 static const char BC_PiDD_COFACT = 81;
@@ -357,4 +360,6 @@ void PiDD::Enum2() const
   cout << "\n";
   cout.flush();
 }
+
+} // namespace sapporobdd
 
