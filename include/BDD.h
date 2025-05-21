@@ -21,10 +21,10 @@ class BDD;
 class BDDV;
 
 //--------- Definition of "bddword" type --------
-#ifdef B_64
-  typedef unsigned long long bddword;
-#else
+#ifdef B_32
   typedef unsigned int bddword;
+#else
+  typedef unsigned long long bddword;
 #endif
 
 //--------- External data for BDD ---------

@@ -40,19 +40,19 @@ namespace sapporobdd {
   (type *)realloc(ptr, sizeof(type) * size)
 
 /* Printf format of bddp */
-#ifdef B_64
-#  define B_BDDP_FD "%lld"
-#  define B_BDDP_FX "0x%llX"
-#else
+#ifdef B_32
 #  define B_BDDP_FD "%d"
 #  define B_BDDP_FX "0x%X"
+#else
+#  define B_BDDP_FD "%lld"
+#  define B_BDDP_FX "0x%llX"
 #endif
 
 /* strtol or strtoll */
-#ifdef B_64
-#  define B_STRTOI strtoll
-#else
+#ifdef B_32
 #  define B_STRTOI strtol
+#else
+#  define B_STRTOI strtoll
 #endif
 
 /* Table spaces */
@@ -77,7 +77,12 @@ namespace sapporobdd {
 #define B_BDDP_NP(p)  ((bddp)((p)-Node) << 1U)
 
 /* Read & Write of bddp field in the tables */
-#ifdef B_64
+#ifdef B_32
+#  define B_SET_NXP(p, f, i) (p ## _32 = f ## _32 + i)
+#  define B_GET_BDDP(f) (f ## _32)
+#  define B_SET_BDDP(f, g) (f ## _32 = g)
+#  define B_CPY_BDDP(f, g) (f ## _32 = g ## _32)
+#else
 #  define B_LOW32(f) ((bddp_32)((f)&((1ULL<<32U)-1U)))
 #  define B_HIGH8(f) ((bddp_h8)((f)>>32U))
 #  define B_SET_NXP(p, f, i) \
@@ -88,12 +93,7 @@ namespace sapporobdd {
     (f ## _h8 = B_HIGH8(g), f ## _32 = B_LOW32(g))
 #  define B_CPY_BDDP(f, g) \
     (f ## _h8 = g ## _h8, f ## _32 = g ## _32)
-#else
-#  define B_SET_NXP(p, f, i) (p ## _32 = f ## _32 + i)
-#  define B_GET_BDDP(f) (f ## _32)
-#  define B_SET_BDDP(f, g) (f ## _32 = g)
-#  define B_CPY_BDDP(f, g) (f ## _32 = g ## _32)
-#endif /* B_64 */
+#endif /* B_32 */
 
 /* var & rfc manipulation */
 #define B_VAR_NP(p)    ((p)->varrfc & B_VAR_MASK)
@@ -148,7 +148,7 @@ int BDD_RecurCount = 0;
 /* ------- Declaration of static (internal) data ------- */
 /* typedef of bddp field in the tables */
 typedef unsigned int bddp_32;
-#ifdef B_64
+#ifndef B_32
   typedef unsigned char bddp_h8;
 #endif
 
@@ -159,11 +159,11 @@ struct B_NodeTable
   bddp_32      f1_32;  /* 1-edge */
   bddp_32      nx_32;  /* Node index */
   unsigned int varrfc; /* VarID & Reference counter */
-#ifdef B_64
+#ifndef B_32
   bddp_h8      f0_h8;  /* Extention of 0-edge */
   bddp_h8      f1_h8;  /* Extention of 1-edge */
   bddp_h8      nx_h8;  /* Extention of node index */
-#endif /* B_64 */
+#endif /* B_32 */
 };
 static struct B_NodeTable *Node = 0; /* Node Table */
 static bddp NodeLimit = 0;    /* Final limit size */
@@ -178,9 +178,9 @@ struct B_VarTable
   bddp    hashUsed;  /* Current used entries */
   bddvar  lev;      /* Level of the variable */
   bddp_32 *hash_32; /* Hash-table */
-#ifdef B_64
+#ifndef B_32
   bddp_h8 *hash_h8; /* Extension of hash-table */
-#endif /* B_64 */
+#endif /* B_32 */
 };
 static struct B_VarTable *Var = 0; /* Var-tables */
 static bddvar *VarID = 0;     /* VarID reverse table */
@@ -194,11 +194,11 @@ struct B_CacheTable
   bddp_32       g_32; /* an operand BDD */
   bddp_32       h_32; /* Result BDD */
   unsigned char op;   /* Operation code */
-#ifdef B_64
+#ifndef B_32
   bddp_h8       f_h8; /* Extention of an operand BDD */
   bddp_h8       g_h8; /* Extention of an operand BDD */
   bddp_h8       h_h8; /* Extention of result BDD */
-#endif /* B_64 */
+#endif /* B_32 */
 };
 static struct B_CacheTable *Cache = 0; /* Opeartion cache */
 static bddp CacheSpc = 0;           /* Current cache size */
@@ -208,10 +208,10 @@ struct B_RFC_Table
 {
   bddp_32 nx_32;   /* Node index */
   bddp_32 rfc_32;  /* RFC */
-#ifdef B_64
+#ifndef B_32
   bddp_h8 nx_h8;   /* Extension of Node index */
   bddp_h8 rfc_h8;  /* Extension of RFC */
-#endif /* B_64 */
+#endif /* B_32 */
 };
 static struct B_RFC_Table *RFCT = 0; /* RFC-Table */
 static bddp RFCT_Spc;   /* Current RFC-table size */
@@ -269,7 +269,7 @@ int bddinit(bddp initsize, bddp limitsize)
     for(i=0; i<VarSpc; i++)
     {
       if(Var[i].hash_32) free(Var[i].hash_32);
-#ifdef B_64
+#ifndef B_32
       if(Var[i].hash_h8) free(Var[i].hash_h8);
 #endif
     }
@@ -331,7 +331,7 @@ int bddinit(bddp initsize, bddp limitsize)
     Var[i].lev = i;
     VarID[i] = i;
     Var[i].hash_32 = 0;
-#ifdef B_64
+#ifndef B_32
     Var[i].hash_h8 = 0;
 #endif
   }
@@ -390,7 +390,7 @@ int bddgc()
   bddvar v;
   bddp oldSpc, newSpc, nx, key;
   bddp_32 *newhash_32, *p_32, *p2_32;
-#ifdef B_64
+#ifndef B_32
   bddp_h8 *newhash_h8, *p_h8, *p2_h8;
 #endif
 
@@ -496,7 +496,7 @@ int bddgc()
     if(newSpc == oldSpc) continue;
 
     /* Reduce space */
-#ifdef B_64
+#ifndef B_32
     newhash_32 = 0;
     newhash_h8 = 0;
     newhash_32 = B_MALLOC(bddp_32, newSpc);
@@ -543,7 +543,7 @@ int bddgc()
     varp->hashSpc = newSpc;
     free(varp->hash_32);
     varp->hash_32 = newhash_32;
-#ifdef B_64
+#ifndef B_32
     free(varp->hash_h8);
     varp->hash_h8 = newhash_h8;
 #endif
@@ -1379,7 +1379,7 @@ static void var_enlarge()
       newVar[i].lev = Var[i].lev;
       newVar[i].hash_32 = Var[i].hash_32;
       newVarID[i] = VarID[i];
-#ifdef B_64
+#ifndef B_32
       newVar[i].hash_h8 = Var[i].hash_h8;
 #endif
     }
@@ -1403,7 +1403,7 @@ static void var_enlarge()
     Var[i].lev = i;
     Var[i].hash_32 = 0;
     VarID[i] = i;
-#ifdef B_64
+#ifndef B_32
     Var[i].hash_h8 = 0;
 #endif
   }
@@ -1433,11 +1433,11 @@ static int node_enlarge()
       newNode[i].f0_32 = Node[i].f0_32;
       newNode[i].f1_32 = Node[i].f1_32;
       newNode[i].nx_32 = Node[i].nx_32;
-#ifdef B_64
+#ifndef B_32
       newNode[i].f0_h8 = Node[i].f0_h8;
       newNode[i].f1_h8 = Node[i].f1_h8;
       newNode[i].nx_h8 = Node[i].nx_h8;
-#endif /* B_64 */
+#endif /* B_32 */
     }
     free(Node);
     Node = newNode;
@@ -1498,7 +1498,7 @@ static int hash_enlarge(bddvar v)
   struct B_VarTable *varp;
   bddp i, oldSpc, newSpc, nx, key, f0, f1;
   bddp_32 *newhash_32, *p_32;
-#ifdef B_64
+#ifndef B_32
   bddp_h8 *newhash_h8, *p_h8;
 #endif
   
@@ -1510,7 +1510,7 @@ static int hash_enlarge(bddvar v)
   newSpc = oldSpc << 1U;
 
   /* Enlarge space */
-#ifdef B_64
+#ifndef B_32
   newhash_32 = 0;
   newhash_h8 = 0;
   newhash_32 = B_MALLOC(bddp_32, newSpc);
@@ -1589,7 +1589,7 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
   struct B_VarTable *varp;
   bddp ix, nx, key;
   bddp_32 *p_32;
-#ifdef B_64
+#ifndef B_32
   bddp_h8 *p_h8;
 #endif
 
@@ -1600,7 +1600,7 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
     varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
     if(!varp->hash_32) return bddnull;
-#ifdef B_64
+#ifndef B_32
     varp->hash_h8 = 0;
     varp->hash_h8 = B_MALLOC(bddp_h8, B_HASH_SPC0);
     if(!varp->hash_h8)
@@ -2332,7 +2332,7 @@ static void gc1(struct B_NodeTable *np)
   struct B_VarTable *varp;
   struct B_NodeTable *np1, *np2;
   bddp_32 *p_32;
-#ifdef B_64
+#ifndef B_32
   bddp_h8 *p_h8;
 #endif
 

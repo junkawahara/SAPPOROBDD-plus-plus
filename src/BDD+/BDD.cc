@@ -348,10 +348,10 @@ BDDV BDDV_Mask2(int index, int len)
 
 #define IMPORTHASH(x) ((((x)>>1)^((x)<<8)^((x)<<16)) & (hashsize-1))
 
-#ifdef B_64
-#  define B_STRTOI strtoll
-#else
+#ifdef B_32
 #  define B_STRTOI strtol
+#else
+#  define B_STRTOI strtoll
 #endif
 
 BDDV BDDV_Import(FILE *strm)

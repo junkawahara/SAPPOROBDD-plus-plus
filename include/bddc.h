@@ -14,12 +14,13 @@ namespace sapporobdd {
 #define B_VAR_MASK       ((1U << B_VAR_WIDTH) - 1U)
 
 /***************** Internal macro for bddp *****************/
-#ifdef B_64
-#  define B_MSB_POS   39ULL
-#  define B_LSB_MASK  1ULL
-#else
+
+#ifdef B_32
 #  define B_MSB_POS   31U
 #  define B_LSB_MASK  1U
+#else
+#  define B_MSB_POS   39ULL
+#  define B_LSB_MASK  1ULL
 #endif
 #define B_MSB_MASK  (B_LSB_MASK << B_MSB_POS)
 #define B_INV_MASK  B_LSB_MASK /* Mask of inverter-flag */
@@ -29,10 +30,11 @@ namespace sapporobdd {
 
 /***************** External typedef *****************/
 typedef unsigned int bddvar;
-#ifdef B_64
-  typedef unsigned long long bddp;
-#else
+
+#ifdef B_32
   typedef unsigned int bddp;
+#else
+  typedef unsigned long long bddp;
 #endif
 
 /***************** External Macro *****************/
