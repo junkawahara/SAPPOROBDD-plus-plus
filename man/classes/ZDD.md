@@ -319,7 +319,7 @@ bddnull（BDD_MaxNodeよりも大きな数値）を返す。
 bddword ZDD::Size(void) const 
 ```
 
-自分自身のグラフの節点数を返す。nullに対しては0を返す。
+自分自身のグラフの節点数を返す。終端節点はカウントしない。ZDDは否定枝表現であるため、否定枝表現を用いない場合の節点数とは異なることに注意。終端（bddempty, bddsingle）や nullに対しては0を返す。
 
 ### Print
 
