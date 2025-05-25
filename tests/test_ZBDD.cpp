@@ -11,11 +11,29 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#define BDD_CPP
+#include "../include/bddc.h"
 #include "../include/BDD.h"
+
+// This macro is defined in bddc.h
+#ifdef SAPPOROBDD_PLUS_PLUS
 #include "../include/ZDD.h"
+#else
+#include "../include/ZBDD.h"
+#endif
 
 using namespace std;
+
+#ifdef SAPPOROBDD_PLUS_PLUS
 using namespace sapporobdd;
+#else
+#define ZDD ZBDD
+#define ZDD_ID ZBDD_ID
+#define ZDD_Meet ZBDD_Meet
+#define ZDD_Random ZBDD_Random
+#define ZDD_Export ZBDD_Export
+#define ZDD_Import ZBDD_Import
+#endif
 
 // Test counter
 int test_count = 0;
