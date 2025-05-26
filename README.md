@@ -14,12 +14,24 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 
 # Change from SAPPOROBDD
 
-* All the code is written in C++.
-* Some compiler warnings are suppressed.
-* We change default to 64-bit version and add B_32 macro for 32-bit version.
-* Namespace 'sapporobdd' is introduced.
-* ZBDD is renamed to ZDD.
-* The manual is converted to Markdown.
+- All the code is rewritten in C++.
+  - If you want to use the C language, please use the original [SAPPOROBDD](https://github.com/Shin-ichi-Minato/SAPPOROBDD) package.
+- Some compiler warnings are suppressed.
+- We change default to 64-bit version and add B_32 macro for 32-bit version.
+  - Defining B_64 does not affect the code.
+- Namespace 'sapporobdd' is introduced.
+  - Put `using namespace sapporobdd;` before using SAPPOROBDD++
+- ZBDD is renamed to ZDD.
+  - Functions including "ZBDD" are also renamed. For example, ZBDD_Meet is renamed to ZDD_Meet.
+  - You can still use "ZBDD".
+- The manual is converted to Markdown (and minor mistakes are fixed).
+- Tests are added (in the "tests" directory).
+
+# Manual
+
+See [BDDplus.md](man/BDDplus.md) and [ZDD.md](man/classes/ZDD.md) (in Japanese).
+
+
 
 # Author
 
