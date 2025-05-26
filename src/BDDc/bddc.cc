@@ -1499,7 +1499,7 @@ static int node_enlarge()
 }
 
 static int hash_enlarge(bddvar v)
-/* Returns 1 if not enough memory */
+/* Throws an exception if not enough memory */
 {
   struct B_NodeTable *np, *np0;
   struct B_VarTable *varp;
@@ -1536,9 +1536,18 @@ static int hash_enlarge(bddvar v)
   }
   else
   {
-    if(newhash_32) free(newhash_32);
-    if(newhash_h8) free(newhash_h8);
-    return 1;
+    bddp memsize = 0;
+    if(newhash_32) {
+      free(newhash_32);
+    } else {
+      memsize += sizeof(bddp_32) * newSpc;
+    }
+    if(newhash_h8) {
+      free(newhash_h8);
+    } else {
+      memsize += sizeof(bddp_h8) * newSpc;
+    }
+    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
   }
 #else
   newhash_32 = 0;
@@ -1549,7 +1558,10 @@ static int hash_enlarge(bddvar v)
     free(varp->hash_32);
     varp->hash_32 = newhash_32;
   }
-  else return 1; /* Not enough memory */
+  else {
+    bddp memsize = sizeof(bddp_32) * newSpc;
+    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
+  } /* Not enough memory */
 #endif
   varp->hashSpc = newSpc;
 
@@ -1589,7 +1601,7 @@ static int hash_enlarge(bddvar v)
 }
 
 static bddp getnode(bddvar v, bddp f0, bddp f1)
-/* Returns bddnull if not enough memory */
+/* Throws an exception if not enough memory */
 {
   /* After checking elimination rule & negative edge rule */
   struct B_NodeTable *np, *fp;
@@ -1606,14 +1618,14 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
   {
     varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
-    if(!varp->hash_32) return bddnull;
+    if(!varp->hash_32) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0);
 #ifndef B_32
     varp->hash_h8 = 0;
     varp->hash_h8 = B_MALLOC(bddp_h8, B_HASH_SPC0);
     if(!varp->hash_h8)
     {
       free(varp->hash_32);
-      return bddnull;
+      throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_h8) * B_HASH_SPC0);
     }
 #endif
     for(ix=0; ix<B_HASH_SPC0; ix++)
@@ -1649,7 +1661,8 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
   /* Check hash-table overflow */
   if(++ varp->hashUsed >= varp->hashSpc)
   {
-    if(hash_enlarge(v)) return bddnull; /* Hash-table overflow */
+    if(hash_enlarge(v)) throw BDDOutOfMemoryException("getnode: "
+      "not enough memory for hash table", sizeof(bddp_32) * varp->hashSpc); /* Hash-table overflow */
     key = B_HASHKEY(f0, f1, varp->hashSpc); /* Enlarge success */
   }
 
@@ -1658,7 +1671,8 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
   {
     if(node_enlarge())
     {
-      if(bddgc()) return bddnull; /* Node-table overflow */
+      if(bddgc()) throw BDDOutOfMemoryException("getnode: "
+        "not enough memory for node table", 0); /* Node-table overflow */
       key = B_HASHKEY(f0, f1, varp->hashSpc);
     }
     /* Node-table enlarged or GC succeeded */

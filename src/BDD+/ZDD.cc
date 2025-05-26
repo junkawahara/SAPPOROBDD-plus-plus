@@ -329,8 +329,8 @@ ZDD ZDD::ImplySet(int v) const
 int ZDD::CoImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
-  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
+  if(v1 <= 0) BDDerr("ZDD::CoImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0) BDDerr("ZDD::CoImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
@@ -806,28 +806,28 @@ ZDDV ZDDV_Import(FILE *strm)
   bddword *hash1 = 0;
   ZDD *hash2 = 0;
 
-  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
-  if(strcmp(s, "_i") != 0) return ZDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _i tag", ExceptionType::FileFormat);
+  if(strcmp(s, "_i") != 0) BDDerr("ZDDV_Import(): File format error, expected _i tag", ExceptionType::FileFormat);
+  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading variable count", ExceptionType::FileFormat);
   int n = strtol(s, NULL, 10);
   while(n > BDD_TopLev()) BDD_NewVar();
 
-  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
-  if(strcmp(s, "_o") != 0) return ZDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _o tag", ExceptionType::FileFormat);
+  if(strcmp(s, "_o") != 0) BDDerr("ZDDV_Import(): File format error, expected _o tag", ExceptionType::FileFormat);
+  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading output count", ExceptionType::FileFormat);
   int m = strtol(s, NULL, 10);
 
-  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
-  if(strcmp(s, "_n") != 0) return ZDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return ZDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _n tag", ExceptionType::FileFormat);
+  if(strcmp(s, "_n") != 0) BDDerr("ZDDV_Import(): File format error, expected _n tag", ExceptionType::FileFormat);
+  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading node count", ExceptionType::FileFormat);
   bddword n_nd = B_STRTOI(s, NULL, 10);
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
   hash1 = new bddword[hashsize];
-  if(hash1 == 0) return ZDDV(-1);
+  if(hash1 == 0) BDDerr("ZDDV_Import(): Memory allocation failed for hash1", ExceptionType::OutOfMemory);
   hash2 = new ZDD[hashsize];
-  if(hash2 == 0) { delete[] hash1; return ZDDV(-1); }
+  if(hash2 == 0) { delete[] hash1; BDDerr("ZDDV_Import(): Memory allocation failed for hash2", ExceptionType::OutOfMemory); }
   for(bddword ix=0; ix<hashsize; ix++)
   {
     hash1[ix] = B_VAL_MASK;
@@ -883,7 +883,7 @@ ZDDV ZDDV_Import(FILE *strm)
     }
 
     f = f1.Change(var) + f0;
-    if(f == -1) { e = 1; break; }
+    if(f == -1) BDDerr("ZDDV_Import(): Invalid ZDD result from operation", ExceptionType::InternalError);
 
     bddword ixx = IMPORTHASH(nd);
     while(hash1[ixx] != B_VAL_MASK)
@@ -901,7 +901,7 @@ ZDDV ZDDV_Import(FILE *strm)
   {
     delete[] hash2;
     delete[] hash1;
-    return ZDDV(-1);
+    BDDerr("ZDDV_Import(): File format error while reading nodes", ExceptionType::FileFormat);
   }
 
   ZDDV v = ZDDV();
@@ -911,7 +911,7 @@ ZDDV ZDDV_Import(FILE *strm)
     {
       delete[] hash2;
       delete[] hash1;
-      return ZDDV(-1);
+      BDDerr("ZDDV_Import(): Unexpected end of file reading output values", ExceptionType::FileFormat);
     }
     bddword nd = B_STRTOI(s, NULL, 10);
     if(strcmp(s, "F") == 0) v += ZDDV(0, i);
