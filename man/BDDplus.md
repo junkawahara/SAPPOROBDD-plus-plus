@@ -27,6 +27,18 @@
   設定されている。計算中に記憶あふれを起こした場合は、計算を中断して、
   nullオブジェクトBDD(-1) を返す。
 
+## SAPPOROBDD++ 独自の機能
+
+- SAPPOROBDD++ では64ビットバージョンがデフォルトになったため、B_64 マクロの定義は必要なくなった。32ビットバージョンでコンパイルする場合は B_32 マクロを定義する。
+- SAPPOROBDD++ ではすべてのパッケージは sapporobdd 名前空間に入れられている。`using namespace sapporobdd` を使用前に書く必要がある。
+- SAPPOROBDD++ では ZBDD は ZDD にリネームされている。ZBDD を使い続けることも可能である。ZBDD_Meet 等の関数名も ZDD_Meet にリネームされている。
+- エラーが発生した際は、BDDException 例外が投げられる。例外クラスは BDDException.h で定義されている。以下の例外（いずれも BDDException の子クラス）が存在する。
+  - BDDInvalidBDDValueException
+  - BDDOutOfRangeException
+  - BDDOutOfMemoryException
+  - BDDFileFormatException
+  - BDDInternalErrorException
+
 ## 提供するクラスとその依存関係
 
 - [BDD](classes/BDD.md) - BDDで表現された個々の論理関数を指すクラス

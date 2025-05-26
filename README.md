@@ -16,6 +16,8 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 
 - All the code is rewritten in C++.
   - If you want to use the C language, please use the original [SAPPOROBDD](https://github.com/Shin-ichi-Minato/SAPPOROBDD) package.
+- When an error occurs, an exception is thrown instead of calling exit(1)
+  - BDDException class is introduced.
 - Some compiler warnings are suppressed.
 - We change default to 64-bit version and add B_32 macro for 32-bit version.
   - Defining B_64 does not affect the code.
