@@ -1,13 +1,8 @@
-# C++版BDDパッケージ(SAPPORO-1.96)　ドキュメント
-
-著者: 湊 真一　京都大学　大学院情報学研究科  
-最新更新日: 2022.10.15
-
----
+# SAPPOROBDD++ マニュアル
 
 ## パッケージの概要
 
-- このパッケージはBDDの基本操作を行うC++のクラスライブラリである。
+- このパッケージはBDD/ZDDの基本操作を行うC++のクラスライブラリである。
   本プログラムは、32ビットまたは64ビットの計算機で動作する。
   （コンパイル時に、オプションB_32を指定すると32ビットモードとなり、指定しないと64ビットモードになる。この動作はオリジナルの SAPPOROBDD とは異なることに注意。）
   各操作はC++のメソッド呼び出しにより実行される。
@@ -32,22 +27,24 @@
   設定されている。計算中に記憶あふれを起こした場合は、計算を中断して、
   nullオブジェクトBDD(-1) を返す。
 
-- 提供するクラスとその依存関係:
-  - [BDD](classes/BDD.md) - BDDで表現された個々の論理関数を指すクラス
-    - [BDDV](classes/BDDV.md) - BDDの配列（論理関数の配列）を表すクラス
-      - [BtoI](classes/BtoI.md) - ２値入力整数値出力の論理関数を表すクラス
-    - [BDDDG](classes/BDDDG.md) - BDDを単純直交分解した結果を表すクラス
-    - [ZDD](classes/ZDD.md) - ゼロサプレス型BDDで表現された組合せ集合を指すクラス
-      - [ZDDV](classes/ZDDV.md) - ZDDの配列（組合せ集合の配列）を表すクラス
-        - [CtoI](classes/CtoI.md) - 整数値組合せ集合（整係数ユネイト論理式）を表すクラス
-      - [SOP](classes/SOP.md) - 正負のリテラルからなる積和形論理式を表現するクラス
-        - [SOPV](classes/SOPV.md) - SOPの配列（積和形論理式の配列）を表すクラス
-      - [PiDD](classes/PiDD.md) - 順列集合を表現するクラス
-      - [SeqBDD](classes/SeqBDD.md) - 系列集合を表現するクラス
-      - [GBase](classes/GBase.md) - ZDDでパス/サイクル列挙を行うためのクラス
-      - [BDDCT](classes/BDDCT.md) - BDD/ZDDでコスト制約付き変数を扱うためのクラス
+## 提供するクラスとその依存関係
 
-- BDDクラスの使用例
+- [BDD](classes/BDD.md) - BDDで表現された個々の論理関数を指すクラス
+  - [BDDV](classes/BDDV.md) - BDDの配列（論理関数の配列）を表すクラス
+    - [BtoI](classes/BtoI.md) - ２値入力整数値出力の論理関数を表すクラス
+  - [BDDDG](classes/BDDDG.md) - BDDを単純直交分解した結果を表すクラス
+  - [ZDD](classes/ZDD.md) - ゼロサプレス型BDDで表現された組合せ集合を指すクラス
+    - [ZDDV](classes/ZDDV.md) - ZDDの配列（組合せ集合の配列）を表すクラス
+      - [CtoI](classes/CtoI.md) - 整数値組合せ集合（整係数ユネイト論理式）を表すクラス
+    - [SOP](classes/SOP.md) - 正負のリテラルからなる積和形論理式を表現するクラス
+      - [SOPV](classes/SOPV.md) - SOPの配列（積和形論理式の配列）を表すクラス
+    - [PiDD](classes/PiDD.md) - 順列集合を表現するクラス
+    - [SeqBDD](classes/SeqBDD.md) - 系列集合を表現するクラス
+    - [GBase](classes/GBase.md) - ZDDでパス/サイクル列挙を行うためのクラス
+    - [BDDCT](classes/BDDCT.md) - BDD/ZDDでコスト制約付き変数を扱うためのクラス
+
+## BDDクラスの使用例
+
 ```cpp
 int x = BDD_NewVar();
 int y = BDD_NewVar();
