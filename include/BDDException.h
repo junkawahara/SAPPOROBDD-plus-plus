@@ -1,6 +1,5 @@
 /*****************************************
- *  BDD Package (SAPPORO-1.94) Exception Classes  *
- *  (C) Shin-ichi MINATO                          *
+ *  SAPPOROBDD++ Exception Classes       *
  ******************************************/
 
 #ifndef BDD_EXCEPTION_H
@@ -11,7 +10,16 @@
 #include <sstream>
 #include "bddc.h"
 
-namespace SAPPOROBDD {
+namespace sapporobdd {
+
+/* Enum for exception types */
+enum class ExceptionType {
+  InvalidBDDValue,
+  OutOfRange,
+  OutOfMemory,
+  FileFormat,
+  InternalError
+};
 
 /**
  * Base exception class for all BDD errors
@@ -22,9 +30,17 @@ protected:
 
 public:
     BDDException(const std::string& msg) : message(msg) {}
+#if __cplusplus >= 201103L /* C++11 */
     virtual ~BDDException() noexcept = default;
+#else
+    virtual ~BDDException() throw() {}
+#endif
 
+#if __cplusplus >= 201103L /* C++11 */
     virtual const char* what() const noexcept override {
+#else
+    virtual const char* what() const throw() {
+#endif
         return message.c_str();
     }
     
@@ -149,6 +165,6 @@ public:
     }
 };
 
-} // namespace SAPPOROBDD
+} // namespace sapporobdd
 
 #endif // BDD_EXCEPTION_H

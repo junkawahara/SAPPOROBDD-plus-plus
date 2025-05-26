@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bddc.h"
+#include "BDDException.h"
 
 namespace sapporobdd {
 
@@ -108,7 +109,7 @@ namespace sapporobdd {
 #define B_RFC_DEC_NP(p) \
   (((p)->varrfc >= B_RFC_MASK)? rfc_dec_ovf(p): \
    (B_RFC_ZERO_NP(p))? \
-    err("B_RFC_DEC_NP: rfc under flow", p-Node): \
+    err("B_RFC_DEC_NP: rfc under flow", p-Node, ExceptionType::InternalError): \
     ((p)->varrfc -= B_RFC_UNIT, 0))
 
 /* ----------- Stack overflow limitter ------------ */
@@ -116,7 +117,7 @@ const int BDD_RecurLimit = 8192;
 int BDD_RecurCount = 0;
 #define BDD_RECUR_INC \
   {if(++BDD_RecurCount >= BDD_RecurLimit) \
-    err("BDD_RECUR_INC: Recursion Limit", BDD_RecurCount);}
+    err("BDD_RECUR_INC: Recursion Limit", BDD_RecurCount, ExceptionType::InternalError);}
 #define BDD_RECUR_DEC BDD_RecurCount--
 
 /* Conversion of ZDD node flag */
@@ -234,7 +235,7 @@ struct B_MP
 
 /* ----- Declaration of static (internal) functions ------ */
 /* Private procedure */
-static int  err(const char *msg, bddp num);
+static int  err(const char *msg, bddp num, ExceptionType exType);
 static int  rfc_inc_ovf(struct B_NodeTable *np);
 static int  rfc_dec_ovf(struct B_NodeTable *np);
 static void var_enlarge(void);
@@ -362,7 +363,7 @@ bddp bddcopy(bddp f)
   if(B_CST(f)) return f; /* Constant */
   fp = B_NP(f);
   if(fp >= Node+NodeSpc || fp->varrfc == 0)
-    err("bddcopy: Invalid bddp", f);
+    err("bddcopy: Invalid bddp", f, ExceptionType::InvalidBDDValue);
   B_RFC_INC_NP(fp);
   return f;
 }
@@ -375,7 +376,7 @@ void bddfree(bddp f)
   if(B_CST(f)) return; /* Constant */
   fp = B_NP(f);
   if(fp >= Node+NodeSpc || fp->varrfc == 0)
-    err("bddfree: Invalid bddp", f);
+    err("bddfree: Invalid bddp", f, ExceptionType::InvalidBDDValue);
   B_RFC_DEC_NP(fp);
 }
 
@@ -562,7 +563,7 @@ bddp bddsize(bddp f)
   if(f == bddnull) return 0;
   if(B_CST(f)) return 0; /* Constant */
   if((fp=B_NP(f))>=Node+NodeSpc || fp->varrfc == 0)
-    err("bddsize: Invalid bddp", f);
+    err("bddsize: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   num = count(f);
   reset(f);
@@ -587,7 +588,7 @@ bddp bddvsize(bddp *p, int lim)
     }
     if(!B_CST(p[i])&&
        ((fp=B_NP(p[i]))>=Node+NodeSpc || fp->varrfc==0))
-      err("bddvsize: Invalid bddp", p[i]);
+      err("bddvsize: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
   }
   num = 0;
   for(i=0; i<n; i++) num += count(p[i]);
@@ -612,7 +613,7 @@ void bddexport(FILE *strm, bddp *p, int lim)
     }
     if(!B_CST(p[i])&&
        ((fp=B_NP(p[i]))>=Node+NodeSpc || fp->varrfc==0))
-      err("bddvexport: Invalid bddp", p[i]);
+      err("bddvexport: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
     lev0 = bddlevofvar(bddtop(p[i]));
     if(lev0 > lev) lev = lev0;
   }
@@ -643,7 +644,7 @@ void bdddump(bddp f)
   if(f == bddnull) { printf("RT = NULL\n\n"); return; }
   if(!B_CST(f)&&
      ((fp=B_NP(f))>=Node+NodeSpc || fp->varrfc==0))
-      err("bdddump: Invalid bddp", f);
+      err("bdddump: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   /* Dump nodes */
   dump(f);
@@ -668,7 +669,7 @@ void bddvdump(bddp *p, int n)
     if(p[i] == bddnull) return;
     if(!B_CST(p[i])&&
        ((fp=B_NP(p[i]))>=Node+NodeSpc || fp->varrfc==0))
-      err("bddvdump: Invalid bddp", p[i]);
+      err("bddvdump: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
   }
 
   /* Dump nodes */
@@ -707,7 +708,7 @@ void bddwcache(unsigned char op, bddp f, bddp g, bddp h)
 {
   struct B_CacheTable *cachep;
 
-  if(op < 20) err("bddwcache: op < 20", op);
+  if(op < 20) err("bddwcache: op < 20", op, ExceptionType::InternalError);
   if(h == bddnull) return;
   cachep = Cache + B_CACHEKEY(op, f, g);
   cachep->op = op;
@@ -725,14 +726,14 @@ bddp bddnot(bddp f)
 bddvar bddlevofvar(bddvar v)
 {
   if(v > VarUsed)
-    err("bddlevofvar: Invalid VarID", v);
+    err("bddlevofvar: Invalid VarID", v, ExceptionType::OutOfRange);
   return Var[v].lev;
 }
 
 bddvar bddvaroflev(bddvar lev)
 {
   if(lev > VarUsed)
-    err("bddvaroflev: Invalid level", lev);
+    err("bddvaroflev: Invalid level", lev, ExceptionType::OutOfRange);
   return VarID[lev];
 }
 
@@ -752,7 +753,7 @@ bddvar bddnewvaroflev(bddvar lev)
   bddvar i;
 
   if(lev == 0 || lev > ++VarUsed)
-    err("bddnewvaroflev: Invalid level", lev);
+    err("bddnewvaroflev: Invalid level", lev, ExceptionType::OutOfRange);
   if(VarUsed == VarSpc) var_enlarge();
   for(i=VarUsed; i>lev; i--) Var[ VarID[i] = VarID[i-1U] ].lev = i;
   Var[ VarID[lev] = VarUsed ].lev = lev;
@@ -767,7 +768,7 @@ bddvar bddtop(bddp f)
   if(B_CST(f)) return 0; /* Constant */
   fp = B_NP(f);
   if(fp >= Node+NodeSpc || fp->varrfc == 0)
-    err("bddtop: Invalid bddp", f);
+    err("bddtop: Invalid bddp", f, ExceptionType::InvalidBDDValue);
   return B_VAR_NP(fp);
 }
 
@@ -775,7 +776,7 @@ bddp    bddprime(bddvar v)
 /* Returns bddnull if not enough memory */
 {
         if(v == 0 || v > VarUsed)
-		err("bddprime: Invalid VarID", v);
+		err("bddprime: Invalid VarID", v, ExceptionType::InvalidBDDValue);
         return getbddp(v, bddfalse, bddtrue);
 }
 
@@ -789,22 +790,22 @@ bddp bddand(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddand: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddand: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddand: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f);
+      err("bddand: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddand: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g);
+      err("bddand: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_AND, 0);
@@ -831,22 +832,22 @@ bddp bddxor(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddand: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddand: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddxor: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f);
+      err("bddxor: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddxor: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g);
+      err("bddxor: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_XOR, 0);
@@ -886,22 +887,22 @@ bddp bddcofactor(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddcofactor: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddcofactor: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddcofactor: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", f);
+      err("bddcofactor: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddcofactor: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddcofactor: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddcofactor: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", g);
+      err("bddcofactor: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_COFACTOR, 0);
@@ -916,22 +917,22 @@ bddp bdduniv(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bdduniv: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bdduniv: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bdduniv: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", f);
+      err("bdduniv: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bdduniv: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bdduniv: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bdduniv: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", g);
+      err("bdduniv: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_UNIV, 0);
@@ -957,22 +958,22 @@ int bddimply(bddp f, bddp g)
   if(f == bddnull) return 0;
   if(g == bddnull) return 0;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddimply: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddimply: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddimply: Invalid bddp", f);
-    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", f);
+      err("bddimply: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddimply: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddimply: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddimply: Invalid bddp", g);
-    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", g);
+      err("bddimply: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return ! andfalse(f, B_NOT(g));
@@ -988,7 +989,7 @@ bddp bddsupport(bddp f)
   if(B_CST(f)) return bddfalse;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddsupport: Invalid bddp", f);
+    err("bddsupport: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, bddfalse, BC_SUPPORT, 0);
 }
@@ -999,12 +1000,12 @@ bddp bddat0(bddp f, bddvar v)
   struct B_NodeTable *fp;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddat0: Invalid VarID", v);
+  if(v > VarUsed || v == 0) err("bddat0: Invalid VarID", v, ExceptionType::InvalidBDDValue);
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddat0: Invalid bddp", f);
+    err("bddat0: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, (bddp)v, BC_AT0, 0);
 }
@@ -1015,12 +1016,12 @@ bddp bddat1(bddp f, bddvar v)
   struct B_NodeTable *fp;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddat1: Invalid VarID", v);
+  if(v > VarUsed || v == 0) err("bddat1: Invalid VarID", v, ExceptionType::InvalidBDDValue);
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddat1: Invalid bddp", f);
+    err("bddat1: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, (bddp)v, BC_AT1, 0);
 }
@@ -1032,12 +1033,12 @@ bddp bddlshift(bddp f, bddvar shift)
 
   /* Check operands */
   if(shift >= VarUsed)
-    err("bddlshift: Invalid shift", shift);
+    err("bddlshift: Invalid shift", shift, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
   if(shift == 0) return bddcopy(f);
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddlshift: Invalid bddp", f);
+    err("bddlshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, (bddp)shift, BC_LSHIFT, 0);
 }
@@ -1049,12 +1050,12 @@ bddp bddrshift(bddp f, bddvar shift)
 
   /* Check operands */
   if(shift >= VarUsed)
-    err("bddrshift: Invalid shift", shift);
+    err("bddrshift: Invalid shift", shift, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
   if(shift == 0) return bddcopy(f);
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddrshift: Invalid bddp", f);
+    err("bddrshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, (bddp)shift, BC_RSHIFT, 0);
 }
@@ -1065,13 +1066,13 @@ bddp    bddoffset(bddp f, bddvar v)
   struct B_NodeTable *fp;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddoffset: Invalid VarID", v);
+  if(v > VarUsed || v == 0) err("bddoffset: Invalid VarID", v, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddoffset: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddoffset: applying non-ZDD node", f);
+    err("bddoffset: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+  if(!B_Z_NP(fp)) err("bddoffset: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, (bddp)v, BC_OFFSET, 0);
 }
@@ -1082,13 +1083,13 @@ bddp    bddonset0(bddp f, bddvar v)
   struct B_NodeTable *fp;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddonset0: Invalid VarID", v);
+  if(v > VarUsed || v == 0) err("bddonset0: Invalid VarID", v, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return bddfalse;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddonset0: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddonset0: applying non-ZDD node", f);
+    err("bddonset0: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+  if(!B_Z_NP(fp)) err("bddonset0: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, (bddp)v, BC_ONSET, 0);
 }
@@ -1110,14 +1111,14 @@ bddp    bddchange(bddp f, bddvar v)
   struct B_NodeTable *fp;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddchange: Invalid VarID", v);
+  if(v > VarUsed || v == 0) err("bddchange: Invalid VarID", v, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
   if(!B_CST(f))
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddchange: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddchange: applying non-ZDD node", f);
+      err("bddchange: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddchange: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, (bddp)v, BC_CHANGE, 0);
@@ -1132,22 +1133,22 @@ bddp bddintersec(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddintersec: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddintersec: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddintersec: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", f);
+      err("bddintersec: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddintersec: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddintersec: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddintersec: Invalid bddp", g);
-    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", g);
+      err("bddintersec: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_INTERSEC, 0);
@@ -1162,22 +1163,22 @@ bddp bddunion(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddunion: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddunion: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddunion: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", f);
+      err("bddunion: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddunion: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddunion: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddunion: Invalid bddp", g);
-    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", g);
+      err("bddunion: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_UNION, 0);
@@ -1192,22 +1193,22 @@ bddp bddsubtract(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddsubtract: Invalid bddp", f); }
+  { if(B_ABS(f) != bddfalse) err("bddsubtract: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddsubtarct: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", f);
+      err("bddsubtarct: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddsubtarct: Invalid bddp", g); }
+  { if(B_ABS(g) != bddfalse) err("bddsubtarct: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddsubtarct: Invalid bddp", g);
-    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", g);
+      err("bddsubtarct: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_SUBTRACT, 0);
@@ -1221,8 +1222,8 @@ bddp bddcard(bddp f)
   if(B_CST(f)) return (f == bddfalse)? 0: 1;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddcard: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddcard: applying non-ZDD node", f);
+    err("bddcard: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+  if(!B_Z_NP(fp)) err("bddcard: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, bddfalse, BC_CARD, 0);
 }
@@ -1235,8 +1236,8 @@ bddp bddlit(bddp f)
   if(B_CST(f)) return 0;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddlit: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddlit: applying non-ZDD node", f);
+    err("bddlit: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+  if(!B_Z_NP(fp)) err("bddlit: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, bddfalse, BC_LIT, 0);
 }
@@ -1249,8 +1250,8 @@ bddp bddlen(bddp f)
   if(B_CST(f)) return 0;
   fp = B_NP(f);
   if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddlen: Invalid bddp", f);
-  if(!B_Z_NP(fp)) err("bddlen: applying non-ZDD node", f);
+    err("bddlen: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+  if(!B_Z_NP(fp)) err("bddlen: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
 
   return apply(f, bddfalse, BC_LEN, 0);
 }
@@ -1269,8 +1270,8 @@ char *bddcardmp16(bddp f, char *s)
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddcardmp16: Invalid bddp", f);
-    if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZDD node", f);
+      err("bddcardmp16: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
     h = apply(B_ABS(f), bddfalse, BC_CARD2, 0);
     if(h == B_MP_NULL) mp.len = 0;
     else
@@ -1322,7 +1323,7 @@ int bddisbdd(bddp f)
   if(f == bddnull) return 0;
   if(B_CST(f)) return 1;
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddisbdd: Invalid bddp", f);
+    err("bddisbdd: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return (B_NEG(B_GET_BDDP(fp->f0)) ? 0 : 1);
 }
@@ -1334,7 +1335,7 @@ int bddiszdd(bddp f)
   if(f == bddnull) return 0;
   if(B_CST(f)) return 1;
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddiszdd: Invalid bddp", f);
+    err("bddiszdd: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   return (B_NEG(B_GET_BDDP(fp->f0)) ? 1 : 0);
 }
@@ -1351,7 +1352,7 @@ bddp    bddpush(bddp f, bddvar v)
   struct B_NodeTable *fp;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddpush: Invalid VarID", v);
+  if(v > VarUsed || v == 0) err("bddpush: Invalid VarID", v, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
 
   if(!B_CST(f)) { fp = B_NP(f); B_RFC_INC_NP(fp); }
@@ -1367,7 +1368,7 @@ static void var_enlarge()
   
   /* Get new size */
   if(VarSpc == bddvarmax+1U)
-    err("var_enlarge: var index range full", VarSpc);
+    err("var_enlarge: var index range full", VarSpc, ExceptionType::OutOfRange);
   newSpc = VarSpc << 2U;
   if(newSpc > bddvarmax+1) newSpc = bddvarmax+1U;
 
@@ -1398,7 +1399,7 @@ static void var_enlarge()
   {
     if(newVar) free(newVar);
     if(newVarID) free(newVarID);
-    err("var_enlarge: memory allocation failed", VarSpc);
+    err("var_enlarge: memory allocation failed", VarSpc, ExceptionType::OutOfMemory);
   }
 
   /* Initialize new space */
@@ -1931,7 +1932,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   default:
-    err("apply: unknown opcode", op);
+    err("apply: unknown opcode", op, ExceptionType::InternalError);
     break;
   }
 
@@ -2085,7 +2086,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   default:
-    err("apply: unknown opcode", op);
+    err("apply: unknown opcode", op, ExceptionType::InternalError);
   }
 
   /* Stack overflow limitter */
@@ -2187,13 +2188,13 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
       {
         newlev = flev + (bddvar)g;
         if(newlev > VarUsed || newlev < flev)
-          err("apply: Invald shift", newlev);
+          err("apply: Invald shift", newlev, ExceptionType::OutOfRange);
       }
       else
       {
         newlev = flev - (bddvar)g;
         if(newlev == 0 || newlev > flev)
-          err("apply: Invald shift", newlev);
+          err("apply: Invald shift", newlev, ExceptionType::OutOfRange);
       }
       v = bddvaroflev(newlev);
     }
@@ -2273,7 +2274,7 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   default:
-    err("apply: unknown opcode", op);
+    err("apply: unknown opcode", op, ExceptionType::InternalError);
     break;
   }
 
@@ -2357,7 +2358,7 @@ static void gc1(struct B_NodeTable *np)
     while(np1 != np)
     {
       if(nx1 == bddnull)
-        err("gc1: Fail to find the node to be deleted", np-Node);
+        err("gc1: Fail to find the node to be deleted", np-Node, ExceptionType::InternalError);
       np2 = np1;
       nx1 = B_GET_BDDP(np2->nx);
       np1 = Node + nx1;
@@ -2398,7 +2399,7 @@ static bddp count(bddp f)
 
   /* Check consistensy
   if(f == bddnull)
-    err("count: bddnull found", bddnull);
+    err("count: bddnull found", bddnull, ExceptionType::InternalError);
   */
 
   if(B_CST(f)) return 0; /* Constant */
@@ -2415,14 +2416,14 @@ static bddp count(bddp f)
   {
     gp = B_NP(g); glev = Var[B_VAR_NP(gp)].lev;
     if(flev <= glev) 
-        err("count: inconsistensy found at f0", fp-Node);
+        err("count: inconsistensy found at f0", fp-Node, ExceptionType::InternalError);
   }
   g = B_GET_BDDP(fp->f1);
   if(!B_CST(g))
   {
     gp = B_NP(g); glev = Var[B_VAR_NP(gp)].lev;
     if(flev <= glev) 
-        err("count: inconsistensy found at f1", fp-Node);
+        err("count: inconsistensy found at f1", fp-Node, ExceptionType::InternalError);
   }
   */
 
@@ -2624,23 +2625,42 @@ static int andfalse(bddp f, bddp g)
   return 0;
 }
 
-static int err(const char *msg, bddp num)
+static int err(const char *msg, bddp num, ExceptionType exType)
 {
-  fprintf(stderr,"***** ERROR  %s ( ", msg);
-  fprintf(stderr, B_BDDP_FX, num);
-  fprintf(stderr," ) *****\n");
-  fprintf(stderr," NodeLimit : ");
-  fprintf(stderr, B_BDDP_FD, NodeLimit);
-  fprintf(stderr,"\t NodeSpc : ");
-  fprintf(stderr, B_BDDP_FD, NodeSpc);
-  fprintf(stderr,"\t VarSpc : %d",VarSpc);
-  fprintf(stderr,"\n CacheSpc : ");
-  fprintf(stderr, B_BDDP_FD, CacheSpc);
-  fprintf(stderr,"\t NodeUsed : ");
-  fprintf(stderr, B_BDDP_FD, NodeUsed);
-  fprintf(stderr,"\t VarUsed : %d\n",VarUsed);
-  exit(1);
-  return 1;
+  const int msg_buf_size = 1024;
+  char msg_buf[msg_buf_size];
+  snprintf(msg_buf, msg_buf_size, "***** ERROR  %s ( ", msg);
+  snprintf(msg_buf, msg_buf_size, B_BDDP_FX, num);
+  snprintf(msg_buf, msg_buf_size, " ) *****\n");
+  snprintf(msg_buf, msg_buf_size, " NodeLimit : ");
+  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, NodeLimit);
+  snprintf(msg_buf, msg_buf_size, "\t NodeSpc : ");
+  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, NodeSpc);
+  snprintf(msg_buf, msg_buf_size, "\t VarSpc : %d", VarSpc);
+  snprintf(msg_buf, msg_buf_size, "\n CacheSpc : ");
+  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, CacheSpc);
+  snprintf(msg_buf, msg_buf_size, "\t NodeUsed : ");
+  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, NodeUsed);
+  snprintf(msg_buf, msg_buf_size, "\t VarUsed : %d\n", VarUsed);
+
+  std::string errorMsg(msg_buf);
+
+  // Throw appropriate exception based on exType
+  switch (exType) {
+    case ExceptionType::InvalidBDDValue:
+      throw BDDInvalidBDDValueException(errorMsg, num);
+    case ExceptionType::OutOfRange:
+      throw BDDOutOfRangeException(errorMsg, num);
+    case ExceptionType::OutOfMemory:
+      throw BDDOutOfMemoryException(errorMsg, num);
+    case ExceptionType::FileFormat:
+      throw BDDFileFormatException(errorMsg, num);
+    case ExceptionType::InternalError:
+    default:
+      throw BDDInternalErrorException(errorMsg, num);
+  }
+
+  return 1; // This line will never be reached but kept for compatibility
 }
 
 static int rfc_inc_ovf(struct B_NodeTable *np)
@@ -2656,7 +2676,7 @@ static int rfc_inc_ovf(struct B_NodeTable *np)
     RFCT = B_MALLOC(struct B_RFC_Table, B_RFCT_SPC0);
     if(!RFCT)
     {
-      err("B_RFC_INC_NP: rfc memory over flow", np-Node);
+      err("B_RFC_INC_NP: rfc memory over flow", np-Node, ExceptionType::OutOfMemory);
       return 1;
     }
     for(ix=0; ix<B_RFCT_SPC0; ix++)
@@ -2704,7 +2724,7 @@ static int rfc_inc_ovf(struct B_NodeTable *np)
     RFCT = B_MALLOC(struct B_RFC_Table, RFCT_Spc);
     if(!RFCT)
     {
-      err("B_RFC_INC_NP: rfc memory over flow", np-Node);
+      err("B_RFC_INC_NP: rfc memory over flow", np-Node, ExceptionType::OutOfMemory);
       return 1;
     }
     for(ix=0; ix<RFCT_Spc; ix++)
@@ -2771,38 +2791,38 @@ int import(FILE *strm, bddp *p, int lim, int z)
   bddp *hash2;
 
   v = fscanf(strm, "%s", s);
-  if(v == EOF) return 1;
-  if(strcmp(s, "_i") != 0) return 1;
+  if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
+  if(strcmp(s, "_i") != 0) throw BDDFileFormatException("Import error: Expected '_i' marker", 0);
   v = fscanf(strm, "%s", s);
-  if(v == EOF) return 1;
+  if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   n = strtol(s, 0, 10);
   while(n > (int)bddvarused()) bddnewvar();
 
   v = fscanf(strm, "%s", s);
-  if(v == EOF) return 1;
-  if(strcmp(s, "_o") != 0) return 1;
+  if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
+  if(strcmp(s, "_o") != 0) throw BDDFileFormatException("Import error: Expected '_o' marker", 0);
   v = fscanf(strm, "%s", s);
-  if(v == EOF) return 1;
+  if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   m = strtol(s, 0, 10);
 
   v = fscanf(strm, "%s", s);
-  if(v == EOF) return 1;
-  if(strcmp(s, "_n") != 0) return 1;
+  if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
+  if(strcmp(s, "_n") != 0) throw BDDFileFormatException("Import error: Expected '_n' marker", 0);
   v = fscanf(strm, "%s", s);
-  if(v == EOF) return 1;
+  if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   n_nd = B_STRTOI(s, 0, 10);
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
   hash1 = 0;
   hash1 = B_MALLOC(bddp, hashsize);
-  if(hash1 == 0) return 1;
+  if(hash1 == 0) throw BDDOutOfMemoryException("Import error: Memory allocation failed", hashsize);
   hash2 = 0;
   hash2 = B_MALLOC(bddp, hashsize);
   if(hash2 == 0)
   {
     free(hash1);
-    return 1;
+    throw BDDOutOfMemoryException("Import error: Memory allocation failed", hashsize);
   }
   for(ix=0; ix<hashsize; ix++) hash1[ix] = bddnull;
 
@@ -2831,8 +2851,12 @@ int import(FILE *strm, bddp *p, int lim, int z)
       {
         if(hash1[ixx] == bddnull)
         {
-          err("bddimport: internal error", ixx);
-	  return 1;
+          // Clean up before throwing
+          for(bddp j=0; j<hashsize; j++)
+            if(hash1[j] != bddnull) bddfree(hash2[j]);
+          free(hash2);
+          free(hash1);
+          err("bddimport: internal error", ixx, ExceptionType::FileFormat);
         }
         ixx++;
         ixx &= (hashsize-1);
@@ -2855,8 +2879,13 @@ int import(FILE *strm, bddp *p, int lim, int z)
       {
         if(hash1[ixx] == bddnull)
         {
-          err("bddimport: internal error", ixx);
-	  return 1;
+          bddfree(f0);
+          // Clean up before throwing
+          for(bddp j=0; j<hashsize; j++)
+            if(hash1[j] != bddnull) bddfree(hash2[j]);
+          free(hash2);
+          free(hash1);
+          err("bddimport: internal error", ixx, ExceptionType::FileFormat);
         }
         ixx++;
         ixx &= (hashsize-1);
@@ -2878,8 +2907,13 @@ int import(FILE *strm, bddp *p, int lim, int z)
     {
       if(hash1[ixx] == nd)
       {
-        err("bddimport: internal error", ixx);
-        return 1;
+        // Clean up before throwing
+        bddfree(f);
+        for(bddp j=0; j<hashsize; j++)
+          if(hash1[j] != bddnull) bddfree(hash2[j]);
+        free(hash2);
+        free(hash1);
+        err("bddimport: internal error", ixx, ExceptionType::FileFormat);
       }
       ixx++;
       ixx &= (hashsize-1);
@@ -2890,11 +2924,12 @@ int import(FILE *strm, bddp *p, int lim, int z)
 
   if(e)
   {
+    // Cleanup and throw exception for EOF or other errors
     for(ix=0; ix<hashsize; ix++)
       if(hash1[ix] != bddnull) bddfree(hash2[ix]);
     free(hash2);
     free(hash1);
-    return 1;
+    throw BDDFileFormatException("Import error: Unexpected end of file or format error", 0);
   }
 
   for(i=0; i<m; i++)
@@ -2903,18 +2938,19 @@ int import(FILE *strm, bddp *p, int lim, int z)
     v = fscanf(strm, "%s", s);
     if(v == EOF)
     {
+      // Cleanup on error
       for(i--; i>=0; i--) bddfree(p[i]);
       for(ix=0; ix<hashsize; ix++)
         if(hash1[ix] != bddnull) bddfree(hash2[ix]);
       free(hash2);
       free(hash1);
-      return 1;
+      throw BDDFileFormatException("Import error: Unexpected end of file", 0);
     }
-    nd = B_STRTOI(s, 0, 10);
     if(strcmp(s, "F") == 0) p[i] = bddfalse;
     else if(strcmp(s, "T") == 0) p[i] = bddtrue;
     else
     {
+      nd = B_STRTOI(s, 0, 10);
       if(nd & 1) { inv = 1; nd ^= 1; }
       else inv = 0;
   
@@ -2923,8 +2959,13 @@ int import(FILE *strm, bddp *p, int lim, int z)
       {
         if(hash1[ixx] == bddnull)
         {
-          err("bddimport: internal error", ixx);
-          return 1;
+          // Cleanup on error
+          for(i--; i>=0; i--) bddfree(p[i]);
+          for(ix=0; ix<hashsize; ix++)
+            if(hash1[ix] != bddnull) bddfree(hash2[ix]);
+          free(hash2);
+          free(hash1);
+          err("bddimport: internal error", ixx, ExceptionType::FileFormat);
         }
         ixx++;
         ixx &= (hashsize-1);

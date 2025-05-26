@@ -4,6 +4,7 @@
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
 
+#include "BDDException.h"
 #include "BDD.h"
 
 using std::cout;
@@ -93,7 +94,7 @@ BDD BDD::Spread(const int& k) const
   int t = Top();
   if(t == 0) return *this;
   if(k == 0) return *this;
-  if(k < 0) BDDerr("BDD::Spread: k < 0.",k);
+  if(k < 0) BDDerr("BDD::Spread: k < 0.", k, ExceptionType::OutOfRange);
   bddword fx = GetID();
   bddword gx = BDDvar(k).GetID();
   BDD_CACHE_CHK_RETURN(BC_Spread, fx, gx);
@@ -117,7 +118,7 @@ int BDD_Init(bddword init, bddword limit)
 int BDD_NewVarOfLev(int lev)
 {
   if(lev > BDD_TopLev() + 1)
-    BDDerr("BDD_NewVarOfLev:Invald lev ", (bddword)lev);
+    BDDerr("BDD_NewVarOfLev:Invald lev ", (bddword)lev, ExceptionType::OutOfRange);
   return bddnewvaroflev(lev);
 }
 
@@ -129,15 +130,18 @@ void BDD_GC() { bddgc(); }
 
 BDD BDD_Import(FILE *strm)
 {
-	bddword bdd;
-	if(bddimport(strm, &bdd, 1)) return -1;
-	return BDD_ID(bdd);
+  bddword bdd;
+  // bddimport throws an exception on failure
+  if (bddimport(strm, &bdd, 1)) {
+    throw BDDFileFormatException("BDD_Import: Failed to import BDD from file.", 0);
+  }
+  return BDD_ID(bdd);
 }
 
 BDD BDD_Random(int level, int density)
 {
   if(level < 0)
-    BDDerr("BDD_Random: level < 0.",level);
+    BDDerr("BDD_Random: level < 0.", level, ExceptionType::OutOfRange);
   if(level == 0) return ((rand()%100) < density)? 1: 0;
   return (BDDvar(BDD_VarOfLev(level))
         & BDD_Random(level-1, density)) |
@@ -145,22 +149,48 @@ BDD BDD_Random(int level, int density)
         & BDD_Random(level-1, density));
 }
 
-void BDDerr(const char* msg)
+void BDDerr(const char* msg, ExceptionType exType)
 {
-  cerr << "<ERROR> " << msg << " \n";
-  exit(1);
+  switch (exType) {
+    case ExceptionType::InvalidBDDValue:
+      throw BDDInvalidBDDValueException(msg, 0);
+    case ExceptionType::OutOfRange:
+      throw BDDOutOfRangeException(msg, 0);
+    case ExceptionType::OutOfMemory:
+      throw BDDOutOfMemoryException(msg, 0);
+    case ExceptionType::FileFormat:
+      throw BDDFileFormatException(msg, 0);
+    case ExceptionType::InternalError:
+    default:
+      throw BDDInternalErrorException(msg);
+  }
 }
 
-void BDDerr(const char* msg, bddword key)
+void BDDerr(const char* msg, bddword key, ExceptionType exType)
 {
-  cerr << "<ERROR> " << msg << " (" << key << ")\n";
-  exit(1);
+  switch (exType) {
+    case ExceptionType::InvalidBDDValue:
+      throw BDDInvalidBDDValueException(msg, key);
+    case ExceptionType::OutOfRange:
+      throw BDDOutOfRangeException(msg, key);
+    case ExceptionType::OutOfMemory:
+      throw BDDOutOfMemoryException(msg, key);
+    case ExceptionType::FileFormat:
+      throw BDDFileFormatException(msg, key);
+    case ExceptionType::InternalError:
+    default:
+      throw BDDInternalErrorException(msg, key);
+  }
 }
 
-void BDDerr(const char* msg, const char* name)
+void BDDerr(const char* msg, const char* name, ExceptionType exType)
 {
-  cerr << "<ERROR> " << msg << " (" << name << ")\n";
-  exit(1);
+  std::string message(msg);
+  message += " (";
+  message += name;
+  message += ")";
+
+  BDDerr(message.c_str(), 0, exType);
 }
 
 
@@ -175,11 +205,11 @@ const int BDDV_MaxLenImport = 1000;
 
 BDDV::BDDV(const BDD& f, int len)
 {
-  if(len < 0) BDDerr("BDDV::BDDV: len < 0.", len);
-  if(len > BDDV_MaxLen) BDDerr("BDDV::BDDV: Too large len.", len);
+  if(len < 0) BDDerr("BDDV::BDDV: len < 0.", len, ExceptionType::OutOfRange);
+  if(len > BDDV_MaxLen) BDDerr("BDDV::BDDV: Too large len.", len, ExceptionType::OutOfRange);
   int t = f.Top();
   if(t > 0 && BDD_LevOfVar(t) > BDD_TopLev())
-    BDDerr("BDDV::BDDV: Invalid Top Var.", t);
+    BDDerr("BDDV::BDDV: Invalid Top Var.", t, ExceptionType::InvalidBDDValue);
   _bdd = (len == 0)? 0: f;
   _len = (f == -1)? 1: len;
   _lev = GetLev(len);
@@ -211,7 +241,7 @@ BDDV BDDV::Cofact(const BDDV& fv) const
     return Former().Cofact(fv.Former()) || Latter().Cofact(fv.Latter());
   BDDV hv;
   if((hv._bdd = _bdd.Cofact(fv._bdd)) == -1) return BDDV(-1);
-  if(_len != fv._len) BDDerr("BDDV::Cofact: Length mismatch.");
+  if(_len != fv._len) BDDerr("BDDV::Cofact: Length mismatch.", ExceptionType::OutOfRange);
   hv._len = _len;
   // hv._lev = _lev; (always zero)
   return hv;
@@ -220,9 +250,9 @@ BDDV BDDV::Cofact(const BDDV& fv) const
 BDDV BDDV::Swap(int v1, int v2) const
 {
   if(BDD_LevOfVar(v1) > BDD_TopLev())
-    BDDerr("BDDV::Swap: Invalid VarID.", v1);
+    BDDerr("BDDV::Swap: Invalid VarID.", v1, ExceptionType::OutOfRange);
   if(BDD_LevOfVar(v2) > BDD_TopLev())
-    BDDerr("BDDV::Swap: Invalid VarID.", v2);
+    BDDerr("BDDV::Swap: Invalid VarID.", v2, ExceptionType::OutOfRange);
   BDDV hv;
   if((hv._bdd = _bdd.Swap(v1, v2)) == -1) return BDDV(-1);
   hv._len = _len;
@@ -268,7 +298,7 @@ BDDV BDDV::Part(int start, int len) const
   if(len == 0) return BDDV();
 
   if(start < 0 || start + len  > _len)
-    BDDerr("BDDV::Part: Illegal index.");
+    BDDerr("BDDV::Part: Illegal index.", ExceptionType::OutOfRange);
   
   if(start == 0 && len == _len) return *this;
   
@@ -283,7 +313,7 @@ BDDV BDDV::Part(int start, int len) const
 BDD BDDV::GetBDD(int index) const
 {
   if(index < 0 || index >= _len)
-    BDDerr("BDDV::GetBDD: Illegal index.",index);
+    BDDerr("BDDV::GetBDD: Illegal index.", index, ExceptionType::OutOfRange);
   if(_len == 1) return _bdd;
   BDD f = _bdd;
   for(int i=_lev-1; i>=0; i--)
@@ -325,24 +355,24 @@ BDDV operator||(const BDDV& fv, const BDDV& gv)
   BDD x = BDDvar(fv._lev + 1);
   if((hv._bdd = (~x & fv._bdd)|(x & gv._bdd)) == -1) return BDDV(-1);
   if((hv._len = fv._len + gv._len) > BDDV_MaxLen)
-    BDDerr("BDDV::operatop||: Too large len.", hv._len);
+    BDDerr("BDDV::operatop||: Too large len.", hv._len, ExceptionType::OutOfRange);
   hv._lev = fv._lev + 1;
   return hv;
 }
 
 BDDV BDDV_Mask1(int index, int len)
 {
-  if(len < 0) BDDerr("BDDV_Mask1: len < 0.", len);
+  if(len < 0) BDDerr("BDDV_Mask1: len < 0.", len, ExceptionType::OutOfRange);
   if(index < 0 || index >= len)
-    BDDerr("BDDV_Mask1: Illegal index.", index);
+    BDDerr("BDDV_Mask1: Illegal index.", index, ExceptionType::OutOfRange);
   return BDDV(0,index)||BDDV(1,1)||BDDV(0,len-index-1);
 }
 
 BDDV BDDV_Mask2(int index, int len)
 {
-  if(len < 0) BDDerr("BDDV_Mask2: len < 0.", len);
+  if(len < 0) BDDerr("BDDV_Mask2: len < 0.", len, ExceptionType::OutOfRange);
   if(index < 0 || index > len)
-    BDDerr("BDDV_Mask2: Illegal index.", index);
+    BDDerr("BDDV_Mask2: Illegal index.", index, ExceptionType::OutOfRange);
   return BDDV(0,index)||BDDV(1,len-index);
 }
 
@@ -412,7 +442,7 @@ BDDV BDDV_Import(FILE *strm)
       while(hash1[ixx] != nd0)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("BDDV_Import(): internal error", ixx);
+          BDDerr("BDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -432,7 +462,7 @@ BDDV BDDV_Import(FILE *strm)
       while(hash1[ixx] != nd1)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("BDDV_Import(): internal error", ixx);
+          BDDerr("BDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -447,7 +477,7 @@ BDDV BDDV_Import(FILE *strm)
     while(hash1[ixx] != B_VAL_MASK)
     {
       if(hash1[ixx] == nd)
-        BDDerr("BDDV_Import(): internal error", ixx);
+        BDDerr("BDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
       ixx++;
       ixx &= (hashsize-1);
     }
@@ -483,7 +513,7 @@ BDDV BDDV_Import(FILE *strm)
       while(hash1[ixx] != nd)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("BDDV_Import(): internal error", ixx);
+          BDDerr("BDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
         ixx++;
         ixx &= (hashsize-1);
       }

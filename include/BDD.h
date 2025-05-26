@@ -14,6 +14,7 @@
 
 #define BDD_CPP
 #include "bddc.h"
+#include "BDDException.h"
 
 namespace sapporobdd {
 
@@ -40,7 +41,7 @@ extern const int BDDV_MaxLenImport;
 //--------- Stack overflow limitter ---------
 #define BDD_RECUR_INC \
   {if(++BDD_RecurCount >= BDD_RecurLimit) \
-  BDDerr("BDD_RECUR_INC:Stack overflow ", (bddword) BDD_RecurCount);}
+  BDDerr("BDD_RECUR_INC:Stack overflow ", (bddword) BDD_RecurCount, ExceptionType::InternalError);}
 #define BDD_RECUR_DEC BDD_RecurCount--
 
 class BDD
@@ -111,9 +112,9 @@ extern bddword BDD_Used(void);
 extern void    BDD_GC(void);
 extern BDD BDD_Import(FILE *strm = stdin);
 extern BDD BDD_Random(int, int density = 50);
-extern void BDDerr(const char *);
-extern void BDDerr(const char *, bddword);
-extern void BDDerr(const char *, const char *);
+extern void BDDerr(const char *, ExceptionType);
+extern void BDDerr(const char *, bddword, ExceptionType);
+extern void BDDerr(const char *, const char *, ExceptionType);
 
 //--------- Inline functions for BDD ---------
 inline int BDD_TopLev(void)
@@ -178,7 +179,7 @@ public:
   BDDV(const BDD& f) {
     int t = f.Top();
     if(t > 0 && BDD_LevOfVar(t) > BDD_TopLev())
-      BDDerr("BDDV::BDDV: Invalid top var.", t);
+      BDDerr("BDDV::BDDV: Invalid top var.", t, ExceptionType::InvalidBDDValue);
     _bdd = f;
     _len = 1;
     _lev = 0;
@@ -204,7 +205,7 @@ public:
 
   BDDV At0(int v) const {
     if(v > 0 && BDD_LevOfVar(v) > BDD_TopLev())
-      BDDerr("BDDV::At0: Invalid var.", v);
+      BDDerr("BDDV::At0: Invalid var.", v, ExceptionType::OutOfRange);
     BDDV hv;
     if((hv._bdd = _bdd.At0(v)) == -1) return BDDV(-1);
     hv._len = _len;
@@ -214,7 +215,7 @@ public:
 
   BDDV At1(int v) const {
     if(v > 0 && BDD_LevOfVar(v) > BDD_TopLev())
-      BDDerr("BDDV::At1: Invalid var.", v);
+      BDDerr("BDDV::At1: Invalid var.", v, ExceptionType::OutOfRange);
     BDDV hv;
     if((hv._bdd = _bdd.At1(v)) == -1) return BDDV(-1);
     hv._len = _len;
@@ -285,7 +286,7 @@ inline int BDDV_NewVarOfLev(int lev) {return BDD_NewVarOfLev(lev); }
 inline BDDV operator&(const BDDV& fv, const BDDV& gv) {
   BDDV hv;
   if((hv._bdd = fv._bdd & gv._bdd) == -1) return BDDV(-1);
-  if(fv._len != gv._len) BDDerr("BDDV::operator&: Length mismatch");
+  if(fv._len != gv._len) BDDerr("BDDV::operator&: Length mismatch", ExceptionType::OutOfRange);
   hv._len = fv._len;
   hv._lev = fv._lev;
   return hv;
@@ -294,7 +295,7 @@ inline BDDV operator&(const BDDV& fv, const BDDV& gv) {
 inline BDDV operator|(const BDDV& fv, const BDDV& gv) {
   BDDV hv;
   if((hv._bdd = fv._bdd | gv._bdd) == -1) return BDDV(-1);
-  if(fv._len != gv._len) BDDerr("BDDV::operator|: Length mismatch");
+  if(fv._len != gv._len) BDDerr("BDDV::operator|: Length mismatch", ExceptionType::OutOfRange);
   hv._len = fv._len;
   hv._lev = fv._lev;
   return hv;
@@ -303,7 +304,7 @@ inline BDDV operator|(const BDDV& fv, const BDDV& gv) {
 inline BDDV operator^(const BDDV& fv, const BDDV& gv) {
   BDDV hv;
   if((hv._bdd = fv._bdd ^ gv._bdd) == -1) return BDDV(-1);
-  if(fv._len != gv._len) BDDerr("BDDV::operator^: Length mismatch");
+  if(fv._len != gv._len) BDDerr("BDDV::operator^: Length mismatch", ExceptionType::OutOfRange);
   hv._len = fv._len;
   hv._lev = fv._lev;
   return hv;
