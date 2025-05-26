@@ -76,6 +76,18 @@ bddc.o: ../include/bddc.h
 		exit 1; \
 	fi
 
+# SBDD_helper test
+
+# http://codeforces.com/blog/entry/15547  -Wshift-overflow=2 -Wduplicated-cond
+SBDDH_OPT = -Wall -Wextra -pedantic -Wshadow -Wformat=2 -Wfloat-equal \
+-Wcast-qual -Wcast-align -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC \
+-D_FORTIFY_SOURCE=2 -fstack-protector -Wlogical-op -Wconversion
+
+testsbddh: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
+        SBDD_helper_testc.c ../sbdd_helper/SBDD_helper.h
+	g++ -O3 -I../include $(SBDDH_OPT) SBDD_helper_testcpp.cpp ../lib/BDD64.a -o testsbddh
+
+
 # Run tests
 test: $(TARGETS)
 	@echo "Running test_ZBDD..."
@@ -86,7 +98,7 @@ test: $(TARGETS)
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat
+	rm -f *.o $(TARGETS) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat testsbddh testsbddh.exe
 
 # For Visual Studio nmake
 # Use: nmake /f Makefile.vc
