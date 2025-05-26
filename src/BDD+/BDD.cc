@@ -219,7 +219,8 @@ BDDV BDDV::operator<<(int shift) const
 {
   if(!Uniform()) return (Former() << shift) || (Latter() << shift);
   BDDV hv;
-  if((hv._bdd = _bdd << shift) == -1) return BDDV(-1);
+  if((hv._bdd = _bdd << shift) == -1) 
+    BDDerr("BDDV::operator<<: Operation failed.", ExceptionType::InternalError);
   hv._len = _len;
   hv._lev = _lev;
   return hv;
@@ -229,7 +230,8 @@ BDDV BDDV::operator>>(int shift) const
 {
   if(!Uniform()) return (Former() >> shift) || (Latter() >> shift);
   BDDV hv;
-  if((hv._bdd = _bdd >> shift) == -1) return BDDV(-1);
+  if((hv._bdd = _bdd >> shift) == -1) 
+    BDDerr("BDDV::operator>>: Operation failed.", ExceptionType::InternalError);
   hv._len = _len;
   hv._lev = _lev;
   return hv;
@@ -240,7 +242,8 @@ BDDV BDDV::Cofact(const BDDV& fv) const
   if(_lev > 0)
     return Former().Cofact(fv.Former()) || Latter().Cofact(fv.Latter());
   BDDV hv;
-  if((hv._bdd = _bdd.Cofact(fv._bdd)) == -1) return BDDV(-1);
+  if((hv._bdd = _bdd.Cofact(fv._bdd)) == -1) 
+    BDDerr("BDDV::Cofact: Operation failed.", ExceptionType::InternalError);
   if(_len != fv._len) BDDerr("BDDV::Cofact: Length mismatch.", ExceptionType::OutOfRange);
   hv._len = _len;
   // hv._lev = _lev; (always zero)
@@ -254,7 +257,8 @@ BDDV BDDV::Swap(int v1, int v2) const
   if(BDD_LevOfVar(v2) > BDD_TopLev())
     BDDerr("BDDV::Swap: Invalid VarID.", v2, ExceptionType::OutOfRange);
   BDDV hv;
-  if((hv._bdd = _bdd.Swap(v1, v2)) == -1) return BDDV(-1);
+  if((hv._bdd = _bdd.Swap(v1, v2)) == -1) 
+    BDDerr("BDDV::Swap: Operation failed.", ExceptionType::OutOfMemory);
   hv._len = _len;
   hv._lev = _lev;
   return hv;
@@ -353,7 +357,8 @@ BDDV operator||(const BDDV& fv, const BDDV& gv)
     return (fv || BDDV(gv).Former()) || BDDV(gv).Latter();
   BDDV hv;
   BDD x = BDDvar(fv._lev + 1);
-  if((hv._bdd = (~x & fv._bdd)|(x & gv._bdd)) == -1) return BDDV(-1);
+  if((hv._bdd = (~x & fv._bdd)|(x & gv._bdd)) == -1) 
+    BDDerr("BDDV::operator||: Operation failed.", ExceptionType::InternalError);
   if((hv._len = fv._len + gv._len) > BDDV_MaxLen)
     BDDerr("BDDV::operatop||: Too large len.", hv._len, ExceptionType::OutOfRange);
   hv._lev = fv._lev + 1;
@@ -393,28 +398,41 @@ BDDV BDDV_Import(FILE *strm)
   bddword *hash1 = 0;
   BDD *hash2 = 0;
 
-  if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
-  if(strcmp(s, "_i") != 0) return BDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) 
+    BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
+  if(strcmp(s, "_i") != 0) 
+    BDDerr("BDDV_Import: Invalid format, expected '_i'.", ExceptionType::FileFormat);
+  if(fscanf(strm, "%s", s) == EOF) 
+    BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
   int n = strtol(s, NULL, 10);
   while(n > BDD_TopLev()) BDD_NewVar();
 
-  if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
-  if(strcmp(s, "_o") != 0) return BDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) 
+    BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
+  if(strcmp(s, "_o") != 0) 
+    BDDerr("BDDV_Import: Invalid format, expected '_o'.", ExceptionType::FileFormat);
+  if(fscanf(strm, "%s", s) == EOF) 
+    BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
   int m = strtol(s, NULL, 10);
 
-  if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
-  if(strcmp(s, "_n") != 0) return BDDV(-1);
-  if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
+  if(fscanf(strm, "%s", s) == EOF) 
+    BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
+  if(strcmp(s, "_n") != 0) 
+    BDDerr("BDDV_Import: Invalid format, expected '_n'.", ExceptionType::FileFormat);
+  if(fscanf(strm, "%s", s) == EOF) 
+    BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
   bddword n_nd = B_STRTOI(s, NULL, 10);
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
   hash1 = new bddword[hashsize];
-  if(hash1 == 0) return BDDV(-1);
+  if(hash1 == 0) 
+    BDDerr("BDDV_Import: Failed to allocate memory for hash1.", ExceptionType::OutOfMemory);
   hash2 = new BDD[hashsize];
-  if(hash2 == 0) { delete[] hash1; return BDDV(-1); }
+  if(hash2 == 0) { 
+    delete[] hash1; 
+    BDDerr("BDDV_Import: Failed to allocate memory for hash2.", ExceptionType::OutOfMemory);
+  }
   for(bddword ix=0; ix<hashsize; ix++)
   {
     hash1[ix] = B_VAL_MASK;
@@ -471,7 +489,10 @@ BDDV BDDV_Import(FILE *strm)
 
     BDD x = BDDvar(var);
     f = (x & f1) | (~x & f0);
-    if(f == -1) { e = 1; break; }
+    if(f == -1) { 
+      e = 1; 
+      break; 
+    }
 
     bddword ixx = IMPORTHASH(nd);
     while(hash1[ixx] != B_VAL_MASK)
@@ -489,7 +510,7 @@ BDDV BDDV_Import(FILE *strm)
   {
     delete[] hash2;
     delete[] hash1;
-    return BDDV(-1);
+    BDDerr("BDDV_Import: Error during node processing.", ExceptionType::FileFormat);
   }
 
   BDDV v = BDDV();
@@ -499,7 +520,7 @@ BDDV BDDV_Import(FILE *strm)
     {
       delete[] hash2;
       delete[] hash1;
-      return BDDV(-1);
+      BDDerr("BDDV_Import: Unexpected end of file during vector processing.", ExceptionType::FileFormat);
     }
     bddword nd = B_STRTOI(s, NULL, 10);
     if(strcmp(s, "F") == 0) v = v || BDD(0);
@@ -533,7 +554,8 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
   int m = 0;
   int mode = 1; // 0:f 1:fd 2:fr 3:fdr
 
-  do if(fscanf(strm, "%s", s) == EOF) return BDDV(-1);
+  do if(fscanf(strm, "%s", s) == EOF) 
+      BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   while(s[0] == '#');
 
   // declaration part 
@@ -542,19 +564,19 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
     if(strcmp(s, ".i") == 0)
     {
       if(fscanf(strm, "%s", s) == EOF)
-      { cerr << "unexpected eof.\n"; return BDDV(-1);}
+        BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
       n = strtol(s, NULL, 10);
     }
     else if(strcmp(s, ".o") == 0)
     {
       if(fscanf(strm, "%s", s) == EOF)
-      { cerr << "unexpected eof.\n"; return BDDV(-1);}
+        BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
       m = strtol(s, NULL, 10);
     }
     else if(strcmp(s, ".type") == 0)
     {
       if(fscanf(strm, "%s", s) == EOF)
-      { cerr << "unexpected eof.\n"; return BDDV(-1);}
+        BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
       if(strcmp(s, "f") == 0) mode = 0;
       else if(strcmp(s, "fd") == 0) mode = 1;
       else if(strcmp(s, "fr") == 0) mode = 2;
@@ -564,14 +586,16 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
     else 
     {
       if(fscanf(strm, "%s", s) == EOF)
-      { cerr << "unexpected eof.\n"; return BDDV(-1);}
+        BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
     }
     if(fscanf(strm, "%s", s) == EOF)
-    { cerr << "unexpected eof.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   }
   
-  if(n < 0) { cerr << "error in input size.\n"; return BDDV(-1);}
-  if(m <= 0) { cerr << "error in output size.\n"; return BDDV(-1);}
+  if(n < 0) 
+    BDDerr("BDDV_ImportPla: Error in input size.", ExceptionType::FileFormat);
+  if(m <= 0) 
+    BDDerr("BDDV_ImportPla: Error in output size.", ExceptionType::FileFormat);
   while(BDD_TopLev() < n*2) BDD_NewVar();
   BDDV onset = BDDV(0, m);
   BDDV offset = BDDV(0, m);
@@ -582,7 +606,7 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
   while(s[0] != '.')
   {
     if((int)strlen(s) != n)
-    { cerr << "error at product term.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Error at product term.", ExceptionType::FileFormat);
     term = 1;
     for(int i=0; i<n; i++)
     {
@@ -597,14 +621,13 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
       case '-':
 	break;
       default:
-        cerr << "error at product term.\n";
-        return BDDV(-1);
+        BDDerr("BDDV_ImportPla: Error at product term.", ExceptionType::FileFormat);
       }
     }
     if(fscanf(strm, "%s", s) == EOF)
-    { cerr << "unexpected eof.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
     if((int)strlen(s) != m) 
-    { cerr << "error at output symbol.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Error at output symbol.", ExceptionType::FileFormat);
     for(int i=0; i<m; i++)
     {
       BDDV tv = BDDV(term, m) & BDDV_Mask1(i, m);
@@ -622,12 +645,11 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
       case '~':
 	break;
       default:
-        cerr << "error at output symbol.\n";
-        return BDDV(-1);
+        BDDerr("BDDV_ImportPla: Error at output symbol.", ExceptionType::FileFormat);
       }
     }
     if(fscanf(strm, "%s", s) == EOF)
-    { cerr << "unexpected eof.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   }
 
   // final part
@@ -643,18 +665,18 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
     break;
   case 2:
     if((onset & offset) != BDDV(0, m)) 
-    { cerr << "overlaping onset & offset.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Overlapping onset & offset.", ExceptionType::FileFormat);
     dcset = ~(onset | offset);
     break;
   case 3:
     if((onset & offset) != BDDV(0, m)) 
-    { cerr << "overlaping onset & offset.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Overlapping onset & offset.", ExceptionType::FileFormat);
     if((onset & dcset) != BDDV(0, m))
-    { cerr << "overlaping onset & dcset.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Overlapping onset & dcset.", ExceptionType::FileFormat);
     if((offset & dcset) != BDDV(0, m))
-    { cerr << "overlaping offset & dcset.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Overlapping offset & dcset.", ExceptionType::FileFormat);
     if((onset | offset | dcset) != BDDV(1, m))
-    { cerr << "not covering function.\n"; return BDDV(-1);}
+      BDDerr("BDDV_ImportPla: Not covering function.", ExceptionType::FileFormat);
     break;
   }
   return (onset || dcset);
