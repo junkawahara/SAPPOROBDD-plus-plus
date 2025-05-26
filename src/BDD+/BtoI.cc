@@ -15,7 +15,7 @@ BtoI::BtoI(int n)
   if(k < 0)
   {
     k = -k;
-    if(k < 0) BDDerr("BtoI::BtoI(): overflow.", n);
+    if(k < 0) BDDerr("BtoI::BtoI(): overflow.", n, ExceptionType::OutOfRange);
   }
   while(k != 0)
   {
@@ -346,7 +346,7 @@ BtoI operator/(const BtoI& a, const BtoI& b)
   if(a == 0) return 0;
   if(a == b) return 1;
   if(BtoI_EQ(b, 0) != 0) 
-    BDDerr("BtoI::operator/(): Divided by 0.");
+    BDDerr("BtoI::operator/(): Divided by 0.", ExceptionType::InvalidBDDValue);
   BDD sign = a.GetSignBDD() ^ b.GetSignBDD();
   BtoI a0 = BtoI_ITE(a.GetSignBDD(), -a, a);
   if(a0 == BtoI(BDD(-1))) return a0;

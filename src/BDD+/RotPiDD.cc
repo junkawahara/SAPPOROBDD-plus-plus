@@ -46,7 +46,7 @@ int *RotPiDD_XOfLev;
 int RotPiDD_NewVar()
 {
    if(RotPiDD_TopVar == RotPiDD_MaxVar)
-     BDDerr("PiDD_NewVar: Too large var ", (bddword) RotPiDD_TopVar);
+     BDDerr("PiDD_NewVar: Too large var ", (bddword) RotPiDD_TopVar, ExceptionType::OutOfRange);
 
    if(RotPiDD_TopVar == 0)
    {
@@ -108,9 +108,9 @@ RotPiDD RotPiDD::LeftRot(int u, int v) const
   if(_zdd == -1) return -1;
   int m = RotPiDD_VarUsed();
   if(u <= 0 || u > m)
-     BDDerr("PiDD::Rot_PreRot(): Invalid U ", (bddword) u);
+     BDDerr("PiDD::Rot_PreRot(): Invalid U ", (bddword) u, ExceptionType::OutOfRange);
   if(v <= 0 || v > m)
-     BDDerr("PiDD::Rot_PreRot(): Invalid V ", (bddword) v);
+     BDDerr("PiDD::Rot_PreRot(): Invalid V ", (bddword) v, ExceptionType::OutOfRange);
   if(u == v) return *this;
   if(u < v) return LeftRot(v, u);
 
@@ -149,9 +149,9 @@ RotPiDD RotPiDD::Swap(int a, int b) const
   if(_zdd == -1) return -1;
   int m = RotPiDD_VarUsed();
   if(a <= 0 || a > m)
-     BDDerr("PiDD::Rot_PreRot(): Invalid U ", (bddword) a);
+     BDDerr("PiDD::Rot_PreRot(): Invalid U ", (bddword) a, ExceptionType::OutOfRange);
   if(b <= 0 || b > m)
-     BDDerr("PiDD::Rot_PreRot(): Invalid V ", (bddword) b);
+     BDDerr("PiDD::Rot_PreRot(): Invalid V ", (bddword) b, ExceptionType::OutOfRange);
   if(a == b) return *this;
   if(a > b) return Swap(b, a);
 
@@ -175,9 +175,9 @@ RotPiDD RotPiDD::Reverse(int l, int r) const
   if(_zdd == -1) return -1;
   int m = RotPiDD_VarUsed();
   if(l <= 0 || l > m)
-     BDDerr("PiDD::Rot_PreRot(): Invalid U ", (bddword) l);
+     BDDerr("PiDD::Rot_PreRot(): Invalid U ", (bddword) l, ExceptionType::OutOfRange);
   if(r <= 0 || r > m)
-     BDDerr("PiDD::Rot_PreRot(): Invalid V ", (bddword) r);
+     BDDerr("PiDD::Rot_PreRot(): Invalid V ", (bddword) r, ExceptionType::OutOfRange);
   if(l == r) return *this;
   if(l > r) return Swap(r, l);
 
@@ -200,9 +200,9 @@ RotPiDD RotPiDD::Cofact(int u, int v) const
   if(_zdd == -1) return -1;
   int m = RotPiDD_VarUsed();
   if(u <= 0 || u > m)
-     BDDerr("PiDD::Cofact(): Invalid U ", (bddword) u);
+     BDDerr("PiDD::Cofact(): Invalid U ", (bddword) u, ExceptionType::OutOfRange);
   if(v <= 0 || v > m)
-     BDDerr("PiDD::Cofact(): Invalid V ", (bddword) v);
+     BDDerr("PiDD::Cofact(): Invalid V ", (bddword) v, ExceptionType::OutOfRange);
 
   int x = TopX();
   if(x < u || x < v) return (u == v)? *this: 0;

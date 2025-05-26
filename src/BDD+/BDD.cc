@@ -190,7 +190,7 @@ void BDDerr(const char* msg, const char* name, ExceptionType exType)
   message += name;
   message += ")";
 
-  BDDerr(message.c_str(), 0, exType);
+  BDDerr(message.c_str(), static_cast<bddword>(0), exType);
 }
 
 

@@ -54,13 +54,13 @@ public:
   
   BtoI At0(int v) const {
     if(BDD_LevOfVar(v) > BDD_TopLev())
-      BDDerr("BtoI::At0: Invalid VarID.", v);
+      BDDerr("BtoI::At0: Invalid VarID.", v, ExceptionType::OutOfRange);
     return BtoI(_bddv.At0(v)).Sup();
   }
 
   BtoI At1(int v) const {
     if(BDD_LevOfVar(v) > BDD_TopLev())
-      BDDerr("BtoI::At1: Invalid VarID.", v);
+      BDDerr("BtoI::At1: Invalid VarID.", v, ExceptionType::OutOfRange);
     return BtoI(_bddv.At1(v)).Sup();
   }
 

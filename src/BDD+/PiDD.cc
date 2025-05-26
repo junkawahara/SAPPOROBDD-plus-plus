@@ -39,7 +39,7 @@ int *PiDD_XOfLev;
 int PiDD_NewVar()
 {
    if(PiDD_TopVar == PiDD_MaxVar) 
-     BDDerr("PiDD_NewVar: Too large var ", (bddword) PiDD_TopVar);
+     BDDerr("PiDD_NewVar: Too large var ", (bddword) PiDD_TopVar, ExceptionType::OutOfRange);
 
    if(PiDD_TopVar == 0)
    {
@@ -102,7 +102,7 @@ PiDD operator/(const PiDD& f, const PiDD& p)
   if(f == -1) return -1;
   if(p == -1) return -1;
   if(p == 1) return f;
-  if(p == 0) BDDerr("operator/(): Divided by zero.");
+  if(p == 0) BDDerr("operator/(): Divided by zero.", ExceptionType::InvalidBDDValue);
   int fx = f.TopX(); int px = p.TopX();
   if(fx < px) return 0;
 
@@ -139,9 +139,9 @@ PiDD PiDD::Swap(int u, int v) const
   if(_zdd == -1) return -1;
   int m = PiDD_VarUsed();
   if(u <= 0 || u > m)
-     BDDerr("PiDD::Swap(): Invalid U ", (bddword) u);
+     BDDerr("PiDD::Swap(): Invalid U ", (bddword) u, ExceptionType::OutOfRange);
   if(v <= 0 || v > m)
-     BDDerr("PiDD::Swap(): Invalid V ", (bddword) v);
+     BDDerr("PiDD::Swap(): Invalid V ", (bddword) v, ExceptionType::OutOfRange);
   if(u == v) return *this;
   if(u < v) return Swap(v, u);
 
@@ -170,9 +170,9 @@ PiDD PiDD::Cofact(int u, int v) const
   if(_zdd == -1) return -1;
   int m = PiDD_VarUsed();
   if(u <= 0 || u > m)
-     BDDerr("PiDD::Cofact(): Invalid U ", (bddword) u);
+     BDDerr("PiDD::Cofact(): Invalid U ", (bddword) u, ExceptionType::OutOfRange);
   if(v <= 0 || v > m)
-     BDDerr("PiDD::Cofact(): Invalid V ", (bddword) v);
+     BDDerr("PiDD::Cofact(): Invalid V ", (bddword) v, ExceptionType::OutOfRange);
 
   int x = TopX();
   if(x < u || x < v) return (u == v)? *this: 0;

@@ -41,7 +41,7 @@ CtoI::CtoI(int n)
   else if(n == 1) _zdd = 1;
   else if(n < 0)
   {
-    if((n = -n) < 0) BDDerr("CtoI::CtoI(): overflow.", n);
+    if((n = -n) < 0) BDDerr("CtoI::CtoI(): overflow.", n, ExceptionType::InternalError);
     *this = -CtoI(n);
   }
   else
@@ -136,7 +136,7 @@ CtoI CtoI::ConstTerm() const
 
 CtoI CtoI::Digit(int index) const
 {
-  if(index < 0) BDDerr("CtoI::Digit(): invalid index.", index);
+  if(index < 0) BDDerr("CtoI::Digit(): invalid index.", index, ExceptionType::OutOfRange);
   CtoI a = *this;
   for(int i=0; i<BDDV_SysVarTop; i++)
   {
@@ -221,7 +221,7 @@ CtoI CtoI::MinVal() const { return - (- *this).MaxVal(); }
 CtoI CtoI::TimesSysVar(int v) const
 {
   if(v > BDDV_SysVarTop || v <= 0)
-    BDDerr("CtoI::TimesSysVar(): invalid var ID.", v);
+    BDDerr("CtoI::TimesSysVar(): invalid var ID.", v, ExceptionType::OutOfRange);
   if(*this == 0) return *this;
   if(*this == CtoI_Null()) return *this;
   CtoI a0 = Factor0(v);
@@ -233,7 +233,7 @@ CtoI CtoI::TimesSysVar(int v) const
 CtoI CtoI::DivBySysVar(int v) const
 {
   if(v > BDDV_SysVarTop || v <= 0)
-    BDDerr("CtoI::DivBySysVar(): invalid var ID.", v);
+    BDDerr("CtoI::DivBySysVar(): invalid var ID.", v, ExceptionType::OutOfRange);
   if(*this == 0) return *this;
   if(*this == CtoI_Null()) return *this;
   CtoI a0 = Factor0(v);
@@ -836,7 +836,7 @@ CtoI operator *(const CtoI& ac, const CtoI& bc)
     else if(atop > 1)
       c = a0*b0 + (a1*b0 + a0*b1).TimesSysVar(atop)
         + (a1*b1).TimesSysVar(atop - 1);
-    else BDDerr("CtoI::operator*(): SysVar overflow.");
+    else BDDerr("CtoI::operator*(): SysVar overflow.", ExceptionType::InternalError);
   }
 
   CtoI_CACHE_ENT_RETURN(BC_CtoI_MULT, ax, bx, c);
@@ -848,7 +848,7 @@ CtoI operator /(const CtoI& ac, const CtoI& bc)
   if(bc == CtoI_Null()) return bc;
   if(ac == 0) return 0;
   if(ac == bc) return 1;
-  if(bc == 0) BDDerr("CtoI::operator/(): Divide by zero.");
+  if(bc == 0) BDDerr("CtoI::operator/(): Divide by zero.", ExceptionType::InvalidBDDValue);
 
   CtoI a = ac; CtoI b = bc;
   bddword ax = a._zdd.GetID();
@@ -1067,7 +1067,7 @@ CtoI CtoI_Meet(const CtoI& ac, const CtoI& bc)
       c = CtoI_Meet(a0, b0)
         + (CtoI_Meet(a1, b0) + CtoI_Meet(a0, b1)).TimesSysVar(atop)
         + CtoI_Meet(a1, b1).TimesSysVar(atop - 1);
-    else BDDerr("CtoI_Meet(): SysVar overflow.");
+    else BDDerr("CtoI_Meet(): SysVar overflow.", ExceptionType::InternalError);
   }
 
   CtoI_CACHE_ENT_RETURN(BC_CtoI_MEET, ax, bx, c);

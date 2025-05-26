@@ -8,6 +8,7 @@
 
 #define BDD_CPP
 #include "bddc.h"
+#include "BDDException.h"
 
 using std::cout;
 
@@ -162,8 +163,8 @@ ZDD ZDD::Always() const
 int ZDD::SymChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::SymChk(): invalid v1.", v1);
-  if(v2 <= 0) BDDerr("ZDD::SymChk(): invalid v2.", v2);
+  if(v1 <= 0) BDDerr("ZDD::SymChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0) BDDerr("ZDD::SymChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(*this == 0 || *this == 1) return 1;
   if(v1 == v2) return 1;
   if(v1 < v2) { int tmp = v1; v1 = v2; v2 = tmp; }
@@ -297,7 +298,7 @@ static ZDD ZDD_SymSet(const ZDD& f0, const ZDD& f1)
 ZDD ZDD::SymSet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZDD::SymSet(): invalid v.", v);
+  if(v <= 0) BDDerr("ZDD::SymSet(): invalid v.", v, ExceptionType::OutOfRange);
   ZDD f0 = OffSet(v);
   ZDD f1 = OnSet0(v);
   return ZDD_SymSet(f0, f1);
@@ -306,8 +307,8 @@ ZDD ZDD::SymSet(int v) const
 int ZDD::ImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1);
-  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2);
+  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
@@ -319,7 +320,7 @@ int ZDD::ImplyChk(int v1, int v2) const
 ZDD ZDD::ImplySet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZDD::ImplySet(): invalid v.", v);
+  if(v <= 0) BDDerr("ZDD::ImplySet(): invalid v.", v, ExceptionType::OutOfRange);
   ZDD f1 = OnSet0(v);
   if(f1 == 0) return Support();
   return f1.Always();
@@ -328,8 +329,8 @@ ZDD ZDD::ImplySet(int v) const
 int ZDD::CoImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1);
-  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2);
+  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
@@ -379,7 +380,7 @@ static ZDD ZDD_CoImplySet(const ZDD& f0, const ZDD& f1)
 ZDD ZDD::CoImplySet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZDD::CoImplySet(): invalid v.", v);
+  if(v <= 0) BDDerr("ZDD::CoImplySet(): invalid v.", v, ExceptionType::OutOfRange);
   ZDD f0 = OffSet(v);
   ZDD f1 = OnSet0(v);
   if(f1 == 0) return Support();
@@ -469,7 +470,7 @@ ZDD operator/(const ZDD& f, const ZDD& p)
   if(p == -1) return -1;
   if(p == 1) return f;
   if(f == p) return 1;
-  if(p == 0) BDDerr("operator /(): Divided by zero.");
+  if(p == 0) BDDerr("operator /(): Divided by zero.", ExceptionType::InvalidBDDValue);
   int top = p.Top();
   if(BDD_LevOfVar(f.Top()) < BDD_LevOfVar(top)) return 0;
 
@@ -536,7 +537,7 @@ ZDD ZDD_Meet(const ZDD& fc, const ZDD& gc)
 
 ZDD ZDD_Random(int lev, int density)
 {
-  if(lev < 0) BDDerr("ZDD_Random(): lev < 0.", lev);
+  if(lev < 0) BDDerr("ZDD_Random(): lev < 0.", lev, ExceptionType::OutOfRange);
   if(lev == 0) return ((rand()%100) < density)? 1: 0;
   return ZDD_Random(lev-1, density) +
          ZDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
@@ -545,7 +546,10 @@ ZDD ZDD_Random(int lev, int density)
 ZDD ZDD_Import(FILE *strm)
 {
   bddword zdd;
-  if(bddimportz(strm, &zdd, 1)) return -1;
+  // bddimportz may throw an exception on error
+  if (bddimportz(strm, &zdd, 1)) {
+    BDDerr("ZDD_Import(): Import failed.", ExceptionType::FileFormat);
+  }
   return ZDD_ID(zdd);
 }
 
@@ -554,11 +558,11 @@ ZDD ZDD_Import(FILE *strm)
 
 ZDDV::ZDDV(const ZDD& f, int location)
 {
-  if(location < 0) BDDerr("ZDDV::ZDDV(): location < 0.", location);
+  if(location < 0) BDDerr("ZDDV::ZDDV(): location < 0.", location, ExceptionType::OutOfRange);
   if(location >= BDDV_MaxLen)
-    BDDerr("ZDDV::ZDDV(): Too large location.", location);
+    BDDerr("ZDDV::ZDDV(): Too large location.", location, ExceptionType::OutOfRange);
   if(BDD_LevOfVar(f.Top()) > BDD_TopLev())
-    BDDerr("ZDDV::ZDDV(): Invalid top var.", f.Top());
+    BDDerr("ZDDV::ZDDV(): Invalid top var.", f.Top(), ExceptionType::InvalidBDDValue);
   _zdd = f;
   int var = 1;
   for(int i=location; i>0; i>>=1)
@@ -599,7 +603,7 @@ ZDDV ZDDV::operator>>(int shift) const
 ZDDV ZDDV::OffSet(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZDDV::OffSet(): Invalid VarID.", v);
+    BDDerr("ZDDV::OffSet(): Invalid VarID.", v, ExceptionType::OutOfRange);
   ZDDV tmp;
   tmp._zdd = _zdd.OffSet(v);
   return tmp;
@@ -608,7 +612,7 @@ ZDDV ZDDV::OffSet(int v) const
 ZDDV ZDDV::OnSet(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZDDV::OnSet(): Invalid VarID.", v);
+    BDDerr("ZDDV::OnSet(): Invalid VarID.", v, ExceptionType::OutOfRange);
   ZDDV tmp;
   tmp._zdd = _zdd.OnSet(v);
   return tmp;
@@ -617,7 +621,7 @@ ZDDV ZDDV::OnSet(int v) const
 ZDDV ZDDV::OnSet0(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZDDV::OnSet0(): Invalid VarID.", v);
+    BDDerr("ZDDV::OnSet0(): Invalid VarID.", v, ExceptionType::OutOfRange);
   ZDDV tmp;
   tmp._zdd = _zdd.OnSet0(v);
   return tmp;
@@ -626,7 +630,7 @@ ZDDV ZDDV::OnSet0(int v) const
 ZDDV ZDDV::Change(int v) const
 {
   if(BDD_LevOfVar(v) > BDD_TopLev())
-    BDDerr("ZDDV::Change(): Invalid VarID.", v);
+    BDDerr("ZDDV::Change(): Invalid VarID.", v, ExceptionType::InvalidBDDValue);
   ZDDV tmp;
   tmp._zdd = _zdd.Change(v);
   return tmp;
@@ -635,9 +639,9 @@ ZDDV ZDDV::Change(int v) const
 ZDDV ZDDV::Swap(int v1, int v2) const
 {
   if(BDD_LevOfVar(v1) > BDD_TopLev())
-    BDDerr("ZDDV::Swap(): Invalid VarID.", v1);
+    BDDerr("ZDDV::Swap(): Invalid VarID.", v1, ExceptionType::InvalidBDDValue);
   if(BDD_LevOfVar(v1) > BDD_TopLev())
-    BDDerr("ZDDV::Swap(): Invalid VarID.", v2);
+    BDDerr("ZDDV::Swap(): Invalid VarID.", v2, ExceptionType::InvalidBDDValue);
   ZDDV tmp;
   tmp._zdd = _zdd.Swap(v1, v2);
   return tmp;
@@ -674,9 +678,9 @@ int ZDDV::Last() const
 ZDDV ZDDV::Mask(int start, int len) const
 {
   if(start < 0 || start >= BDDV_MaxLen)
-    BDDerr("ZDDV::Mask(): Illegal start index.", start);
+    BDDerr("ZDDV::Mask(): Illegal start index.", start, ExceptionType::OutOfRange);
   if(len <= 0 || start+len > BDDV_MaxLen)
-    BDDerr("ZDDV::Mask(): Illegal len.", len);
+    BDDerr("ZDDV::Mask(): Illegal len.", len, ExceptionType::OutOfRange);
   ZDDV tmp;
   for(int i=start; i<start+len; i++)
   	tmp += ZDDV(this -> GetZDD(i), i);
@@ -686,7 +690,7 @@ ZDDV ZDDV::Mask(int start, int len) const
 ZDD ZDDV::GetZDD(int index) const
 {
   if(index < 0 || index >= BDDV_MaxLen)
-    BDDerr("ZDDV::GetZDD(): Illegal index.",index);
+    BDDerr("ZDDV::GetZDD(): Illegal index.", index, ExceptionType::OutOfRange);
   int level = 0;
   for(int i=1; i<=index; i<<=1) level++;
 
@@ -851,7 +855,7 @@ ZDDV ZDDV_Import(FILE *strm)
       while(hash1[ixx] != nd0)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("ZDDV_Import(): internal error", ixx);
+          BDDerr("ZDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -871,7 +875,7 @@ ZDDV ZDDV_Import(FILE *strm)
       while(hash1[ixx] != nd1)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("ZDDV_Import(): internal error", ixx);
+          BDDerr("ZDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -885,7 +889,7 @@ ZDDV ZDDV_Import(FILE *strm)
     while(hash1[ixx] != B_VAL_MASK)
     {
       if(hash1[ixx] == nd)
-        BDDerr("ZDDV_Import(): internal error", ixx);
+        BDDerr("ZDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
       ixx++;
       ixx &= (hashsize-1);
     }
@@ -921,7 +925,7 @@ ZDDV ZDDV_Import(FILE *strm)
       while(hash1[ixx] != nd)
       {
         if(hash1[ixx] == B_VAL_MASK)
-          BDDerr("ZDDV_Import(): internal error", ixx);
+          BDDerr("ZDDV_Import(): internal error", ixx, ExceptionType::FileFormat);
         ixx++;
         ixx &= (hashsize-1);
       }

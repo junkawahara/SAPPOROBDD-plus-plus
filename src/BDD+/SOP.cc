@@ -47,7 +47,7 @@ int SOP_NewVar() { BDD_NewVar(); return BDD_NewVar(); }
 
 int SOP_NewVarOfLev(int lev)
 {
-  if(lev & 1) BDDerr("SOP_NewVarOfLev: Invalid lev.", lev);
+  if(lev & 1) BDDerr("SOP_NewVarOfLev: Invalid lev.", lev, ExceptionType::OutOfRange);
   BDD_NewVarOfLev(lev - 1);
   return BDD_NewVarOfLev(lev);
 }
@@ -99,7 +99,7 @@ SOP operator/(const SOP& fc, const SOP& pc)
   if(pc == -1) return -1;
   if(pc == 1) return fc;
   if(fc == pc) return 1;
-  if(pc == 0) BDDerr("operator /(): Divided by zero.");
+  if(pc == 0) BDDerr("operator /(): Divided by zero.", ExceptionType::InvalidBDDValue);
 
   SOP f = fc; SOP p = pc;
   int top = p.Top();
@@ -138,19 +138,19 @@ SOP operator/(const SOP& fc, const SOP& pc)
 
 SOP SOP::operator<<(int n) const
 {
-  if(n & 1) BDDerr("SOP::operator<<: Invalid shift.", n);
+  if(n & 1) BDDerr("SOP::operator<<: Invalid shift.", n, ExceptionType::OutOfRange);
   return SOP(_zdd << n);
 }
 
 SOP SOP::operator>>(int n) const
 {
-  if(n & 1) BDDerr("SOP::operator>>: Invalid shift.", n);
+  if(n & 1) BDDerr("SOP::operator>>: Invalid shift.", n, ExceptionType::OutOfRange);
   return SOP(_zdd >> n);
 }
 
 SOP SOP::And0(int v) const
 {
-  if(v & 1) BDDerr("SOP::And0: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOP::And0: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDD f = _zdd.OffSet(v);
   f = f.OnSet0(v-1) + f.OffSet(v-1);
   f = f.Change(v-1);
@@ -159,7 +159,7 @@ SOP SOP::And0(int v) const
 
 SOP SOP::And1(int v) const
 {
-  if(v & 1) BDDerr("SOP::And1: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOP::And1: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDD f = _zdd.OffSet(v-1);
   f = f.OnSet0(v) + f.OffSet(v);
   f = f.Change(v);
@@ -168,21 +168,21 @@ SOP SOP::And1(int v) const
 
 SOP SOP::Factor0(int v) const
 {
-  if(v & 1) BDDerr("SOP::Factor0: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOP::Factor0: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDD f = _zdd.OnSet0(v-1);
   return SOP(f);
 }
 
 SOP SOP::Factor1(int v) const
 {
-  if(v & 1) BDDerr("SOP::Factor1: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOP::Factor1: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDD f = _zdd.OnSet0(v);
   return SOP(f);
 }
 
 SOP SOP::FactorD(int v) const
 {
-  if(v & 1) BDDerr("SOP::FactorD: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOP::FactorD: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDD f = _zdd.OffSet(v).OffSet(v-1);
   return SOP(f);
 }
@@ -293,8 +293,8 @@ SOP SOP::Divisor() const
 
 SOP SOP::Swap(int v1, int v2) const
 {
-  if(v1 & 1) BDDerr("SOP::Swap: VarID must be even number.", v1);
-  if(v2 & 1) BDDerr("SOP::Swap: VarID must be even number.", v2);
+  if(v1 & 1) BDDerr("SOP::Swap: VarID must be even number.", v1, ExceptionType::OutOfRange);
+  if(v2 & 1) BDDerr("SOP::Swap: VarID must be even number.", v2, ExceptionType::OutOfRange);
   ZDD z = GetZDD();
   z = z.Swap(v1, v2);
   z = z.Swap(v1-1, v2-1);
@@ -343,7 +343,7 @@ SOPV SOPV::operator>>=(int n)  { return *this = *this >> n; }
 
 SOPV SOPV::And0(int v) const
 {
-  if(v & 1) BDDerr("SOPV::And0: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOPV::And0: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDDV f = _v.OffSet(v);
   f = f.OnSet0(v-1) + f.OffSet(v-1);
   f = f.Change(v-1);
@@ -352,7 +352,7 @@ SOPV SOPV::And0(int v) const
 
 SOPV SOPV::And1(int v) const
 {
-  if(v & 1) BDDerr("SOPV::And1: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOPV::And1: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDDV f = _v.OffSet(v-1);
   f = f.OnSet0(v) + f.OffSet(v);
   f = f.Change(v);
@@ -361,21 +361,21 @@ SOPV SOPV::And1(int v) const
 
 SOPV SOPV::Factor0(int v) const
 {
-  if(v & 1) BDDerr("SOPV::Factor0: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOPV::Factor0: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDDV f = _v.OnSet0(v-1);
   return SOPV(f);
 }
 
 SOPV SOPV::Factor1(int v) const
 {
-  if(v & 1) BDDerr("SOPV::Factor1: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOPV::Factor1: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDDV f = _v.OnSet0(v);
   return SOPV(f);
 }
 
 SOPV SOPV::FactorD(int v) const
 {
-  if(v & 1) BDDerr("SOPV::FactorD: VarID must be even number.", v);
+  if(v & 1) BDDerr("SOPV::FactorD: VarID must be even number.", v, ExceptionType::OutOfRange);
   ZDDV f = _v.OffSet(v).OffSet(v-1);
   return SOPV(f);
 }
@@ -386,8 +386,8 @@ SOP SOPV::GetSOP(int index) const { return SOP(_v.GetZDD(index)); }
 
 SOPV SOPV::Swap(int v1, int v2) const
 {
-  if(v1 & 1) BDDerr("SOPV::Swap: VarID must be even number.", v1);
-  if(v2 & 1) BDDerr("SOPV::Swap: VarID must be even number.", v2);
+  if(v1 & 1) BDDerr("SOPV::Swap: VarID must be even number.", v1, ExceptionType::OutOfRange);
+  if(v2 & 1) BDDerr("SOPV::Swap: VarID must be even number.", v2, ExceptionType::OutOfRange);
   ZDDV z = GetZDDV();
   z = z.Swap(v1, v2);
   z = z.Swap(v1-1, v2-1);
@@ -564,7 +564,7 @@ SOPV SOPV_ISOP(BDDV v) { return SOPV_ISOP(v, BDDV(0, v.Len())); }
 SOPV SOPV_ISOP(BDDV on, BDDV dc)
 {
   int len = on.Len();
-  if(len != dc.Len()) BDDerr("SOPV_ISOP(): Len mismatch.");
+  if(len != dc.Len()) BDDerr("SOPV_ISOP(): Len mismatch.", ExceptionType::OutOfRange);
   int top = on.Top();
   if(BDD_LevOfVar(top) < BDD_LevOfVar(dc.Top())) top = dc.Top();
   SOPV csv(0, 0);
@@ -581,7 +581,7 @@ SOPV SOPV_ISOP2(BDDV v) { return SOPV_ISOP2(v, BDDV(0, v.Len())); }
 SOPV SOPV_ISOP2(BDDV on, BDDV dc)
 {
   int len = on.Len();
-  if(len != dc.Len()) BDDerr("SOPV_ISOP2(): Len mismatch,");
+  if(len != dc.Len()) BDDerr("SOPV_ISOP2(): Len mismatch,", ExceptionType::OutOfRange);
   int top = on.Top();
   if(BDD_LevOfVar(top) < BDD_LevOfVar(dc.Top())) top = dc.Top();
   SOPV csv;

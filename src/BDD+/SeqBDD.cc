@@ -83,7 +83,7 @@ SeqBDD operator/(const SeqBDD& f, const SeqBDD& p)
   if(p == -1) return -1;
   if(p == 1) return f;
   if(f == p) return 1;
-  if(p == 0) BDDerr("operator /(): Divided by zero.");
+  if(p == 0) BDDerr("operator /(): Divided by zero.", ExceptionType::InvalidBDDValue);
   int top = p.Top();
   if(BDD_LevOfVar(f.Top()) < BDD_LevOfVar(top)) return 0;
 
