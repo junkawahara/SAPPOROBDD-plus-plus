@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "bddc.h"
 #include "BDDException.h"
 
@@ -146,6 +147,8 @@ int BDD_RecurCount = 0;
 #define B_MP_LEN(f) (B_CST(f)? (B_VAL(f)>>B_MP_LPOS)+1: 0)
 #define B_MP_VAL(f) ((f) & (B_VAL_MASK>>B_MP_LWID))
 
+#define CACHE_RATIO_MAX  1024
+
 /* ------- Declaration of static (internal) data ------- */
 /* typedef of bddp field in the tables */
 typedef unsigned int bddp_32;
@@ -203,6 +206,7 @@ struct B_CacheTable
 };
 static struct B_CacheTable *Cache = 0; /* Opeartion cache */
 static bddp CacheSpc = 0;           /* Current cache size */
+static double CacheRatio = 0.5;    /* Cache size ratio to node table size */
 
 /* Declaration of RFC-table */
 struct B_RFC_Table
@@ -255,13 +259,25 @@ static int andfalse(bddp f, bddp g);
 
 static int mp_add(struct B_MP *p, bddp ix);
 
+static void setcacheratiovalue(double cacheRatio);
+static bool allocatecache();
+
 /* ------------------ Body of program -------------------- */
 /* ----------------- External functions ------------------ */
-int bddinit(bddp initsize, bddp limitsize)
+int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
 /* Returns 1 if not enough memory (usually 0) */
 {
   bddp   ix;
   bddvar i;
+  bool cacheallocated = false;
+
+  /* Set cache ratio if specified */
+  if(cacheRatio > 0.0) {
+    /* throw an exeption if cacheRatio is illegal */
+    setcacheratiovalue(cacheRatio);
+  } else {
+    CacheRatio = 0.5; /* Default cache ratio */
+  }
 
   /* Check dupulicate initialization */
   if(Node){ free(Node); Node = 0; }
@@ -289,10 +305,6 @@ int bddinit(bddp initsize, bddp limitsize)
   else if(initsize > NodeLimit) NodeSpc = NodeLimit;
   else NodeSpc = initsize;
 
-  /* Set CacheSpc */
-  for(CacheSpc=B_NODE_SPC0; CacheSpc<NodeSpc>>1; CacheSpc<<=1U)
-    ; /* empty */
-
   /* Set VarSpc */
   VarSpc = B_VAR_SPC0;
 
@@ -300,10 +312,10 @@ int bddinit(bddp initsize, bddp limitsize)
   Node = B_MALLOC(struct B_NodeTable, NodeSpc);
   Var = B_MALLOC(struct B_VarTable, VarSpc);
   VarID = B_MALLOC(bddvar, VarSpc);
-  Cache = B_MALLOC(struct B_CacheTable, CacheSpc);
+  cacheallocated = allocatecache();
 
   /* Check overflow */
-  if(Node == 0 || Var == 0 || VarID == 0 || Cache == 0)
+  if(Node == 0 || Var == 0 || VarID == 0 || !cacheallocated)
   {
     if(Cache){ free(Cache); Cache = 0; }
     if(VarID){ free(VarID); VarID = 0; }
@@ -336,8 +348,6 @@ int bddinit(bddp initsize, bddp limitsize)
     Var[i].hash_h8 = 0;
 #endif
   }
-
-  for(ix=0; ix<CacheSpc; ix++) Cache[ix].op = BC_NULL;
 
   /* Init RFC Table */
   if(RFCT){ free(RFCT); RFCT = 0; }
@@ -1359,6 +1369,22 @@ bddp    bddpush(bddp f, bddvar v)
   return getzddp(v, bddfalse, f);
 }
 
+void bddsetcacheratio(double cacheRatio)
+/* Set cache size ratio (must be power of 2: ..., 0.25, 0.5, 1, 2, 4, ...) */
+{
+  /* throw an exception if cacheRatio is illegal */
+  setcacheratiovalue(cacheRatio);
+  if (!allocatecache()) {
+    err("bddsetcacheratio: memory allocation failed", 0, ExceptionType::OutOfMemory);
+  }
+}
+
+double bddgetcacheratio(void)
+/* Get current cache size ratio */
+{
+  return CacheRatio;
+}
+
 /* ----------------- Internal functions ------------------ */
 static void var_enlarge()
 {
@@ -1422,7 +1448,6 @@ static int node_enlarge()
 {
   bddp i, newSpc;
   struct B_NodeTable *newNode;
-  struct B_CacheTable *newCache, *cp, *cp1;
   
   /* Get new size */
   if(NodeSpc == NodeLimit) return 1; /* Cannot enlarge */
@@ -1463,38 +1488,8 @@ static int node_enlarge()
   NodeSpc = newSpc;
 
   /* Realloc Cache */
-  for(newSpc=CacheSpc; newSpc<NodeSpc>>1U; newSpc<<=1U)
-    ; /* empty */
-  newCache = 0;
-  newCache = B_MALLOC(struct B_CacheTable, newSpc);
-  if(newCache)
-  {
-    for(i=0; i<CacheSpc; i++)
-    {
-    cp = newCache + i;
-    cp1 = Cache + i;
-    cp->op = cp1->op;
-    B_CPY_BDDP(cp->f, cp1->f);
-    B_CPY_BDDP(cp->g, cp1->g);
-    B_CPY_BDDP(cp->h, cp1->h);
-    }
-    free(Cache);
-    Cache = newCache;
-  }
-  else return 0; /* Only NodeTable enlarged */
-
-  /* Reconstruct Cache */
-  for(i=CacheSpc; i<newSpc; i++)
-  {
-    cp = Cache + i;
-    cp1 = Cache + (i & (CacheSpc - 1));
-    cp->op = cp1->op;
-    B_CPY_BDDP(cp->f, cp1->f);
-    B_CPY_BDDP(cp->g, cp1->g);
-    B_CPY_BDDP(cp->h, cp1->h);
-  }
-  CacheSpc = newSpc;
-
+  allocatecache();
+  /* if allocatecache returned false, only NodeTable has been enlarged */
   return 0;
 }
 
@@ -3030,6 +3025,110 @@ int mp_add(struct B_MP *p, bddp ix)
     p->word[p->len++] = c;
   }
   return 0;
+}
+
+/* return true if ratio is a power of 2 */
+static void setcacheratiovalue(double ratio)
+{
+ /* Check if ratio is a power of 2 */
+  if (ratio <= 0.0) {
+    err("bddsetcacheratio: ratio must be positive", 0, ExceptionType::OutOfRange);
+  } else if (ratio > static_cast<double>(CACHE_RATIO_MAX)) {
+    err("bddsetcacheratio: ratio exceeds maximum", 0, ExceptionType::OutOfRange);
+  } else if (ratio < 1.0 / static_cast<double>(CACHE_RATIO_MAX)) {
+    err("bddsetcacheratio: ratio is too small", 0, ExceptionType::OutOfRange);
+  }
+
+  if (ratio >= 1.0) {
+    int ratio_integer = static_cast<int>(ratio);
+    if (static_cast<double>(ratio_integer) != ratio
+        || (ratio_integer & (ratio_integer - 1)) != 0) {
+      err("bddsetcacheratio: ratio must be a power of 2", 0, ExceptionType::OutOfRange);
+    }
+    CacheRatio = static_cast<double>(ratio_integer);
+  } else {
+    /* For ratios less than 1, we check if the inverse is a power of 2 */
+    int ratio_integer = static_cast<int>(1.0 / ratio);
+    if (static_cast<double>(ratio_integer) != (1.0 / ratio)
+        || (ratio_integer & (ratio_integer - 1)) != 0) {
+      err("bddsetcacheratio: ratio must be a power of 2", 0, ExceptionType::OutOfRange);
+    }
+    CacheRatio = 1.0 / static_cast<double>(ratio_integer);
+  }
+}
+
+// return true if cache is allocated successfully
+static bool allocatecache()
+{
+  bddp oldCacheSpc = 0;
+  bddp newCacheSpc;
+  struct B_CacheTable *newCache;
+  bddp ix;
+  struct B_CacheTable *cp, *cp1;
+
+  if (Cache != NULL) {
+    oldCacheSpc = CacheSpc;
+  }
+
+  /* Calculate new cache size */
+  bddp targetCacheSize;
+  double targetCacheSizeDouble = static_cast<double>(NodeSpc) * CacheRatio;
+  if (targetCacheSizeDouble > B_NODE_MAX) {
+    targetCacheSize = B_NODE_MAX;
+  } else if (targetCacheSizeDouble < B_NODE_SPC0) {
+    targetCacheSize = B_NODE_SPC0;
+  } else {
+    targetCacheSize = static_cast<bddp>(targetCacheSizeDouble);
+  }
+
+  /* Find largest power of 2 not exceeding targetCacheSize */
+  for (newCacheSpc = B_NODE_SPC0; newCacheSpc < targetCacheSize;
+        newCacheSpc <<= 1U) ;
+
+  /* newCacheSpc must be a power of 2 */
+  assert((newCacheSpc & (newCacheSpc - 1)) == 0);
+
+  /* If size is different, reallocate cache */
+  if (newCacheSpc != oldCacheSpc) {
+    /* Allocate new cache */
+    newCache = B_MALLOC(struct B_CacheTable, newCacheSpc);
+    if (newCache == NULL) {
+      return false;
+    }
+
+    if (Cache != NULL) { /* reallocate cache */
+      /* Copy old cache to new cache */
+      for (ix = 0; ix < oldCacheSpc && ix < newCacheSpc; ++ix) {
+        cp = newCache + ix;
+        cp1 = Cache + ix;
+        cp->op = cp1->op;
+        B_CPY_BDDP(cp->f, cp1->f);
+        B_CPY_BDDP(cp->g, cp1->g);
+        B_CPY_BDDP(cp->h, cp1->h);
+      }
+      if (newCacheSpc > oldCacheSpc) {
+        /* assume that oldCacheSpc is the power of 2 */
+        assert((oldCacheSpc & (oldCacheSpc - 1)) == 0);
+        for (ix = oldCacheSpc; ix < newCacheSpc; ++ix) {
+          cp = newCache + ix;
+          cp1 = newCache + ix - oldCacheSpc;
+          cp->op = cp1->op;
+          B_CPY_BDDP(cp->f, cp1->f);
+          B_CPY_BDDP(cp->g, cp1->g);
+          B_CPY_BDDP(cp->h, cp1->h);
+        }
+        free(Cache);
+      }
+    } else {
+      /* Initialize new cache */
+      for(ix=0; ix<newCacheSpc; ix++) newCache[ix].op = BC_NULL;
+    }
+
+    /* Update pointers */
+    Cache = newCache;
+    CacheSpc = newCacheSpc;
+  }
+  return true;
 }
 
 } // namespace sapporobdd

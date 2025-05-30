@@ -65,7 +65,7 @@ extern int BDD_RecurCount;
 /***************** External operations *****************/
 
 /***************** Init. and config. ****************/
-extern int    bddinit (bddp initsize, bddp limitsize);
+extern int    bddinit (bddp initsize, bddp limitsize, double cacheRatio = 0.5);
 extern bddvar bddnewvar (void);
 extern bddvar bddnewvaroflev (bddvar lev);
 extern bddvar bddlevofvar (bddvar v);
@@ -132,6 +132,10 @@ extern int    bddiszbdd(bddp f); // for compatibility
 
 /************** SeqBDD operations *************/
 extern bddp   bddpush(bddp f, bddvar v);
+
+/************** SAPPOROBDD++ additions *************/
+extern void   bddsetcacheratio(double ratio);
+extern double bddgetcacheratio(void);
 
 } // namespace sapporobdd
 
