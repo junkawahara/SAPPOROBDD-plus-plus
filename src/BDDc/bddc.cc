@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <assert.h>
 #include "bddc.h"
 #include "BDDException.h"
@@ -312,12 +313,13 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
   Node = B_MALLOC(struct B_NodeTable, NodeSpc);
   Var = B_MALLOC(struct B_VarTable, VarSpc);
   VarID = B_MALLOC(bddvar, VarSpc);
+  CacheSpc = 0;
   cacheallocated = allocatecache();
 
   /* Check overflow */
   if(Node == 0 || Var == 0 || VarID == 0 || !cacheallocated)
   {
-    if(Cache){ free(Cache); Cache = 0; }
+    if(Cache){ free(Cache); Cache = 0; CacheSpc = 0; }
     if(VarID){ free(VarID); VarID = 0; }
     if(Var){ free(Var); Var = 0; }
     if(Node){ free(Node); Node = 0; }
@@ -3027,9 +3029,10 @@ int mp_add(struct B_MP *p, bddp ix)
   return 0;
 }
 
-/* return true if ratio is a power of 2 */
 static void setcacheratiovalue(double ratio)
 {
+  const double epsilon = 1e-9;
+
  /* Check if ratio is a power of 2 */
   if (ratio <= 0.0) {
     err("bddsetcacheratio: ratio must be positive", 0, ExceptionType::OutOfRange);
@@ -3041,15 +3044,16 @@ static void setcacheratiovalue(double ratio)
 
   if (ratio >= 1.0) {
     int ratio_integer = static_cast<int>(ratio);
-    if (static_cast<double>(ratio_integer) != ratio
+    if (fabs(static_cast<double>(ratio_integer) - ratio) > epsilon
         || (ratio_integer & (ratio_integer - 1)) != 0) {
       err("bddsetcacheratio: ratio must be a power of 2", 0, ExceptionType::OutOfRange);
     }
     CacheRatio = static_cast<double>(ratio_integer);
   } else {
     /* For ratios less than 1, we check if the inverse is a power of 2 */
-    int ratio_integer = static_cast<int>(1.0 / ratio);
-    if (static_cast<double>(ratio_integer) != (1.0 / ratio)
+    double inverse_ratio = 1.0 / ratio;
+    int ratio_integer = static_cast<int>(inverse_ratio + epsilon);
+    if (fabs(static_cast<double>(ratio_integer) - inverse_ratio) > epsilon
         || (ratio_integer & (ratio_integer - 1)) != 0) {
       err("bddsetcacheratio: ratio must be a power of 2", 0, ExceptionType::OutOfRange);
     }
@@ -3081,15 +3085,16 @@ static bool allocatecache()
     targetCacheSize = static_cast<bddp>(targetCacheSizeDouble);
   }
 
-  /* Find largest power of 2 not exceeding targetCacheSize */
-  for (newCacheSpc = B_NODE_SPC0; newCacheSpc < targetCacheSize;
+  /* Find the smallest power of 2 exceeding targetCacheSize */
+  for (newCacheSpc = B_NODE_SPC0; newCacheSpc < targetCacheSize
+       && newCacheSpc < (B_NODE_MAX >> 1U);
         newCacheSpc <<= 1U) ;
 
   /* newCacheSpc must be a power of 2 */
   assert((newCacheSpc & (newCacheSpc - 1)) == 0);
 
   /* If size is different, reallocate cache */
-  if (newCacheSpc != oldCacheSpc) {
+  if (newCacheSpc != oldCacheSpc || Cache == NULL) {
     /* Allocate new cache */
     newCache = B_MALLOC(struct B_CacheTable, newCacheSpc);
     if (newCache == NULL) {
@@ -3117,8 +3122,8 @@ static bool allocatecache()
           B_CPY_BDDP(cp->g, cp1->g);
           B_CPY_BDDP(cp->h, cp1->h);
         }
-        free(Cache);
       }
+      free(Cache);
     } else {
       /* Initialize new cache */
       for(ix=0; ix<newCacheSpc; ix++) newCache[ix].op = BC_NULL;

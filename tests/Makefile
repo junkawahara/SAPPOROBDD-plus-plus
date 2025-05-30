@@ -33,7 +33,7 @@ OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o bddc.o
 
 # Target executables
 #TARGETS = test_ZBDD test_ZBDD_Hash
-TARGETS = test_ZBDD
+TARGETS = test_ZBDD test_bddc_cache
 
 # Default target
 all: $(TARGETS)
@@ -46,8 +46,16 @@ test_ZBDD: $(OBJ_ZDD)
 test_ZBDD_Hash: $(OBJ_HASH)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_HASH)
 
+# Build test_bddc_cache
+test_bddc_cache: test_bddc_cache.o
+	$(CXX) $(CXXFLAGS) -o $@ test_bddc_cache.o
+
 # Compile rules
+test_ZBDD.o: test_ZBDD.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_ZBDD.cpp
+
+test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c test_bddc_cache.cpp
 
 test_ZBDD_Hash.o: test_ZBDD_Hash.cpp ../include/ZDD.h ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c test_ZBDD_Hash.cpp
@@ -93,12 +101,15 @@ test: $(TARGETS)
 	@echo "Running test_ZBDD..."
 	@./test_ZBDD
 	@echo ""
+	@echo "Running test_bddc_cache..."
+	@./test_bddc_cache
+	@echo ""
 	@echo "Running test_ZBDD_Hash..."
 	@./test_ZBDD_Hash
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat testsbddh testsbddh.exe
+	rm -f *.o $(TARGETS) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe
 
 # For Visual Studio nmake
 # Use: nmake /f Makefile.vc
