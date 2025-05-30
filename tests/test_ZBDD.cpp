@@ -126,6 +126,10 @@ void test_bdd_functions() {
     // Reinitialize BDD package
     BDD_Init(256, 1024 * 1024);
 
+    // check cache ratio
+    BDD_SetCacheRatio(0.25);
+    test_result("Cache ratio is set to 0.25", BDD_GetCacheRatio() == 0.25);
+
     for (int v = 1; v <= 5; ++v) {
         // reverse order of variable creation
         int newVar = BDD_NewVarOfLev(1);
@@ -139,7 +143,11 @@ void test_bdd_functions() {
     }
 
     // Reinitialize BDD package
-    BDD_Init(256, 1024 * 1024);
+    BDD_Init(256, 1024 * 1024, 2.0);
+
+    // check cache ratio
+    test_result("Cache ratio is set to 2.0", BDD_GetCacheRatio() == 2.0);
+    
 
     bool test_newvar_passed = true;
     bool test_varused_passed = true;

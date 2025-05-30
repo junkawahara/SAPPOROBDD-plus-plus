@@ -105,11 +105,13 @@ public:
 };
 
 //--------- External functions for BDD ---------
-extern int     BDD_Init(bddword init=256, bddword limit=BDD_MaxNode);
+extern int     BDD_Init(bddword init=256, bddword limit=BDD_MaxNode, double cacheRatio=0.5);
 extern int     BDD_NewVarOfLev(int);
 extern int     BDD_VarUsed(void);
 extern bddword BDD_Used(void);
 extern void    BDD_GC(void);
+extern void    BDD_SetCacheRatio(double ratio);
+extern double  BDD_GetCacheRatio(void);
 extern BDD BDD_Import(FILE *strm = stdin);
 extern BDD BDD_Random(int, int density = 50);
 extern void BDDerr(const char *, ExceptionType);

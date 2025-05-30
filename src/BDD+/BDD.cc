@@ -108,9 +108,9 @@ BDD BDD::Spread(const int& k) const
 
 //----- External functions for BDD -------
 
-int BDD_Init(bddword init, bddword limit)
+int BDD_Init(bddword init, bddword limit, double cacheRatio)
 {
-  if(bddinit(init, limit)) return 1;
+  if(bddinit(init, limit, cacheRatio)) return 1;
   BDDV_Active = 0;
   return 0;
 }
@@ -127,6 +127,10 @@ int BDD_VarUsed(void) { return bddvarused(); }
 bddword BDD_Used(void) { return bddused(); }
 
 void BDD_GC() { bddgc(); }
+
+void BDD_SetCacheRatio(double ratio) { bddsetcacheratio(ratio); }
+
+double BDD_GetCacheRatio(void) { return bddgetcacheratio(); }
 
 BDD BDD_Import(FILE *strm)
 {
