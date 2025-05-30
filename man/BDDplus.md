@@ -32,6 +32,11 @@
 - SAPPOROBDD++ では64ビットバージョンがデフォルトになったため、B_64 マクロの定義は必要なくなった。32ビットバージョンでコンパイルする場合は B_32 マクロを定義する。
 - SAPPOROBDD++ ではすべてのパッケージは sapporobdd 名前空間に入れられている。`using namespace sapporobdd` を使用前に書く必要がある。
 - SAPPOROBDD++ では ZBDD は ZDD にリネームされている。ZBDD を使い続けることも可能である。ZBDD_Meet 等の関数名も ZDD_Meet にリネームされている。
+- キャッシュサイズを変更可能である。キャッシュサイズは、BDD節点テーブルのサイズに対する比率（キャッシュ比率）で設定される。
+  キャッシュ比率は、2のべき乗の値（例えば、0.125、0.25、0.5、1、2、4など）でなければならない。
+  デフォルトのキャッシュ比率は0.5である。キャッシュ比率は、BDD_Init関数の第3引数で初期設定し、
+  後からBDD_SetCacheRatio関数で変更することもできる。また、BDD_GetCacheRatio関数で
+  現在の比率を取得できる。
 - エラーが発生した際は、BDDException 例外が投げられる。例外クラスは BDDException.h で定義されている。以下の例外（いずれも BDDException の子クラス）が存在する。
   - BDDInvalidBDDValueException
   - BDDOutOfRangeException

@@ -39,13 +39,15 @@ extern const int BDD_MaxVar
 ### BDD_Init
 
 ```cpp
-int BDD_Init(bddword init=256, bddword limit=BDD_MaxNode)
+int BDD_Init(bddword init=256, bddword limit=BDD_MaxNode, double cacheRatio=0.5)
 ```
 
 処理系を初期化しメモリの確保を行う。bddword は unsigned long long
 （64ビット用にコンパイルされた場合）、または unsigned int（32ビット用に
 コンパイルされた場合）の別名である。
-引数initで、最初にメモリを確保するBDD節点数を指定する。以後、演算中
+引数initで、最初にメモリを確保するBDD節点数を指定する。引数cacheRatioで、
+キャッシュサイズの比率を指定する。キャッシュ比率は、2のべき乗の値（例えば、
+0.125、0.25、0.5、1、2、4など）でなければならない。以後、演算中
 にメモリを使い切った場合は、自動的にメモリの再確保が行われる。再確保毎に
 節点数は 4倍に拡大される。拡大の上限は、引数limitによって指定できる。
 使用節点数がlimitに達したときは、メモリの再確保はそれ以上行われず、
@@ -153,6 +155,28 @@ void BDD_GC(void)
 起動しなくても、記憶が足りなくなった場合には自動的に起動される。
 ガベジコレクションで空き節点が回収された場合は 0 を返し、空き節点が
 １個も見つからなかった場合は 1 を返す。
+
+### BDD_SetCacheRatio
+
+```cpp
+void BDD_SetCacheRatio(double ratio)
+```
+
+【SAPPOROBDD++のみ】
+
+キャッシュサイズの比率を設定する。引数ratioは、2のべき乗の値（例えば、0.125、0.25、0.5、1、2、4など）でなければならない。
+この値が1/1024未満または1024より大きい場合は BDDOutOfRangeException 例外が発生する。キャッシュサイズは、BDD節点テーブルのサイズにこの比率を掛けた値となる。
+この関数を呼び出すと、ただちにキャッシュの大きさが拡大または縮小され、中身は適切に書き込まれる。メモリが不足した場合は BDDOutOfMemoryException 例外が発生する。
+
+### BDD_GetCacheRatio
+
+```cpp
+double BDD_GetCacheRatio(void)
+```
+
+【SAPPOROBDD++のみ】
+
+現在設定されているキャッシュサイズの比率を返す。デフォルトは0.5である。
 
 ### BDD_CacheInt
 
@@ -275,6 +299,23 @@ f と g の演算結果が ZDD 型のとき、演算結果を演算キャッシ�
 いる場合はその ZDD を返し、見つからなかった場合は、null を表すオブジェ
 クトを返す。f, g が ZDD 型の演算の場合は、GetID()で bddword 型に変換して
 与える。
+
+### bddsetcacheratio
+
+```cpp
+void bddsetcacheratio(double cacheRatio)
+```
+
+キャッシュサイズの比率を設定する。引数cacheRatioは、2のべき乗の値（例えば、0.125、0.25、0.5、1、2、4など）でなければならない。
+この値が0以下または大きすぎる場合は例外が発生する。キャッシュサイズは、BDD節点テーブルのサイズにこの比率を掛けた値となる。
+
+### bddgetcacheratio
+
+```cpp
+double bddgetcacheratio(void)
+```
+
+現在設定されているキャッシュサイズの比率を返す。デフォルトは0.5である。
 
 ### ZDD_Import
 
