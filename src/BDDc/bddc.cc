@@ -8,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <stdarg.h>
 #include "bddc.h"
 #include "BDDException.h"
 
@@ -262,6 +263,7 @@ static int mp_add(struct B_MP *p, bddp ix);
 
 static void setcacheratiovalue(double cacheRatio);
 static bool allocatecache();
+static void fprintf_check(FILE *strm, const char *format, ...);
 
 /* ------------------ Body of program -------------------- */
 /* ----------------- External functions ------------------ */
@@ -324,6 +326,7 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
     if(Var){ free(Var); Var = 0; }
     if(Node){ free(Node); Node = 0; }
     NodeLimit = 0;
+    err("bddinit: Memory allocation failed", 0, ExceptionType::OutOfMemory);
     return 1;
   }
 
@@ -630,9 +633,9 @@ void bddexport(FILE *strm, bddp *p, int lim)
     if(lev0 > lev) lev = lev0;
   }
 
-  fprintf(strm, "_i %d\n_o %d\n_n ", lev, n);
-  fprintf(strm, B_BDDP_FD, bddvsize(p, n));
-  fprintf(strm, "\n");
+  fprintf_check(strm, "_i %d\n_o %d\n_n ", lev, n);
+  fprintf_check(strm, B_BDDP_FD, bddvsize(p, n));
+  fprintf_check(strm, "\n");
 
   /* Put internal nodes */
   for(i=0; i<n; i++) export_static(strm, p[i]);
@@ -641,10 +644,10 @@ void bddexport(FILE *strm, bddp *p, int lim)
   /* Put external node */
   for(i=0; i<n; i++)
   {
-    if(p[i] == bddfalse) fprintf(strm, "F");
-    else if(p[i] == bddtrue) fprintf(strm, "T");
-    else fprintf(strm, B_BDDP_FD, p[i]);
-    fprintf(strm, "\n");
+    if(p[i] == bddfalse) fprintf_check(strm, "F");
+    else if(p[i] == bddtrue) fprintf_check(strm, "T");
+    else fprintf_check(strm, B_BDDP_FD, p[i]);
+    fprintf_check(strm, "\n");
   }
 }
 
@@ -720,7 +723,7 @@ void bddwcache(unsigned char op, bddp f, bddp g, bddp h)
 {
   struct B_CacheTable *cachep;
 
-  if(op < 20) err("bddwcache: op < 20", op, ExceptionType::InternalError);
+  if(op < 20) err("bddwcache: op < 20", op, ExceptionType::OutOfRange);
   if(h == bddnull) return;
   cachep = Cache + B_CACHEKEY(op, f, g);
   cachep->op = op;
@@ -1293,7 +1296,9 @@ char *bddcardmp16(bddp f, char *s)
     }
   }
   if(!s) s = B_MALLOC(char, mp.len*sizeof(bddp)*2+1);
-  if(!s) return s;
+  if(!s)
+    err("bddcardmp16: memory allocation failed", mp.len*sizeof(bddp)*2+1,
+        ExceptionType::OutOfMemory);
   k = 0;
   nz = 0;
   for(i=mp.len-1; i>=0; i--)
@@ -1452,7 +1457,7 @@ static int node_enlarge()
   struct B_NodeTable *newNode;
   
   /* Get new size */
-  if(NodeSpc == NodeLimit) return 1; /* Cannot enlarge */
+  if(NodeSpc >= NodeLimit) return 1; /* Cannot enlarge */
   newSpc = NodeSpc << 1U;
   if(newSpc > NodeLimit) newSpc = NodeLimit;
 
@@ -2251,6 +2256,10 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
         mpt->size = 16;
         mpt->used = 0;
         mpt->word = B_MALLOC(bddp, mp.len * mpt->size);
+        if (!mpt->word) {
+          err("apply: not enough memory for mp table", sizeof(bddp) * mp.len * mpt->size,
+          ExceptionType::OutOfMemory);
+        }
       }
       if(mpt->size == mpt->used)
       {
@@ -2258,7 +2267,10 @@ static bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
 	if(size2 > (B_CST_MASK>>B_MP_LWID)) { h = B_MP_NULL; break; }
 	wp = 0;
         wp = B_MALLOC(bddp, mp.len * size2);
-	if(!wp) { h = B_MP_NULL; break; }
+	if(!wp) {
+	  err("apply: not enough memory for mp table", sizeof(bddp) * mp.len * size2,
+	  ExceptionType::OutOfMemory);
+	}
 	for(i=0; i<mp.len*(mpt->size); i++) wp[i] = mpt->word[i];
         mpt->size = size2;
 	free(mpt->word);
@@ -2475,16 +2487,16 @@ static void export_static(FILE *strm, bddp f)
   BDD_RECUR_DEC;
 
   /* Dump this node */
-  fprintf(strm, B_BDDP_FD, B_ABS(f));
-  fprintf(strm, " %d ", Var[v].lev);
-  if(f0 == bddfalse) fprintf(strm, "F");
-  else if(f0 == bddtrue) fprintf(strm, "T");
-  else fprintf(strm, B_BDDP_FD, f0); 
-  fprintf(strm, " ");
-  if(f1 == bddfalse) fprintf(strm, "F");
-  else if(f1 == bddtrue) fprintf(strm, "T");
-  else fprintf(strm, B_BDDP_FD, f1);
-  fprintf(strm, "\n");
+  fprintf_check(strm, B_BDDP_FD, B_ABS(f));
+  fprintf_check(strm, " %d ", Var[v].lev);
+  if(f0 == bddfalse) fprintf_check(strm, "F");
+  else if(f0 == bddtrue) fprintf_check(strm, "T");
+  else fprintf_check(strm, B_BDDP_FD, f0); 
+  fprintf_check(strm, " ");
+  if(f1 == bddfalse) fprintf_check(strm, "F");
+  else if(f1 == bddtrue) fprintf_check(strm, "T");
+  else fprintf_check(strm, B_BDDP_FD, f1);
+  fprintf_check(strm, "\n");
 }
 
 static void dump(bddp f)
@@ -3134,6 +3146,23 @@ static bool allocatecache()
     CacheSpc = newCacheSpc;
   }
   return true;
+}
+
+static void fprintf_check(FILE *strm, const char *format, ...)
+{
+  if (strm == NULL) {
+    throw BDDFileFormatException("Output stream is null", 0);
+  }
+  if (format == NULL) {
+    throw BDDFileFormatException("Format string is null", 0);
+  }
+
+  va_list args;
+  va_start(args, format);
+  if (vfprintf(strm, format, args) < 0) {
+    throw BDDFileFormatException("Error writing to file", 0);
+  }
+  va_end(args);
 }
 
 } // namespace sapporobdd
