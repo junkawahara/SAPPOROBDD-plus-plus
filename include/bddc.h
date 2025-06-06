@@ -136,6 +136,8 @@ extern bddp   bddpush(bddp f, bddvar v);
 /************** SAPPOROBDD++ additions *************/
 extern void   bddsetcacheratio(double ratio);
 extern double bddgetcacheratio(void);
+extern void   bddsetgcthreshold(bddp threshold);
+extern bddp   bddgetgcthreshold(void);
 
 } // namespace sapporobdd
 

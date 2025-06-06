@@ -209,6 +209,7 @@ struct B_CacheTable
 static struct B_CacheTable *Cache = 0; /* Opeartion cache */
 static bddp CacheSpc = 0;           /* Current cache size */
 static double CacheRatio = 0.5;    /* Cache size ratio to node table size */
+static bddp GCThreshold = 0;       /* GC threshold - minimum freed nodes for successful GC */
 
 /* Declaration of RFC-table */
 struct B_RFC_Table
@@ -414,7 +415,14 @@ int bddgc()
   for(fp=Node; fp<Node+NodeSpc; fp++)
     if(fp->varrfc != 0 && B_RFC_ZERO_NP(fp))
       gc1(fp);
-  if(n == NodeUsed) return 1; /* No free node */
+
+  bddp freedNodes = n - NodeUsed;
+  if(freedNodes == 0) return 1; /* No free node */
+
+  /* Check if freed nodes count is below threshold */
+  if(GCThreshold > 0 && freedNodes <= GCThreshold) {
+    return 1;
+  }
 
   /* Cache clear */
   for(cachep=Cache; cachep<Cache+CacheSpc; cachep++)
@@ -1390,6 +1398,18 @@ double bddgetcacheratio(void)
 /* Get current cache size ratio */
 {
   return CacheRatio;
+}
+
+void bddsetgcthreshold(bddp threshold)
+/* Set GC threshold - minimum nodes that must be freed for successful GC */
+{
+  GCThreshold = threshold;
+}
+
+bddp bddgetgcthreshold(void)
+/* Get current GC threshold */
+{
+  return GCThreshold;
 }
 
 /* ----------------- Internal functions ------------------ */
