@@ -132,6 +132,10 @@ void BDD_SetCacheRatio(double ratio) { bddsetcacheratio(ratio); }
 
 double BDD_GetCacheRatio(void) { return bddgetcacheratio(); }
 
+void BDD_SetGCThreshold(bddword threshold) { bddsetgcthreshold(threshold); }
+
+bddword BDD_GetGCThreshold(void) { return bddgetgcthreshold(); }
+
 BDD BDD_Import(FILE *strm)
 {
   bddword bdd;

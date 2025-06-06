@@ -112,6 +112,8 @@ extern bddword BDD_Used(void);
 extern void    BDD_GC(void);
 extern void    BDD_SetCacheRatio(double ratio);
 extern double  BDD_GetCacheRatio(void);
+extern void    BDD_SetGCThreshold(bddword threshold);
+extern bddword BDD_GetGCThreshold(void);
 extern BDD BDD_Import(FILE *strm = stdin);
 extern BDD BDD_Random(int, int density = 50);
 extern void BDDerr(const char *, ExceptionType);

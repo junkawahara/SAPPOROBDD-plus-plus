@@ -191,6 +191,27 @@ double BDD_GetCacheRatio(void)
 
 現在設定されているキャッシュサイズの比率を返す。デフォルトは0.5である。
 
+### BDD_SetGCThreshold
+
+```cpp
+void BDD_SetGCThreshold(bddword threshold)
+```
+
+【SAPPOROBDD++のみ】
+
+ガベジコレクション（GC）の閾値を設定する。この値は、ガベジコレクションが成功と見なされるために最低限解放されなければならない節点数を指定する。
+設定された閾値より少ない節点しか回収できなかった場合、ガベジコレクションは失敗と見なされる。
+
+### BDD_GetGCThreshold
+
+```cpp
+bddword BDD_GetGCThreshold(void)
+```
+
+【SAPPOROBDD++のみ】
+
+現在設定されているガベジコレクションの閾値を返す。この値は、ガベジコレクションが成功と見なされるために最低限解放されなければならない節点数を表す。
+
 ### BDD_CacheInt
 
 ```cpp
