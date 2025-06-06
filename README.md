@@ -26,6 +26,9 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 - ZBDD is renamed to ZDD.
   - Functions including "ZBDD" are also renamed. For example, ZBDD_Meet is renamed to ZDD_Meet.
   - You can still use "ZBDD".
+- We can change the size of the cache table.
+- We added configurable GC threshold to throw exceptions when garbage collection frees insufficient nodes.
+- We can store an instance of the ZDD class into a `std::map` and `std::unordered_map` as a key.
 - The manual is converted to Markdown (and minor mistakes are fixed).
 - Tests are added (in the "tests" directory).
 

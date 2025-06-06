@@ -324,6 +324,17 @@ int operator!=(const ZDD& f, const ZDD& g)
 
 f と g が異なる集合かどうかの真偽(1/0)を返す。
 
+### operator<
+
+```cpp
+bool operator<(const ZDD& f, const ZDD& g)
+```
+
+f と g の不等号 < による比較結果を返す。
+2つのZDDの不等号による比較は意味を持たないが、
+本演算は ZDD クラスのインスタンスを std::map のキーとして
+格納するために定義されている。
+
 ### BDD_CacheZDD
 
 ```cpp
