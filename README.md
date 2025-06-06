@@ -29,6 +29,7 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 - We can change the size of the cache table.
 - We added configurable GC threshold to throw exceptions when garbage collection frees insufficient nodes.
 - We can store an instance of the ZDD class into a `std::map` and `std::unordered_map` as a key.
+- We add macro CACHE_OP_USER_START to indicate the number of the start of user-defined cache operations.
 - The manual is converted to Markdown (and minor mistakes are fixed).
 - Tests are added (in the "tests" directory).
 
