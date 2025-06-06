@@ -57,6 +57,7 @@ typedef unsigned int bddvar;
                     /* bddp of a constant valued node */
 #define bddvalmax B_VAL_MASK  /* Max constant value */
 
+#define CACHE_OP_USER_START   100   /* Start of user-defined cache operations */
 
 /***************** For stack overflow limit *****************/
 extern const int BDD_RecurLimit;
