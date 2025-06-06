@@ -159,6 +159,9 @@ inline int operator==(const ZDD& f, const ZDD& g)
 inline int operator!=(const ZDD& f, const ZDD& g)
   { return !(f == g); }
 
+inline bool operator<(const ZDD& f, const ZDD& g)
+  { return f.GetID() < g.GetID(); }
+
 inline ZDD& ZDD::operator*=(const ZDD& f)
   { return *this = *this * f; }
 
@@ -262,5 +265,18 @@ public:
 typedef ZDD_Hash ZBDD_Hash; // for backward compatibility
 
 } // namespace sapporobdd
+
+// Hash function specialization for ZDD (C++11 and later)
+#if __cplusplus >= 201103L
+#include <functional>
+namespace std {
+  template<>
+  struct hash<sapporobdd::ZDD> {
+    std::size_t operator()(const sapporobdd::ZDD& zdd) const {
+      return std::hash<sapporobdd::bddword>{}(zdd.GetID());
+    }
+  };
+}
+#endif
 
 #endif // _ZDD_
