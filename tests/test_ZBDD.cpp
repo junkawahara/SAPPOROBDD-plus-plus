@@ -11,6 +11,8 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <map>
+#include <unordered_map>
 #define BDD_CPP
 #include "../include/bddc.h"
 #include "../include/BDD.h"
@@ -604,6 +606,9 @@ void test_binary_operators() {
     test_result("ZDD_Meet() with unit set", ZDD_Meet(z1, unit) == unit);
 
     std::cout << endl;
+
+    // Check definition of CACHE_OP_USER_START
+    test_result("CACHE_OP_USER_START is defined", CACHE_OP_USER_START < 256);
 }
 
 // Test basic query functions
@@ -1072,6 +1077,146 @@ void test_edge_cases() {
     std::cout << endl;
 }
 
+void test_map() {
+    std::map<ZDD, int> zddMap;
+    ZDD z1(1);
+    ZDD z2 = z1.Change(2);
+    zddMap[z2] = 100;
+    test_result("Map with ZDD key works", zddMap[ZDD(1).Change(2)] == 100);
+
+    std::unordered_map<ZDD, int> zddUnorderedMap;
+    zddUnorderedMap[z2] = 200;
+    test_result("Unordered map with ZDD key works", zddUnorderedMap[ZDD(1).Change(2)] == 200);
+}
+
+void test_gc_threshold() {
+    BDD_Init(256, 1024);
+
+    BDD_SetGCThreshold(0); // Set a threshold for garbage collection
+    test_result("Garbage collection threshold set", BDD_GetGCThreshold() == 0);
+
+    for (int i = 1; i <= 2000; ++i) {
+        BDD_NewVar();
+    }
+
+    ZDD largeZDD;
+
+    // Create a large ZDD to trigger garbage collection
+    try {
+        for (int i = 1; i <= 500; ++i) {
+            largeZDD += ZDD(1).Change(i);
+        }
+        // 500 nodes are created. This should not throw an exception.
+    } catch (const BDDOutOfMemoryException& e) {
+        test_result("Out of memory during garbage collection", false);
+        exit(1);
+    }
+
+    bool errorOccurred = false;
+    try {
+        for (int i = 501; i <= 2000; ++i) {
+            largeZDD += ZDD(1).Change(i);
+        }
+        // 1500 nodes are created, which exceeds the limit.
+    } catch (const BDDOutOfMemoryException& e) {
+        std::cerr << "Out of memory during garbage collection test: " << e.what() << std::endl;
+        errorOccurred = true;
+    }
+    if (errorOccurred) {
+        test_result("Garbage collection failed for large ZDD", true);
+    } else {
+        test_result("Garbage collection unexpectedly worked for large ZDD", false);
+    }
+
+    BDD_Init(256, 1024);
+
+    BDD_SetGCThreshold(0); // Set a threshold for garbage collection
+    test_result("Garbage collection threshold set", BDD_GetGCThreshold() == 0);
+
+    for (int i = 1; i <= 2000; ++i) {
+        BDD_NewVar();
+    }
+
+    {
+        ZDD largeZDD2;
+        // Create a large ZDD to trigger garbage collection
+        for (int i = 1; i <= 500; ++i) {
+            largeZDD2 += ZDD(1).Change(i);
+        }
+    }
+    // At this point, 500 nodes of largeZDD2 should be released.
+
+    try {
+        ZDD largeZDD3;
+        for (int i = 501; i <= 1200; ++i) {
+            largeZDD3 += ZDD(1).Change(i);
+        }
+        // Garbage collection occurs, and 500 nodes are collected,
+        // so it should not throw an exception.
+    } catch (const BDDOutOfMemoryException& e) {
+        test_result("Garbage collection unexpectedly worked", false);
+        return;
+    }
+
+    BDD_Init(256, 1024);
+
+    BDD_SetGCThreshold(400); // Set a threshold for garbage collection
+    test_result("Garbage collection threshold set", BDD_GetGCThreshold() == 400);
+
+    for (int i = 1; i <= 2000; ++i) {
+        BDD_NewVar();
+    }
+
+    {
+        ZDD largeZDD4;
+        // Create a large ZDD to trigger garbage collection
+        for (int i = 1; i <= 500; ++i) {
+            largeZDD4 += ZDD(1).Change(i);
+        }
+    }
+    // At this point, 500 nodes of largeZDD4 should be released.
+
+    try {
+        ZDD largeZDD5;
+        for (int i = 501; i <= 1200; ++i) {
+            largeZDD5 += ZDD(1).Change(i);
+        }
+        // Garbage collection occurs, and 500 nodes are collected,
+        // so it should not throw an exception.
+    } catch (const BDDOutOfMemoryException& e) {
+        test_result("Garbage collection unexpectedly worked", false);
+        return;
+    }
+
+    BDD_GC(); // Force garbage collection
+    {
+        ZDD largeZDD6;
+        // Create a large ZDD to trigger garbage collection
+        for (int i = 1; i <= 200; ++i) {
+            largeZDD6 += ZDD(1).Change(i);
+        }
+    }
+    // Released 200 nodes of largeZDD6
+
+    errorOccurred = false;
+    try {
+        ZDD largeZDD7;
+        for (int i = 301; i <= 1200; ++i) {
+            largeZDD7 += ZDD(1).Change(i);
+        }
+        // Garbage collection occurs, but only 200 nodes are collected,
+        // so it should throw an exception because GC threshold is 400.
+    } catch (const BDDOutOfMemoryException& e) {
+        std::cerr << "Out of memory during garbage collection test: " << e.what() << std::endl;
+        errorOccurred = true;
+    }
+    if (errorOccurred) {
+        test_result("Garbage collection failed for large ZDD", true);
+    } else {
+        test_result("Garbage collection unexpectedly worked for large ZDD", false);
+    }
+}
+
 // Main test function
 int main() {
     test_init();
@@ -1092,7 +1237,11 @@ int main() {
     test_io_operations();
     test_external_functions();
     test_edge_cases();
-    
+
+    test_map();
+
+    test_gc_threshold(); // This should be called finally.
+
     test_cleanup();
     
     cout << "ZDD test completed." << endl;
