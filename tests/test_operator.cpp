@@ -10,6 +10,8 @@
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <set>
+#include <unordered_set>
 #define BDD_CPP
 #include "../include/bddc.h"
 #include "../include/BDD.h"
@@ -78,41 +80,43 @@ ZDD buildZDDFromSets(const vector<vector<int> >& sets) {
     return result;
 }
 
-// Helper function to compute union of two set families
+// Helper function to convert vector to string for hashing
+std::string vectorToString(const vector<int>& vec) {
+    std::string result;
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) result += ",";
+        result += std::to_string(vec[i]);
+    }
+    return result;
+}
+
+// Helper function to compute union of two set families (optimized with hash)
 vector<vector<int> > computeSetUnion(const vector<vector<int> >& sets1, const vector<vector<int> >& sets2) {
+    std::unordered_set<std::string> seen;
     vector<vector<int> > result;
     
     // Add all sets from sets1
     for (size_t i = 0; i < sets1.size(); ++i) {
-        result.push_back(sets1[i]);
+        // Sort the set for consistent hashing
+        vector<int> sorted_set = sets1[i];
+        std::sort(sorted_set.begin(), sorted_set.end());
+        
+        std::string key = vectorToString(sorted_set);
+        if (seen.find(key) == seen.end()) {
+            seen.insert(key);
+            result.push_back(sets1[i]);
+        }
     }
     
     // Add sets from sets2 that are not already in result
     for (size_t i = 0; i < sets2.size(); ++i) {
-        bool found = false;
-        for (size_t j = 0; j < result.size(); ++j) {
-            if (sets2[i].size() == result[j].size()) {
-                bool same = true;
-                for (size_t k = 0; k < sets2[i].size(); ++k) {
-                    bool elem_found = false;
-                    for (size_t l = 0; l < result[j].size(); ++l) {
-                        if (sets2[i][k] == result[j][l]) {
-                            elem_found = true;
-                            break;
-                        }
-                    }
-                    if (!elem_found) {
-                        same = false;
-                        break;
-                    }
-                }
-                if (same) {
-                    found = true;
-                    break;
-                }
-            }
-        }
-        if (!found) {
+        // Sort the set for consistent hashing
+        vector<int> sorted_set = sets2[i];
+        std::sort(sorted_set.begin(), sorted_set.end());
+        
+        std::string key = vectorToString(sorted_set);
+        if (seen.find(key) == seen.end()) {
+            seen.insert(key);
             result.push_back(sets2[i]);
         }
     }
@@ -120,33 +124,27 @@ vector<vector<int> > computeSetUnion(const vector<vector<int> >& sets1, const ve
     return result;
 }
 
-// Helper function to compute intersection of two set families
+// Helper function to compute intersection of two set families (optimized with hash)
 vector<vector<int> > computeSetIntersection(const vector<vector<int> >& sets1, const vector<vector<int> >& sets2) {
+    std::unordered_set<std::string> set2_hashes;
     vector<vector<int> > result;
     
-    // Find sets that appear in both families
+    // First, hash all sets from sets2
+    for (size_t i = 0; i < sets2.size(); ++i) {
+        vector<int> sorted_set = sets2[i];
+        std::sort(sorted_set.begin(), sorted_set.end());
+        std::string key = vectorToString(sorted_set);
+        set2_hashes.insert(key);
+    }
+    
+    // Then check which sets from sets1 are also in sets2
     for (size_t i = 0; i < sets1.size(); ++i) {
-        for (size_t j = 0; j < sets2.size(); ++j) {
-            if (sets1[i].size() == sets2[j].size()) {
-                bool same = true;
-                for (size_t k = 0; k < sets1[i].size(); ++k) {
-                    bool elem_found = false;
-                    for (size_t l = 0; l < sets2[j].size(); ++l) {
-                        if (sets1[i][k] == sets2[j][l]) {
-                            elem_found = true;
-                            break;
-                        }
-                    }
-                    if (!elem_found) {
-                        same = false;
-                        break;
-                    }
-                }
-                if (same) {
-                    result.push_back(sets1[i]);
-                    break;
-                }
-            }
+        vector<int> sorted_set = sets1[i];
+        std::sort(sorted_set.begin(), sorted_set.end());
+        std::string key = vectorToString(sorted_set);
+        
+        if (set2_hashes.find(key) != set2_hashes.end()) {
+            result.push_back(sets1[i]);
         }
     }
     
@@ -154,13 +152,14 @@ vector<vector<int> > computeSetIntersection(const vector<vector<int> >& sets1, c
 }
 
 // Test initialization
-void test_init() {
+void test_init(double cache_ratio) {
     std::cout << "=== ZDD Operator Validation Test ===" << endl;
     std::cout << "Start Time: " << __DATE__ << " " << __TIME__ << endl;
     std::cout << "=====================================" << endl << endl;
     
     // Initialize BDD package
-    BDD_Init(256, 1024 * 1024 * 1024); // 1GB
+    size_t memory_bytes = (size_t)(1024 * 1024 * 1024);
+    BDD_Init(256, memory_bytes, cache_ratio);
 }
 
 // Test cleanup
@@ -393,12 +392,19 @@ void test_random_subsets(int n, int count) {
     std::cout << "Testing operator+ with random subsets..." << endl;
     clock_t union_start = clock();
     ZDD zdd_union = zdd1 + zdd2;
+    clock_t union_end = clock();
+
+    std::cout << "operator+ took " << double(union_end - union_start) / CLOCKS_PER_SEC << " seconds" << endl;
+    std::cout << "zdd_union has " << zdd_union.Card() << " sets and " << zdd_union.Size() << " nodes" << endl;
+
+    clock_t build_expected_start = clock();
     vector<vector<int> > vector_union = computeSetUnion(sets1, sets2);
     ZDD expected_union = buildZDDFromSets(vector_union);
-    clock_t union_end = clock();
+    clock_t build_expected_end = clock();
+
+    std::cout << "buildZDDFromSets for expected_union took " << double(build_expected_end - build_expected_start) / CLOCKS_PER_SEC << " seconds" << endl;
     
     std::cout << "Union: ZDD has " << zdd_union.Card() << " sets, vector has " << vector_union.size() << " sets" << endl;
-    std::cout << "Union computation took " << double(union_end - union_start) / CLOCKS_PER_SEC << " seconds" << endl;
     test_result("Random subsets operator+ matches vector union", zdd_union == expected_union);
     test_result("Random subsets operator+ cardinality correct", zdd_union.Card() == vector_union.size());
     
@@ -406,12 +412,19 @@ void test_random_subsets(int n, int count) {
     std::cout << "Testing operator& with random subsets..." << endl;
     clock_t intersection_start = clock();
     ZDD zdd_intersection = zdd1 & zdd2;
+    clock_t intersection_end = clock();
+
+    std::cout << "operator& took " << double(intersection_end - intersection_start) / CLOCKS_PER_SEC << " seconds" << endl;
+    std::cout << "zdd_intersection has " << zdd_intersection.Card() << " sets and " << zdd_intersection.Size() << " nodes" << endl;
+
+    clock_t build_expected_intersection_start = clock();
     vector<vector<int> > vector_intersection = computeSetIntersection(sets1, sets2);
     ZDD expected_intersection = buildZDDFromSets(vector_intersection);
-    clock_t intersection_end = clock();
+    clock_t build_expected_intersection_end = clock();
+
+    std::cout << "buildZDDFromSets for expected_intersection took " << double(build_expected_intersection_end - build_expected_intersection_start) / CLOCKS_PER_SEC << " seconds" << endl;
     
     std::cout << "Intersection: ZDD has " << zdd_intersection.Card() << " sets, vector has " << vector_intersection.size() << " sets" << endl;
-    std::cout << "Intersection computation took " << double(intersection_end - intersection_start) / CLOCKS_PER_SEC << " seconds" << endl;
     test_result("Random subsets operator& matches vector intersection", zdd_intersection == expected_intersection);
     test_result("Random subsets operator& cardinality correct", zdd_intersection.Card() == vector_intersection.size());
     
@@ -614,15 +627,17 @@ int main(int argc, char* argv[]) {
     // Default values
     int n = 30;
     int count = 1000;
+    double cache_ratio = 1.0;
     
     // Parse command line arguments
     if (argc >= 2) {
         n = atoi(argv[1]);
         if (n <= 0) {
             std::cout << "Error: n must be a positive integer" << endl;
-            std::cout << "Usage: " << argv[0] << " [n] [count]" << endl;
+            std::cout << "Usage: " << argv[0] << " [n] [count] [cache_ratio]" << endl;
             std::cout << "  n: size of the universal set {1, 2, ..., n} (default: 30)" << endl;
             std::cout << "  count: number of random subsets to generate (default: 1000)" << endl;
+            std::cout << "  cache ratio: cache ratio for BDD package (default: 1.0)" << endl;
             return 1;
         }
     }
@@ -631,20 +646,33 @@ int main(int argc, char* argv[]) {
         count = atoi(argv[2]);
         if (count <= 0) {
             std::cout << "Error: count must be a positive integer" << endl;
-            std::cout << "Usage: " << argv[0] << " [n] [count]" << endl;
+            std::cout << "Usage: " << argv[0] << " [n] [count] [cache_ratio]" << endl;
             std::cout << "  n: size of the universal set {1, 2, ..., n} (default: 30)" << endl;
             std::cout << "  count: number of random subsets to generate (default: 1000)" << endl;
+            std::cout << "  cache ratio: cache ratio for BDD package (default: 1.0)" << endl;
             return 1;
         }
     }
     
-    if (argc > 3) {
+    if (argc >= 4) {
+        cache_ratio = atof(argv[3]);
+        if (cache_ratio <= 0.0) {
+            std::cout << "Error: cache_ratio must be a positive number" << endl;
+            std::cout << "Usage: " << argv[0] << " [n] [count] [cache_ratio]" << endl;
+            std::cout << "  n: size of the universal set {1, 2, ..., n} (default: 30)" << endl;
+            std::cout << "  count: number of random subsets to generate (default: 1000)" << endl;
+            std::cout << "  cache ratio: cache ratio for BDD package (default: 1.0)" << endl;
+            return 1;
+        }
+    }
+    
+    if (argc > 4) {
         std::cout << "Warning: Extra arguments ignored" << endl;
     }
     
-    std::cout << "Parameters: n=" << n << ", count=" << count << endl;
+    std::cout << "Parameters: n=" << n << ", count=" << count << ", cache_ratio=" << cache_ratio << endl;
     
-    test_init();
+    test_init(cache_ratio);
     
     std::cout << "Starting ZDD Operator Validation Tests..." << endl << endl;
     
