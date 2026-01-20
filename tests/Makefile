@@ -15,7 +15,10 @@ CXXFLAGS_EXTEND = $(CXXFLAGS) -DB_EXTEND
 CFLAGS_EXTEND = $(CFLAGS) -DB_EXTEND
 
 # Source files
-SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc ../src/BDDc/bddc.cc
+BDDC_SRCS = ../src/BDDc/bddc_init.cc ../src/BDDc/bddc_node.cc ../src/BDDc/bddc_gc.cc \
+            ../src/BDDc/bddc_apply.cc ../src/BDDc/bddc_operations.cc \
+            ../src/BDDc/bddc_io.cc ../src/BDDc/bddc_util.cc
+SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc $(BDDC_SRCS)
 # Dynamically add the appropriate ZDD source file
 ifneq ($(wildcard ../src/BDD+/ZDD.cc),)
     SOURCES += ../src/BDD+/ZDD.cc
@@ -60,8 +63,8 @@ test_ZBDD_Hash: $(OBJ_HASH)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_HASH)
 
 # Build test_bddc_cache
-test_bddc_cache: test_bddc_cache.o
-	$(CXX) $(CXXFLAGS) -o $@ test_bddc_cache.o
+test_bddc_cache: test_bddc_cache.o bddc.o
+	$(CXX) $(CXXFLAGS) -o $@ test_bddc_cache.o bddc.o
 
 # Build test_operator
 test_operator: $(OBJ_OPERATOR)
@@ -74,15 +77,15 @@ test_ZBDD_extend: $(OBJ_ZDD_EXTEND)
 test_operator_extend: $(OBJ_OPERATOR_EXTEND)
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_OPERATOR_EXTEND)
 
-test_bddc_cache_extend: test_bddc_cache_extend.o
-	$(CXX) $(CXXFLAGS_EXTEND) -o $@ test_bddc_cache_extend.o
+test_bddc_cache_extend: test_bddc_cache_extend.o bddc_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ test_bddc_cache_extend.o bddc_extend.o
 
 # Compile rules
 test_ZBDD.o: test_ZBDD.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_ZBDD.cpp
 
-test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS)
-	$(CXX) $(CXXFLAGS) -c test_bddc_cache.cpp
+test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c test_bddc_cache.cpp
 
 test_operator.o: test_operator.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_operator.cpp
@@ -94,8 +97,8 @@ test_ZBDD_extend.o: test_ZBDD.cpp $(HEADERS)
 test_operator_extend.o: test_operator.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS_EXTEND) -c test_operator.cpp -o test_operator_extend.o
 
-test_bddc_cache_extend.o: test_bddc_cache.cpp $(HEADERS)
-	$(CXX) $(CXXFLAGS_EXTEND) -c test_bddc_cache.cpp -o test_bddc_cache_extend.o
+test_bddc_cache_extend.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c test_bddc_cache.cpp -o test_bddc_cache_extend.o
 
 test_ZBDD_Hash.o: test_ZBDD_Hash.cpp ../include/ZDD.h ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c test_ZBDD_Hash.cpp
@@ -112,17 +115,16 @@ ZDD.o: $(HEADERS)
 BDD.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDD.cc -o BDD.o
 
-bddc.o: ../include/bddc.h
-	@if [ -f ../src/BDDc/bddc.cc ]; then \
-		echo "Using bddc.cc with g++"; \
-		$(CXX) $(CXXFLAGS) -c ../src/BDDc/bddc.cc -o bddc.o; \
-	elif [ -f ../src/BDDc/bddc.c ]; then \
-		echo "Using ../src/BDDc/bddc.c with gcc"; \
-		$(CC) $(CFLAGS) -c ../src/BDDc/bddc.c -o bddc.o; \
-	else \
-		echo "Error: Could not find bddc.cc or bddc.c"; \
-		exit 1; \
-	fi
+bddc.o: ../include/bddc.h ../src/BDDc/bddc_internal.h $(BDDC_SRCS)
+	@echo "Compiling split bddc source files..."
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_init.cc -o bddc_init.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_node.cc -o bddc_node.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_gc.cc -o bddc_gc.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_apply.cc -o bddc_apply.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_operations.cc -o bddc_operations.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_io.cc -o bddc_io.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_util.cc -o bddc_util.o
+	ld -r bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_operations.o bddc_io.o bddc_util.o -o bddc.o
 
 # B_EXTEND mode object compilation
 ZDD_extend.o: $(HEADERS)
@@ -137,17 +139,16 @@ ZDD_extend.o: $(HEADERS)
 BDD_extend.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/BDD.cc -o BDD_extend.o
 
-bddc_extend.o: ../include/bddc.h
-	@if [ -f ../src/BDDc/bddc.cc ]; then \
-		echo "Using bddc.cc with g++ and B_EXTEND"; \
-		$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDDc/bddc.cc -o bddc_extend.o; \
-	elif [ -f ../src/BDDc/bddc.c ]; then \
-		echo "Using ../src/BDDc/bddc.c with gcc and B_EXTEND"; \
-		$(CC) $(CFLAGS_EXTEND) -c ../src/BDDc/bddc.c -o bddc_extend.o; \
-	else \
-		echo "Error: Could not find bddc.cc or bddc.c"; \
-		exit 1; \
-	fi
+bddc_extend.o: ../include/bddc.h ../src/BDDc/bddc_internal.h $(BDDC_SRCS)
+	@echo "Compiling split bddc source files with B_EXTEND..."
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_init.cc -o bddc_init_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_node.cc -o bddc_node_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_gc.cc -o bddc_gc_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_apply.cc -o bddc_apply_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_operations.cc -o bddc_operations_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_io.cc -o bddc_io_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_util.cc -o bddc_util_extend.o
+	ld -r bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o -o bddc_extend.o
 
 # SBDD_helper test
 
@@ -188,6 +189,8 @@ test_extend: $(TARGETS_EXTEND)
 # Clean
 clean:
 	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator
+	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_operations.o bddc_io.o bddc_util.o
+	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
 
 # For Visual Studio nmake
 # Use: nmake /f Makefile.vc

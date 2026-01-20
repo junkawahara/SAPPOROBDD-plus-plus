@@ -17,8 +17,8 @@
 // Define BDD_CPP to use C++ interface
 #define BDD_CPP
 
-// Include bddc.cc directly first to access static functions
-#include "../src/BDDc/bddc.cc"
+// Include bddc internal header to access internal functions
+#include "../src/BDDc/bddc_internal.h"
 
 // Only include the minimal headers we need, avoid BDD.h to prevent macro conflicts
 #include "../include/bddc.h"
@@ -26,9 +26,7 @@
 using namespace std;
 
 
-// Include bddc.cc directly to access static functions
-// Note: This will include all the static variables and functions
-// (Already included above before headers to avoid macro conflicts)
+// Note: Internal functions are now exposed via bddc_internal.h
 
 // Test counter
 int test_count = 0;
