@@ -20,11 +20,16 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
   case BC_INTERSEC:
   case BC_UNION:
   case BC_SUBTRACT:
+#ifdef B_FORCE_ITERATIVE
+    /* Force iterative version for testing */
+    return apply_binary_iterative(f, g, op, skip);
+#else
     /* Use iterative version when variable count exceeds threshold */
     if (VarUsed > APPLY_RECURSION_THRESHOLD) {
       return apply_binary_iterative(f, g, op, skip);
     }
     return apply_binary(f, g, op, skip);
+#endif
 
   /* Unary operations (g is typically a variable index) */
   case BC_AT0:
