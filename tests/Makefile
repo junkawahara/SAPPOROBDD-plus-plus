@@ -16,7 +16,9 @@ CFLAGS_EXTEND = $(CFLAGS) -DB_EXTEND
 
 # Source files
 BDDC_SRCS = ../src/BDDc/bddc_init.cc ../src/BDDc/bddc_node.cc ../src/BDDc/bddc_gc.cc \
-            ../src/BDDc/bddc_apply.cc ../src/BDDc/bddc_operations.cc \
+            ../src/BDDc/bddc_apply.cc ../src/BDDc/bddc_apply_binary.cc \
+            ../src/BDDc/bddc_apply_unary.cc ../src/BDDc/bddc_apply_count.cc \
+            ../src/BDDc/bddc_apply_special.cc ../src/BDDc/bddc_operations.cc \
             ../src/BDDc/bddc_io.cc ../src/BDDc/bddc_util.cc
 SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc $(BDDC_SRCS)
 # Dynamically add the appropriate ZDD source file
@@ -115,16 +117,20 @@ ZDD.o: $(HEADERS)
 BDD.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDD.cc -o BDD.o
 
-bddc.o: ../include/bddc.h ../src/BDDc/bddc_internal.h $(BDDC_SRCS)
+bddc.o: ../include/bddc.h ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h $(BDDC_SRCS)
 	@echo "Compiling split bddc source files..."
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_init.cc -o bddc_init.o
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_node.cc -o bddc_node.o
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_gc.cc -o bddc_gc.o
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_apply.cc -o bddc_apply.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_apply_binary.cc -o bddc_apply_binary.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_apply_unary.cc -o bddc_apply_unary.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_apply_count.cc -o bddc_apply_count.o
+	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_apply_special.cc -o bddc_apply_special.o
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_operations.cc -o bddc_operations.o
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_io.cc -o bddc_io.o
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_util.cc -o bddc_util.o
-	ld -r bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_operations.o bddc_io.o bddc_util.o -o bddc.o
+	ld -r bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_operations.o bddc_io.o bddc_util.o -o bddc.o
 
 # B_EXTEND mode object compilation
 ZDD_extend.o: $(HEADERS)
@@ -139,16 +145,20 @@ ZDD_extend.o: $(HEADERS)
 BDD_extend.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/BDD.cc -o BDD_extend.o
 
-bddc_extend.o: ../include/bddc.h ../src/BDDc/bddc_internal.h $(BDDC_SRCS)
+bddc_extend.o: ../include/bddc.h ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h $(BDDC_SRCS)
 	@echo "Compiling split bddc source files with B_EXTEND..."
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_init.cc -o bddc_init_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_node.cc -o bddc_node_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_gc.cc -o bddc_gc_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_apply.cc -o bddc_apply_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_apply_binary.cc -o bddc_apply_binary_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_apply_unary.cc -o bddc_apply_unary_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_apply_count.cc -o bddc_apply_count_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_apply_special.cc -o bddc_apply_special_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_operations.cc -o bddc_operations_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_io.cc -o bddc_io_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c ../src/BDDc/bddc_util.cc -o bddc_util_extend.o
-	ld -r bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o -o bddc_extend.o
+	ld -r bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o -o bddc_extend.o
 
 # SBDD_helper test
 
@@ -189,8 +199,8 @@ test_extend: $(TARGETS_EXTEND)
 # Clean
 clean:
 	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator
-	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_operations.o bddc_io.o bddc_util.o
-	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
+	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_operations.o bddc_io.o bddc_util.o
+	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
 
 # For Visual Studio nmake
 # Use: nmake /f Makefile.vc
