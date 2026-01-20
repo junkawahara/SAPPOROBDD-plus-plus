@@ -21,6 +21,7 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 - Some compiler warnings are suppressed.
 - We change default to 64-bit version and add B_32 macro for 32-bit version.
   - Defining B_64 does not affect the code.
+- Iterative (non-recursive) versions of all apply operations are implemented to prevent stack overflow when handling large numbers of variables (> 8192).
 - Namespace 'sapporobdd' is introduced.
   - Put `using namespace sapporobdd;` before using SAPPOROBDD++
 - ZBDD is renamed to ZDD.
