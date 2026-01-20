@@ -44,10 +44,12 @@ endif
 OBJ_ZDD = test_ZBDD.o ZDD.o BDD.o bddc.o
 OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o bddc.o
 OBJ_OPERATOR = test_operator.o ZDD.o BDD.o bddc.o
+OBJ_ITERATIVE_TEST = test_iterative.o ZDD.o BDD.o bddc.o
 
 # B_EXTEND mode object files
 OBJ_ZDD_EXTEND = test_ZBDD_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
 OBJ_OPERATOR_EXTEND = test_operator_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
+OBJ_ITERATIVE_TEST_EXTEND = test_iterative_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
 
 # B_FORCE_ITERATIVE mode object files
 OBJ_ZDD_ITERATIVE = test_ZBDD_iterative.o ZDD_iterative.o BDD_iterative.o bddc_iterative.o
@@ -55,8 +57,8 @@ OBJ_OPERATOR_ITERATIVE = test_operator_iterative.o ZDD_iterative.o BDD_iterative
 
 # Target executables
 #TARGETS = test_ZBDD test_ZBDD_Hash
-TARGETS = test_ZBDD test_bddc_cache test_operator
-TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend
+TARGETS = test_ZBDD test_bddc_cache test_operator test_iterative_deep
+TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend test_iterative_deep_extend
 TARGETS_ITERATIVE = test_ZBDD_iterative test_operator_iterative test_bddc_cache_iterative
 
 # Default target
@@ -84,6 +86,10 @@ test_bddc_cache: test_bddc_cache.o bddc.o
 test_operator: $(OBJ_OPERATOR)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_OPERATOR)
 
+# Build test_iterative_deep (tests recursive vs iterative apply with high variable count)
+test_iterative_deep: $(OBJ_ITERATIVE_TEST)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_ITERATIVE_TEST)
+
 # Build B_EXTEND mode test programs
 test_ZBDD_extend: $(OBJ_ZDD_EXTEND)
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_ZDD_EXTEND)
@@ -93,6 +99,9 @@ test_operator_extend: $(OBJ_OPERATOR_EXTEND)
 
 test_bddc_cache_extend: test_bddc_cache_extend.o bddc_extend.o
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ test_bddc_cache_extend.o bddc_extend.o
+
+test_iterative_deep_extend: $(OBJ_ITERATIVE_TEST_EXTEND)
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_ITERATIVE_TEST_EXTEND)
 
 # Build B_FORCE_ITERATIVE mode test programs
 test_ZBDD_iterative: $(OBJ_ZDD_ITERATIVE)
@@ -114,6 +123,9 @@ test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
 test_operator.o: test_operator.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_operator.cpp
 
+test_iterative.o: test_iterative.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c test_iterative.cpp
+
 # B_EXTEND mode compile rules
 test_ZBDD_extend.o: test_ZBDD.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS_EXTEND) -c test_ZBDD.cpp -o test_ZBDD_extend.o
@@ -123,6 +135,9 @@ test_operator_extend.o: test_operator.cpp $(HEADERS)
 
 test_bddc_cache_extend.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c test_bddc_cache.cpp -o test_bddc_cache_extend.o
+
+test_iterative_extend.o: test_iterative.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS_EXTEND) -c test_iterative.cpp -o test_iterative_extend.o
 
 # B_FORCE_ITERATIVE mode compile rules
 test_ZBDD_iterative.o: test_ZBDD.cpp $(HEADERS)
@@ -245,6 +260,9 @@ test: $(TARGETS)
 	@echo ""
 	@echo "Running test_operator..."
 	@./test_operator
+	@echo ""
+	@echo "Running test_iterative_deep (recursive vs iterative apply)..."
+	@./test_iterative_deep
 
 # Run B_EXTEND mode tests
 test_extend: $(TARGETS_EXTEND)
@@ -257,6 +275,9 @@ test_extend: $(TARGETS_EXTEND)
 	@echo ""
 	@echo "Running test_bddc_cache_extend..."
 	@./test_bddc_cache_extend
+	@echo ""
+	@echo "Running test_iterative_deep_extend..."
+	@./test_iterative_deep_extend
 	@echo ""
 
 # Run B_FORCE_ITERATIVE mode tests
@@ -274,7 +295,7 @@ test_iterative: $(TARGETS_ITERATIVE)
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator
+	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator test_iterative_deep test_iterative_deep_extend
 	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_apply_iterative.o bddc_operations.o bddc_io.o bddc_util.o
 	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_apply_iterative_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
 	rm -f bddc_init_iterative.o bddc_node_iterative.o bddc_gc_iterative.o bddc_apply_iterative_forced.o bddc_apply_binary_iterative.o bddc_apply_unary_iterative.o bddc_apply_count_iterative.o bddc_apply_special_iterative.o bddc_apply_iterative_impl.o bddc_operations_iterative.o bddc_io_iterative.o bddc_util_iterative.o

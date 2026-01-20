@@ -284,16 +284,21 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
             /* XOR special case: need to negate final result */
             if (need_negate) {
                 /* Push new frame for the non-negated computation */
+                /* Save values before push (realloc may invalidate frame pointer) */
+                bddp saved_f = frame->f;
+                bddp saved_g = frame->g;
+                unsigned char saved_op = frame->op;
                 frame->state = 3; /* State 3: waiting for XOR negate result */
                 if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
                     frame->result = bddnull;
                     goto pop_frame;
                 }
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
-                    child->f = frame->f;
-                    child->g = frame->g;
-                    child->op = frame->op;
+                    child->f = saved_f;
+                    child->g = saved_g;
+                    child->op = saved_op;
                     child->skip = 1; /* skip=1 to avoid infinite loop */
                     child->state = 0;
                     child->h0 = bddnull;
@@ -316,21 +321,28 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
                                 &frame->v, &frame->z);
 
             /* Push frame for first recursive call: apply(f0, g0, op, 0) */
-            frame->state = 1;
-            if (!stack_push(&stack)) {
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push (realloc may invalidate frame pointer) */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                child->f = frame->f0;
-                child->g = frame->g0;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                bddp saved_f0 = frame->f0;
+                bddp saved_g0 = frame->g0;
+                unsigned char saved_op = frame->op;
+                frame->state = 1;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack); /* refresh after failed push */
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f0;
+                    child->g = saved_g0;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -342,22 +354,30 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
             }
 
             /* Push frame for second recursive call: apply(f1, g1, op, 0) */
-            frame->state = 2;
-            if (!stack_push(&stack)) {
-                bddfree(frame->h0);
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push (realloc may invalidate frame pointer) */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                child->f = frame->f1;
-                child->g = frame->g1;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                bddp saved_f1 = frame->f1;
+                bddp saved_g1 = frame->g1;
+                bddp saved_h0 = frame->h0;
+                unsigned char saved_op = frame->op;
+                frame->state = 2;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    bddfree(saved_h0);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f1;
+                    child->g = saved_g1;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -662,16 +682,21 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             }
             if (term_result == 2) {
                 /* Need to recurse with negated f, then negate result */
+                /* Save values before push (realloc may invalidate frame pointer) */
+                bddp saved_f = frame->f;
+                bddp saved_g = frame->g;
+                unsigned char saved_op = frame->op;
                 frame->state = 3; /* State 3: waiting for negated recursion */
                 if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
                     frame->result = bddnull;
                     goto pop_frame;
                 }
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
-                    child->f = frame->f;
-                    child->g = frame->g;
-                    child->op = frame->op;
+                    child->f = saved_f;
+                    child->g = saved_g;
+                    child->op = saved_op;
                     child->skip = 1;
                     child->state = 0;
                     child->h0 = bddnull;
@@ -710,21 +735,28 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             }
 
             /* Push frame for first recursive call: apply(f0, g, op, 0) */
-            frame->state = 1;
-            if (!stack_push(&stack)) {
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push (realloc may invalidate frame pointer) */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                child->f = frame->f0;
-                child->g = frame->g;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                bddp saved_f0 = frame->f0;
+                bddp saved_g = frame->g;
+                unsigned char saved_op = frame->op;
+                frame->state = 1;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f0;
+                    child->g = saved_g;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -735,22 +767,30 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             }
 
             /* Push frame for second recursive call: apply(f1, g, op, 0) */
-            frame->state = 2;
-            if (!stack_push(&stack)) {
-                bddfree(frame->h0);
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push (realloc may invalidate frame pointer) */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                child->f = frame->f1;
-                child->g = frame->g;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                bddp saved_f1 = frame->f1;
+                bddp saved_g = frame->g;
+                bddp saved_h0 = frame->h0;
+                unsigned char saved_op = frame->op;
+                frame->state = 2;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    bddfree(saved_h0);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f1;
+                    child->g = saved_g;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -966,14 +1006,17 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             }
             if (term_result == 2) {
                 /* BC_CARD with negated f: need result + 1 */
+                /* Save values before push (realloc may invalidate frame pointer) */
+                bddp saved_f = frame->f;
                 frame->state = 3;
                 if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
                     frame->result = bddnull;
                     goto pop_frame;
                 }
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
-                    child->f = frame->f;
+                    child->f = saved_f;
                     child->g = bddfalse;
                     child->op = BC_CARD;
                     child->skip = 1;
@@ -999,25 +1042,33 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             }
 
             /* Push frame for first recursive call */
-            frame->state = 1;
-            if (!stack_push(&stack)) {
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push (realloc may invalidate frame pointer) */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                if (frame->op == BC_CARD2) {
-                    child->f = B_ABS(frame->f0);
+                bddp saved_f0 = frame->f0;
+                unsigned char saved_op = frame->op;
+                bddp child_f;
+                if (saved_op == BC_CARD2) {
+                    child_f = B_ABS(saved_f0);
                 } else {
-                    child->f = frame->f0;
+                    child_f = saved_f0;
                 }
-                child->g = bddfalse;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                frame->state = 1;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = child_f;
+                    child->g = bddfalse;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -1034,25 +1085,33 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             }
 
             /* Push frame for second recursive call */
-            frame->state = 2;
-            if (!stack_push(&stack)) {
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push (realloc may invalidate frame pointer) */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                if (frame->op == BC_CARD2) {
-                    child->f = B_ABS(frame->f1);
+                bddp saved_f1 = frame->f1;
+                unsigned char saved_op = frame->op;
+                bddp child_f;
+                if (saved_op == BC_CARD2) {
+                    child_f = B_ABS(saved_f1);
                 } else {
-                    child->f = frame->f1;
+                    child_f = saved_f1;
                 }
-                child->g = bddfalse;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                frame->state = 2;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = child_f;
+                    child->g = bddfalse;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -1306,16 +1365,21 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
             if (frame->op == BC_COFACTOR) {
                 if (frame->g0 == bddfalse && frame->g1 != bddfalse) {
                     /* Only recurse on f1, g1 */
+                    /* Save values before push */
+                    bddp saved_f1 = frame->f1;
+                    bddp saved_g1 = frame->g1;
+                    unsigned char saved_op = frame->op;
                     frame->state = 4; /* Special state for single recursion */
                     if (!stack_push(&stack)) {
+                        frame = stack_current(&stack);
                         frame->result = bddnull;
                         goto pop_frame;
                     }
                     {
                         struct ApplyStackFrame *child = stack_current(&stack);
-                        child->f = frame->f1;
-                        child->g = frame->g1;
-                        child->op = frame->op;
+                        child->f = saved_f1;
+                        child->g = saved_g1;
+                        child->op = saved_op;
                         child->skip = 0;
                         child->state = 0;
                         child->h0 = bddnull;
@@ -1326,16 +1390,21 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                 }
                 if (frame->g1 == bddfalse && frame->g0 != bddfalse) {
                     /* Only recurse on f0, g0 */
+                    /* Save values before push */
+                    bddp saved_f0 = frame->f0;
+                    bddp saved_g0 = frame->g0;
+                    unsigned char saved_op = frame->op;
                     frame->state = 4; /* Special state for single recursion */
                     if (!stack_push(&stack)) {
+                        frame = stack_current(&stack);
                         frame->result = bddnull;
                         goto pop_frame;
                     }
                     {
                         struct ApplyStackFrame *child = stack_current(&stack);
-                        child->f = frame->f0;
-                        child->g = frame->g0;
-                        child->op = frame->op;
+                        child->f = saved_f0;
+                        child->g = saved_g0;
+                        child->op = saved_op;
                         child->skip = 0;
                         child->state = 0;
                         child->h0 = bddnull;
@@ -1347,21 +1416,28 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
             }
 
             /* Push frame for first recursive call */
-            frame->state = 1;
-            if (!stack_push(&stack)) {
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                child->f = frame->f0;
-                child->g = frame->g0;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                bddp saved_f0 = frame->f0;
+                bddp saved_g0 = frame->g0;
+                unsigned char saved_op = frame->op;
+                frame->state = 1;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f0;
+                    child->g = saved_g0;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
@@ -1372,23 +1448,32 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
             }
 
             /* Push frame for second recursive call */
-            frame->state = 2;
-            if (!stack_push(&stack)) {
-                bddfree(frame->h0);
-                frame->result = bddnull;
-                goto pop_frame;
-            }
+            /* Save values before push */
             {
-                struct ApplyStackFrame *child = stack_current(&stack);
-                child->f = frame->f1;
-                /* For UNIV, second call uses g0, not g1 */
-                child->g = (frame->op == BC_UNIV) ? frame->g0 : frame->g1;
-                child->op = frame->op;
-                child->skip = 0;
-                child->state = 0;
-                child->h0 = bddnull;
-                child->h1 = bddnull;
-                child->result = bddnull;
+                bddp saved_f1 = frame->f1;
+                bddp saved_g0 = frame->g0;
+                bddp saved_g1 = frame->g1;
+                bddp saved_h0 = frame->h0;
+                unsigned char saved_op = frame->op;
+                bddp child_g = (saved_op == BC_UNIV) ? saved_g0 : saved_g1;
+                frame->state = 2;
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    bddfree(saved_h0);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f1;
+                    child->g = child_g;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
             }
             break;
 
