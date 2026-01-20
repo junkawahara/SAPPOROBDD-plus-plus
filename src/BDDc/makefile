@@ -6,7 +6,8 @@ OPT32 = $(OPT) -DB_32
 
 SRCS = bddc_init.cc bddc_node.cc bddc_gc.cc bddc_apply.cc \
        bddc_apply_binary.cc bddc_apply_unary.cc bddc_apply_count.cc \
-       bddc_apply_special.cc bddc_operations.cc bddc_io.cc bddc_util.cc
+       bddc_apply_special.cc bddc_apply_iterative.cc \
+       bddc_operations.cc bddc_io.cc bddc_util.cc
 
 OBJS_64 = $(SRCS:.cc=_64.o)
 OBJS_32 = $(SRCS:.cc=_32.o)

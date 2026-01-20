@@ -179,6 +179,50 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip);
 bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip);
 bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip);
 
+/* ============================================================
+ * Iterative (non-recursive) apply implementation
+ * Used when VarUsed > APPLY_RECURSION_THRESHOLD to avoid stack overflow
+ * ============================================================ */
+
+/* Threshold for switching to iterative version */
+#define APPLY_RECURSION_THRESHOLD 8192
+
+/* Stack frame for iterative apply */
+struct ApplyStackFrame {
+    /* Input operands */
+    bddp f, g;
+    unsigned char op;
+    unsigned char skip;
+
+    /* State machine: 0=init, 1=after_h0, 2=after_h1 */
+    unsigned char state;
+
+    /* Extracted child nodes */
+    bddp f0, f1, g0, g1;
+    bddvar v;
+    char z;
+
+    /* Intermediate results */
+    bddp h0, h1;
+    bddp key;
+
+    /* Result to return to parent frame */
+    bddp result;
+};
+
+/* Initial stack capacity */
+#define APPLY_STACK_INIT_SIZE 256
+
+/* Stack structure for iterative apply */
+struct ApplyStack {
+    struct ApplyStackFrame *frames;
+    int top;       /* Current top index (-1 = empty) */
+    int capacity;  /* Current capacity */
+};
+
+/* Declaration of iterative apply function (binary operations only) */
+bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip);
+
 } // namespace sapporobdd
 
 #endif /* BDDC_APPLY_COMMON_H */
