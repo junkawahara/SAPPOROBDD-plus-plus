@@ -39,7 +39,16 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
   case BC_CHANGE:
   case BC_LSHIFT:
   case BC_RSHIFT:
+#ifdef B_FORCE_ITERATIVE
+    /* Force iterative version for testing */
+    return apply_unary_iterative(f, g, op, skip);
+#else
+    /* Use iterative version when variable count exceeds threshold */
+    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+      return apply_unary_iterative(f, g, op, skip);
+    }
     return apply_unary(f, g, op, skip);
+#endif
 
   /* Counting operations */
   case BC_CARD:
@@ -47,12 +56,30 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
   case BC_LIT:
   case BC_LEN:
   case BC_SUPPORT:
+#ifdef B_FORCE_ITERATIVE
+    /* Force iterative version for testing */
+    return apply_count_iterative(f, g, op, skip);
+#else
+    /* Use iterative version when variable count exceeds threshold */
+    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+      return apply_count_iterative(f, g, op, skip);
+    }
     return apply_count(f, g, op, skip);
+#endif
 
   /* Special operations */
   case BC_COFACTOR:
   case BC_UNIV:
+#ifdef B_FORCE_ITERATIVE
+    /* Force iterative version for testing */
+    return apply_special_iterative(f, g, op, skip);
+#else
+    /* Use iterative version when variable count exceeds threshold */
+    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+      return apply_special_iterative(f, g, op, skip);
+    }
     return apply_special(f, g, op, skip);
+#endif
 
   default:
     err("apply: unknown opcode", op, ExceptionType::InternalError);

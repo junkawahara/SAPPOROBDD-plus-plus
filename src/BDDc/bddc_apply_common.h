@@ -220,8 +220,11 @@ struct ApplyStack {
     int capacity;  /* Current capacity */
 };
 
-/* Declaration of iterative apply function (binary operations only) */
+/* Declarations of iterative apply functions */
 bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip);
+bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip);
+bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip);
+bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char skip);
 
 } // namespace sapporobdd
 
