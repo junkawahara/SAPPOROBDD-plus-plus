@@ -47,6 +47,9 @@ namespace sapporobdd {
 #ifdef B_32
 #  define B_BDDP_FD "%d"
 #  define B_BDDP_FX "0x%X"
+#elif defined(B_EXTEND)
+#  define B_BDDP_FD "%lld"
+#  define B_BDDP_FX "0x%llX"
 #else
 #  define B_BDDP_FD "%lld"
 #  define B_BDDP_FX "0x%llX"
@@ -55,6 +58,8 @@ namespace sapporobdd {
 /* strtol or strtoll */
 #ifdef B_32
 #  define B_STRTOI strtol
+#elif defined(B_EXTEND)
+#  define B_STRTOI strtoll
 #else
 #  define B_STRTOI strtoll
 #endif
@@ -81,7 +86,12 @@ namespace sapporobdd {
 #define B_BDDP_NP(p)  ((bddp)((p)-Node) << 1U)
 
 /* Read & Write of bddp field in the tables */
-#ifdef B_32
+#ifdef B_EXTEND
+#  define B_SET_NXP(p, f, i) (p ## _64 = f ## _64 + i)
+#  define B_GET_BDDP(f) (f ## _64)
+#  define B_SET_BDDP(f, g) (f ## _64 = g)
+#  define B_CPY_BDDP(f, g) (f ## _64 = g ## _64)
+#elif defined(B_32)
 #  define B_SET_NXP(p, f, i) (p ## _32 = f ## _32 + i)
 #  define B_GET_BDDP(f) (f ## _32)
 #  define B_SET_BDDP(f, g) (f ## _32 = g)
@@ -100,6 +110,22 @@ namespace sapporobdd {
 #endif /* B_32 */
 
 /* var & rfc manipulation */
+#ifdef B_EXTEND
+#define B_VAR_NP(p)    ((bddvar)((p)->varrfc & 0xFFFFFFFFULL))
+#define B_RFC_MASK     0xFFFFFFFF00000000ULL
+#define B_RFC_UNIT     0x100000000ULL
+#define B_RFC_NP(p)    ((p)->varrfc >> 32U)
+#define B_RFC_ZERO_NP(p) ((p)->varrfc < B_RFC_UNIT)
+#define B_RFC_ONE_NP(p) (((p)->varrfc & B_RFC_MASK) == B_RFC_UNIT)
+#define B_RFC_INC_NP(p) \
+  (((p)->varrfc < B_RFC_MASK - B_RFC_UNIT)? \
+   ((p)->varrfc += B_RFC_UNIT, 0) : rfc_inc_ovf(p)) 
+#define B_RFC_DEC_NP(p) \
+  (((p)->varrfc >= B_RFC_MASK)? rfc_dec_ovf(p): \
+   (B_RFC_ZERO_NP(p))? \
+    err("B_RFC_DEC_NP: rfc under flow", p-Node, ExceptionType::InternalError): \
+    ((p)->varrfc -= B_RFC_UNIT, 0))
+#else
 #define B_VAR_NP(p)    ((p)->varrfc & B_VAR_MASK)
 #define B_RFC_MASK  (~B_VAR_MASK)
 #define B_RFC_UNIT  (1U << B_VAR_WIDTH)
@@ -114,6 +140,7 @@ namespace sapporobdd {
    (B_RFC_ZERO_NP(p))? \
     err("B_RFC_DEC_NP: rfc under flow", p-Node, ExceptionType::InternalError): \
     ((p)->varrfc -= B_RFC_UNIT, 0))
+#endif /* B_EXTEND */
 
 /* ----------- Stack overflow limitter ------------ */
 const int BDD_RecurLimit = 8192;
@@ -124,7 +151,13 @@ int BDD_RecurCount = 0;
 #define BDD_RECUR_DEC BDD_RecurCount--
 
 /* Conversion of ZDD node flag */
+#ifdef B_EXTEND
+#define B_Z_NP(p) ((p)->f0_64 & (bddp_64)B_INV_MASK)
+#elif defined(B_32)
 #define B_Z_NP(p) ((p)->f0_32 & (bddp_32)B_INV_MASK)
+#else
+#define B_Z_NP(p) ((p)->f0_32 & (bddp_32)B_INV_MASK)
+#endif
 
 /* Hash Functions */
 #define B_HASHKEY(f0, f1, hashSpc) \
@@ -154,22 +187,34 @@ int BDD_RecurCount = 0;
 /* ------- Declaration of static (internal) data ------- */
 /* typedef of bddp field in the tables */
 typedef unsigned int bddp_32;
-#ifndef B_32
+#ifdef B_EXTEND
+  typedef unsigned long long bddp_64;
+#elif !defined(B_32)
   typedef unsigned char bddp_h8;
 #endif
 
 /* Declaration of Node table */
 struct B_NodeTable
 {
-  bddp_32      f0_32;  /* 0-edge */
-  bddp_32      f1_32;  /* 1-edge */
-  bddp_32      nx_32;  /* Node index */
-  unsigned int varrfc; /* VarID & Reference counter */
-#ifndef B_32
-  bddp_h8      f0_h8;  /* Extention of 0-edge */
-  bddp_h8      f1_h8;  /* Extention of 1-edge */
-  bddp_h8      nx_h8;  /* Extention of node index */
-#endif /* B_32 */
+#ifdef B_EXTEND
+  bddp_64      f0_64;    /* 0-edge (64bit) */
+  bddp_64      f1_64;    /* 1-edge (64bit) */
+  bddp_64      nx_64;    /* Node index (64bit) */
+  unsigned long long varrfc; /* VarID & Reference counter (64bit) */
+#elif defined(B_32)
+  bddp_32      f0_32;    /* 0-edge */
+  bddp_32      f1_32;    /* 1-edge */
+  bddp_32      nx_32;    /* Node index */
+  unsigned int varrfc;   /* VarID & Reference counter */
+#else
+  bddp_32      f0_32;    /* 0-edge */
+  bddp_32      f1_32;    /* 1-edge */
+  bddp_32      nx_32;    /* Node index */
+  unsigned int varrfc;   /* VarID & Reference counter */
+  bddp_h8      f0_h8;    /* Extension of 0-edge */
+  bddp_h8      f1_h8;    /* Extension of 1-edge */
+  bddp_h8      nx_h8;    /* Extension of node index */
+#endif
 };
 static struct B_NodeTable *Node = 0; /* Node Table */
 static bddp NodeLimit = 0;    /* Final limit size */
@@ -183,10 +228,14 @@ struct B_VarTable
   bddp    hashSpc;  /* Current hash-table size */
   bddp    hashUsed;  /* Current used entries */
   bddvar  lev;      /* Level of the variable */
+#ifdef B_EXTEND
+  bddp_64 *hash_64; /* Hash-table (64bit) */
+#elif defined(B_32)
   bddp_32 *hash_32; /* Hash-table */
-#ifndef B_32
+#else
+  bddp_32 *hash_32; /* Hash-table */
   bddp_h8 *hash_h8; /* Extension of hash-table */
-#endif /* B_32 */
+#endif
 };
 static struct B_VarTable *Var = 0; /* Var-tables */
 static bddvar *VarID = 0;     /* VarID reverse table */
@@ -196,15 +245,23 @@ static bddvar VarSpc = 0;     /* Current Var-table size */
 /* Declaration of Operation Cache */
 struct B_CacheTable
 {
+#ifdef B_EXTEND
+  bddp_64       f_64; /* an operand BDD (64bit) */
+  bddp_64       g_64; /* an operand BDD (64bit) */
+  bddp_64       h_64; /* Result BDD (64bit) */
+#elif defined(B_32)
   bddp_32       f_32; /* an operand BDD */
   bddp_32       g_32; /* an operand BDD */
   bddp_32       h_32; /* Result BDD */
-  unsigned char op;   /* Operation code */
-#ifndef B_32
+#else
+  bddp_32       f_32; /* an operand BDD */
+  bddp_32       g_32; /* an operand BDD */
+  bddp_32       h_32; /* Result BDD */
   bddp_h8       f_h8; /* Extention of an operand BDD */
   bddp_h8       g_h8; /* Extention of an operand BDD */
   bddp_h8       h_h8; /* Extention of result BDD */
-#endif /* B_32 */
+#endif
+  unsigned char op;   /* Operation code */
 };
 static struct B_CacheTable *Cache = 0; /* Opeartion cache */
 static bddp CacheSpc = 0;           /* Current cache size */
@@ -214,12 +271,18 @@ static bddp GCThreshold = 0;       /* GC threshold - minimum freed nodes for suc
 /* Declaration of RFC-table */
 struct B_RFC_Table
 {
+#ifdef B_EXTEND
+  bddp_64 nx_64;   /* Node index (64bit) */
+  bddp_64 rfc_64;  /* RFC (64bit) */
+#elif defined(B_32)
   bddp_32 nx_32;   /* Node index */
   bddp_32 rfc_32;  /* RFC */
-#ifndef B_32
+#else
+  bddp_32 nx_32;   /* Node index */
+  bddp_32 rfc_32;  /* RFC */
   bddp_h8 nx_h8;   /* Extension of Node index */
   bddp_h8 rfc_h8;  /* Extension of RFC */
-#endif /* B_32 */
+#endif
 };
 static struct B_RFC_Table *RFCT = 0; /* RFC-Table */
 static bddp RFCT_Spc;   /* Current RFC-table size */
@@ -289,8 +352,12 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
   {
     for(i=0; i<VarSpc; i++)
     {
+#ifdef B_EXTEND
+      if(Var[i].hash_64) free(Var[i].hash_64);
+#elif defined(B_32)
       if(Var[i].hash_32) free(Var[i].hash_32);
-#ifndef B_32
+#else
+      if(Var[i].hash_32) free(Var[i].hash_32);
       if(Var[i].hash_h8) free(Var[i].hash_h8);
 #endif
     }
@@ -349,8 +416,12 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
     Var[i].hashUsed = 0;
     Var[i].lev = i;
     VarID[i] = i;
+#ifdef B_EXTEND
+    Var[i].hash_64 = 0;
+#elif defined(B_32)
     Var[i].hash_32 = 0;
-#ifndef B_32
+#else
+    Var[i].hash_32 = 0;
     Var[i].hash_h8 = 0;
 #endif
   }
@@ -406,8 +477,12 @@ int bddgc()
   struct B_VarTable *varp;
   bddvar v;
   bddp oldSpc, newSpc, nx, key;
+#ifdef B_EXTEND
+  bddp_64 *newhash_64, *p_64, *p2_64;
+#elif defined(B_32)
   bddp_32 *newhash_32, *p_32, *p2_32;
-#ifndef B_32
+#else
+  bddp_32 *newhash_32, *p_32, *p2_32;
   bddp_h8 *newhash_h8, *p_h8, *p2_h8;
 #endif
 
@@ -520,7 +595,15 @@ int bddgc()
     if(newSpc == oldSpc) continue;
 
     /* Reduce space */
-#ifndef B_32
+#ifdef B_EXTEND
+    newhash_64 = 0;
+    newhash_64 = B_MALLOC(bddp_64, newSpc);
+    if(!newhash_64) break; /* Not enough memory */
+#elif defined(B_32)
+    newhash_32 = 0;
+    newhash_32 = B_MALLOC(bddp_32, newSpc);
+    if(!newhash_32) break; /* Not enough memory */
+#else
     newhash_32 = 0;
     newhash_h8 = 0;
     newhash_32 = B_MALLOC(bddp_32, newSpc);
@@ -531,10 +614,6 @@ int bddgc()
       if(newhash_h8) free(newhash_h8);
       break; /* Not enough memory */
     }
-#else
-    newhash_32 = 0;
-    newhash_32 = B_MALLOC(bddp_32, newSpc);
-    if(!newhash_32) break; /* Not enough memory */
 #endif
 
     /* Initialize new hash entry */
@@ -565,9 +644,15 @@ int bddgc()
       }
     }
     varp->hashSpc = newSpc;
+#ifdef B_EXTEND
+    free(varp->hash_64);
+    varp->hash_64 = newhash_64;
+#elif defined(B_32)
     free(varp->hash_32);
     varp->hash_32 = newhash_32;
-#ifndef B_32
+#else
+    free(varp->hash_32);
+    varp->hash_32 = newhash_32;
     free(varp->hash_h8);
     varp->hash_h8 = newhash_h8;
 #endif
@@ -1422,8 +1507,16 @@ static void var_enlarge()
   /* Get new size */
   if(VarSpc == bddvarmax+1U)
     err("var_enlarge: var index range full", VarSpc, ExceptionType::OutOfRange);
+#ifdef B_EXTEND
+  // avoid overflow
+  if((((unsigned long long)VarSpc) << 2U) > (unsigned long long)bddvarmax+1ULL)
+    newSpc = bddvarmax+1U;
+  else
+    newSpc = VarSpc << 2U;
+#else
   newSpc = VarSpc << 2U;
   if(newSpc > bddvarmax+1) newSpc = bddvarmax+1U;
+#endif
 
   /* Enlarge space */
   newVar = 0;
@@ -1437,9 +1530,13 @@ static void var_enlarge()
       newVar[i].hashSpc = Var[i].hashSpc;
       newVar[i].hashUsed = Var[i].hashUsed;
       newVar[i].lev = Var[i].lev;
-      newVar[i].hash_32 = Var[i].hash_32;
       newVarID[i] = VarID[i];
-#ifndef B_32
+#ifdef B_EXTEND
+      newVar[i].hash_64 = Var[i].hash_64;
+#elif defined(B_32)
+      newVar[i].hash_32 = Var[i].hash_32;
+#else
+      newVar[i].hash_32 = Var[i].hash_32;
       newVar[i].hash_h8 = Var[i].hash_h8;
 #endif
     }
@@ -1461,9 +1558,13 @@ static void var_enlarge()
     Var[i].hashSpc = 0;
     Var[i].hashUsed = 0;
     Var[i].lev = i;
-    Var[i].hash_32 = 0;
     VarID[i] = i;
-#ifndef B_32
+#ifdef B_EXTEND
+    Var[i].hash_64 = 0;
+#elif defined(B_32)
+    Var[i].hash_32 = 0;
+#else
+    Var[i].hash_32 = 0;
     Var[i].hash_h8 = 0;
 #endif
   }
@@ -1488,15 +1589,25 @@ static int node_enlarge()
   {
     for(i=0; i<NodeSpc; i++)
     {
+#ifdef B_EXTEND
+      newNode[i].f0_64 = Node[i].f0_64;
+      newNode[i].f1_64 = Node[i].f1_64;
+      newNode[i].nx_64 = Node[i].nx_64;
+      newNode[i].varrfc = Node[i].varrfc;
+#elif defined(B_32)
       newNode[i].varrfc = Node[i].varrfc;
       newNode[i].f0_32 = Node[i].f0_32;
       newNode[i].f1_32 = Node[i].f1_32;
       newNode[i].nx_32 = Node[i].nx_32;
-#ifndef B_32
+#else
+      newNode[i].varrfc = Node[i].varrfc;
+      newNode[i].f0_32 = Node[i].f0_32;
+      newNode[i].f1_32 = Node[i].f1_32;
+      newNode[i].nx_32 = Node[i].nx_32;
       newNode[i].f0_h8 = Node[i].f0_h8;
       newNode[i].f1_h8 = Node[i].f1_h8;
       newNode[i].nx_h8 = Node[i].nx_h8;
-#endif /* B_32 */
+#endif
     }
     free(Node);
     Node = newNode;
@@ -1526,8 +1637,12 @@ static int hash_enlarge(bddvar v)
   struct B_NodeTable *np, *np0;
   struct B_VarTable *varp;
   bddp i, oldSpc, newSpc, nx, key, f0, f1;
+#ifdef B_EXTEND
+  bddp_64 *newhash_64, *p_64;
+#elif defined(B_32)
   bddp_32 *newhash_32, *p_32;
-#ifndef B_32
+#else
+  bddp_32 *newhash_32, *p_32;
   bddp_h8 *newhash_h8, *p_h8;
 #endif
   
@@ -1539,7 +1654,33 @@ static int hash_enlarge(bddvar v)
   newSpc = oldSpc << 1U;
 
   /* Enlarge space */
-#ifndef B_32
+#ifdef B_EXTEND
+  newhash_64 = 0;
+  newhash_64 = B_MALLOC(bddp_64, newSpc);
+  if(newhash_64)
+  {
+    for(i=0; i<varp->hashSpc; i++) newhash_64[i] = varp->hash_64[i];
+    free(varp->hash_64);
+    varp->hash_64 = newhash_64;
+  }
+  else {
+    bddp memsize = sizeof(bddp_64) * newSpc;
+    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
+  }
+#elif defined(B_32)
+  newhash_32 = 0;
+  newhash_32 = B_MALLOC(bddp_32, newSpc);
+  if(newhash_32)
+  {
+    for(i=0; i<varp->hashSpc; i++) newhash_32[i] = varp->hash_32[i];
+    free(varp->hash_32);
+    varp->hash_32 = newhash_32;
+  }
+  else {
+    bddp memsize = sizeof(bddp_32) * newSpc;
+    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
+  }
+#else
   newhash_32 = 0;
   newhash_h8 = 0;
   newhash_32 = B_MALLOC(bddp_32, newSpc);
@@ -1571,19 +1712,6 @@ static int hash_enlarge(bddvar v)
     }
     throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
   }
-#else
-  newhash_32 = 0;
-  newhash_32 = B_MALLOC(bddp_32, newSpc);
-  if(newhash_32)
-  {
-    for(i=0; i<varp->hashSpc; i++) newhash_32[i] = varp->hash_32[i];
-    free(varp->hash_32);
-    varp->hash_32 = newhash_32;
-  }
-  else {
-    bddp memsize = sizeof(bddp_32) * newSpc;
-    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
-  } /* Not enough memory */
 #endif
   varp->hashSpc = newSpc;
 
@@ -1629,8 +1757,12 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
   struct B_NodeTable *np, *fp;
   struct B_VarTable *varp;
   bddp ix, nx, key;
+#ifdef B_EXTEND
+  bddp_64 *p_64;
+#elif defined(B_32)
   bddp_32 *p_32;
-#ifndef B_32
+#else
+  bddp_32 *p_32;
   bddp_h8 *p_h8;
 #endif
 
@@ -1638,10 +1770,18 @@ static bddp getnode(bddvar v, bddp f0, bddp f1)
   if(varp->hashSpc == 0)
   /* Create hash-table */
   {
+#ifdef B_EXTEND
+    varp->hash_64 = 0;
+    varp->hash_64 = B_MALLOC(bddp_64, B_HASH_SPC0);
+    if(!varp->hash_64) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_64) * B_HASH_SPC0);
+#elif defined(B_32)
     varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
     if(!varp->hash_32) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0);
-#ifndef B_32
+#else
+    varp->hash_32 = 0;
+    varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
+    if(!varp->hash_32) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0);
     varp->hash_h8 = 0;
     varp->hash_h8 = B_MALLOC(bddp_h8, B_HASH_SPC0);
     if(!varp->hash_h8)
@@ -2381,8 +2521,12 @@ static void gc1(struct B_NodeTable *np)
   bddp key, nx1, f0, f1;
   struct B_VarTable *varp;
   struct B_NodeTable *np1, *np2;
+#ifdef B_EXTEND
+  bddp_64 *p_64;
+#elif defined(B_32)
   bddp_32 *p_32;
-#ifndef B_32
+#else
+  bddp_32 *p_32;
   bddp_h8 *p_h8;
 #endif
 

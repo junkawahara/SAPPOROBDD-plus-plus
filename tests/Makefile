@@ -10,6 +10,10 @@ CXXFLAGS = -std=c++11 -Wall -Wextra -I. -I../include -DB_64
 # -DB_64 is not needed for SAPPOROBDD++, but needed for SAPPOROBDD
 CXXFLAGS += -DB_64
 
+# B_EXTEND mode flags
+CXXFLAGS_EXTEND = $(CXXFLAGS) -DB_EXTEND
+CFLAGS_EXTEND = $(CFLAGS) -DB_EXTEND
+
 # Source files
 SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc ../src/BDDc/bddc.cc
 # Dynamically add the appropriate ZDD source file
@@ -32,12 +36,20 @@ OBJ_ZDD = test_ZBDD.o ZDD.o BDD.o bddc.o
 OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o bddc.o
 OBJ_OPERATOR = test_operator.o ZDD.o BDD.o bddc.o
 
+# B_EXTEND mode object files
+OBJ_ZDD_EXTEND = test_ZBDD_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
+OBJ_OPERATOR_EXTEND = test_operator_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
+
 # Target executables
 #TARGETS = test_ZBDD test_ZBDD_Hash
 TARGETS = test_ZBDD test_bddc_cache test_operator
+TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend
 
 # Default target
 all: $(TARGETS)
+
+# B_EXTEND mode targets
+extend: $(TARGETS_EXTEND)
 
 # Build test_ZBDD
 test_ZBDD: $(OBJ_ZDD)
@@ -55,6 +67,16 @@ test_bddc_cache: test_bddc_cache.o
 test_operator: $(OBJ_OPERATOR)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_OPERATOR)
 
+# Build B_EXTEND mode test programs
+test_ZBDD_extend: $(OBJ_ZDD_EXTEND)
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_ZDD_EXTEND)
+
+test_operator_extend: $(OBJ_OPERATOR_EXTEND)
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_OPERATOR_EXTEND)
+
+test_bddc_cache_extend: test_bddc_cache_extend.o
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ test_bddc_cache_extend.o
+
 # Compile rules
 test_ZBDD.o: test_ZBDD.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_ZBDD.cpp
@@ -64,6 +86,16 @@ test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS)
 
 test_operator.o: test_operator.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_operator.cpp
+
+# B_EXTEND mode compile rules
+test_ZBDD_extend.o: test_ZBDD.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS_EXTEND) -c test_ZBDD.cpp -o test_ZBDD_extend.o
+
+test_operator_extend.o: test_operator.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS_EXTEND) -c test_operator.cpp -o test_operator_extend.o
+
+test_bddc_cache_extend.o: test_bddc_cache.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS_EXTEND) -c test_bddc_cache.cpp -o test_bddc_cache_extend.o
 
 test_ZBDD_Hash.o: test_ZBDD_Hash.cpp ../include/ZDD.h ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c test_ZBDD_Hash.cpp
@@ -92,6 +124,31 @@ bddc.o: ../include/bddc.h
 		exit 1; \
 	fi
 
+# B_EXTEND mode object compilation
+ZDD_extend.o: $(HEADERS)
+	@if [ -f ../src/BDD+/ZDD.cc ]; then \
+		echo "Using ZDD.cc with B_EXTEND"; \
+		$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/ZDD.cc -o ZDD_extend.o; \
+	else \
+		echo "ZDD.cc not found, using ZBDD.cc instead with B_EXTEND"; \
+		$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/ZBDD.cc -o ZDD_extend.o; \
+	fi
+
+BDD_extend.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
+	$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/BDD.cc -o BDD_extend.o
+
+bddc_extend.o: ../include/bddc.h
+	@if [ -f ../src/BDDc/bddc.cc ]; then \
+		echo "Using bddc.cc with g++ and B_EXTEND"; \
+		$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDDc/bddc.cc -o bddc_extend.o; \
+	elif [ -f ../src/BDDc/bddc.c ]; then \
+		echo "Using ../src/BDDc/bddc.c with gcc and B_EXTEND"; \
+		$(CC) $(CFLAGS_EXTEND) -c ../src/BDDc/bddc.c -o bddc_extend.o; \
+	else \
+		echo "Error: Could not find bddc.cc or bddc.c"; \
+		exit 1; \
+	fi
+
 # SBDD_helper test
 
 # http://codeforces.com/blog/entry/15547  -Wshift-overflow=2 -Wduplicated-cond
@@ -114,13 +171,23 @@ test: $(TARGETS)
 	@echo ""
 	@echo "Running test_operator..."
 	@./test_operator
+
+# Run B_EXTEND mode tests
+test_extend: $(TARGETS_EXTEND)
+	@echo "Running B_EXTEND mode tests..."
+	@echo "Running test_ZBDD_extend..."
+	@./test_ZBDD_extend
 	@echo ""
-	@echo "Running test_ZBDD_Hash..."
-	@./test_ZBDD_Hash
+	@echo "Running test_operator_extend..."
+	@./test_operator_extend
+	@echo ""
+	@echo "Running test_bddc_cache_extend..."
+	@./test_bddc_cache_extend
+	@echo ""
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator
+	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator
 
 # For Visual Studio nmake
 # Use: nmake /f Makefile.vc
@@ -140,4 +207,4 @@ Makefile.vc:
 	@echo "clean:" >> Makefile.vc
 	@echo "	del *.obj * test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat" >> Makefile.vc
 
-.PHONY: all test clean
+.PHONY: all test clean extend test_extend

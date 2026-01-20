@@ -18,14 +18,25 @@
 namespace sapporobdd {
 
 /***************** Internal macro for index *****************/
-#define B_VAR_WIDTH 16U  /* Width of variable index */
-#define B_VAR_MASK       ((1U << B_VAR_WIDTH) - 1U)
+#ifdef B_EXTEND
+#  define B_VAR_WIDTH 32U  /* Width of variable index */
+#else
+#  define B_VAR_WIDTH 16U  /* Width of variable index */
+#endif
+#ifdef B_EXTEND
+#  define B_VAR_MASK       ((1ULL << B_VAR_WIDTH) - 1ULL)
+#else
+#  define B_VAR_MASK       ((1U << B_VAR_WIDTH) - 1U)
+#endif
 
 /***************** Internal macro for bddp *****************/
 
 #ifdef B_32
 #  define B_MSB_POS   31U
 #  define B_LSB_MASK  1U
+#elif defined(B_EXTEND)
+#  define B_MSB_POS   63ULL
+#  define B_LSB_MASK  1ULL
 #else
 #  define B_MSB_POS   39ULL
 #  define B_LSB_MASK  1ULL
@@ -46,7 +57,12 @@ typedef unsigned int bddvar;
 #endif
 
 /***************** External Macro *****************/
+#ifdef B_EXTEND
+#define bddvarmax (B_VAR_MASK - 1) /* Max value of variable index. -1
+                                      to avoid overflow when var_enlarge */
+#else
 #define bddvarmax B_VAR_MASK /* Max value of variable index */
+#endif
 #define bddnull   B_VAL_MASK /* Special value for null pointer */
 #define bddfalse  B_CST_MASK /* bddp of constant false (0) */
 #define bddtrue   (bddfalse ^ B_INV_MASK)

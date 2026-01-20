@@ -88,7 +88,11 @@ void test_init() {
     std::cout << "============================================" << endl << endl;
     
     // Initialize BDD package
+#ifdef B_EXTEND
+    BDD_Init(1024, 1024 * 1024 * 4); // Larger for B_EXTEND mode
+#else
     BDD_Init(256, 1024 * 1024);
+#endif
 }
 
 // Test cleanup
@@ -1217,6 +1221,73 @@ void test_gc_threshold() {
     }
 }
 
+// Test B_EXTEND mode specific features
+void test_b_extend_mode() {
+    std::cout << "=== Testing B_EXTEND Mode Features ===" << endl;
+    
+#ifdef B_EXTEND
+    std::cout << "B_EXTEND mode is ENABLED" << endl;
+    std::cout << "Variable ID width: 32 bits" << endl;
+    std::cout << "Reference counter width: 32 bits" << endl;
+    std::cout << "BDD pointer width: 64 bits" << endl;
+    //std::cout << "Node structure size: " << sizeof(struct B_NodeTable) << " bytes" << endl;
+    test_result("B_EXTEND mode is active", true);
+    
+    // Test larger variable indices in B_EXTEND mode
+    //BDD_Init(1024, 1024 * 1024 * 4); // Larger initialization for B_EXTEND
+    
+    // Test creating many variables to verify 32-bit variable support
+    std::cout << "Testing large variable indices..." << endl;
+    int varused = BDD_VarUsed();
+    // Create 100,000 variables (beyond 16-bit limit of 65535)
+    for (int i = 1; i <= 100000; ++i) {
+        int var = BDD_NewVar();
+        if (i % 5000 == 1) {
+            test_result("Variable creation in B_EXTEND mode", var == i + varused);
+        }
+    }
+
+    // Test ZDD operations with high variable indices
+    // Note: Cannot do 100000 Change operations due to recursion limit (8192)
+    // Instead, test individual high-index variables
+    try {
+        // Create ZDDs with high variable indices
+        ZDD z1(1);
+        z1 = z1.Change(50000);   // Variable index 50000
+        ZDD z2(1);
+        z2 = z2.Change(75000);   // Variable index 75000
+        ZDD z3(1);
+        z3 = z3.Change(100000);  // Variable index 100000
+
+        // Test union with high variable indices
+        ZDD union_result = z1 + z2 + z3;
+        test_result("ZDD union with high variable indices", union_result.Card() == 3);
+
+        // Test intersection (should be empty since all are different)
+        ZDD intersect_result = z1 & z2;
+        test_result("ZDD intersection with high variable indices", intersect_result.Card() == 0);
+
+        // Test Change operation on high index
+        ZDD z4 = z1.Change(80000);
+        test_result("ZDD Change with high variable index", z4.Card() == 1);
+
+    } catch (const BDDInternalErrorException& e) {
+        std::cerr << "BDDInternalErrorException: " << e.what() << std::endl;
+        exit(1);
+    }
+    
+#else
+    std::cout << "B_EXTEND mode is DISABLED (standard mode)" << endl;
+    std::cout << "Variable ID width: 16 bits" << endl;
+    std::cout << "Reference counter width: 16 bits" << endl;
+    std::cout << "BDD pointer width: 40 bits (64-bit mode)" << endl;
+    //std::cout << "Node structure size: " << sizeof(struct B_NodeTable) << " bytes" << endl;
+    test_result("Standard mode is active", true);
+#endif
+    
+    std::cout << endl;
+}
+
 // Main test function
 int main() {
     test_init();
@@ -1239,6 +1310,8 @@ int main() {
     test_edge_cases();
 
     test_map();
+
+    test_b_extend_mode();
 
     test_gc_threshold(); // This should be called finally.
 

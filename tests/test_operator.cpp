@@ -151,15 +151,83 @@ vector<vector<int> > computeSetIntersection(const vector<vector<int> >& sets1, c
     return result;
 }
 
+// Test B_EXTEND mode specific features
+void test_b_extend_mode() {
+    std::cout << "=== Testing B_EXTEND Mode Features ===" << endl;
+    
+#ifdef B_EXTEND
+    std::cout << "B_EXTEND mode is ENABLED" << endl;
+    std::cout << "Variable ID width: 32 bits" << endl;
+    std::cout << "Reference counter width: 32 bits" << endl;
+    std::cout << "BDD pointer width: 64 bits" << endl;
+    //std::cout << "Node structure size: " << sizeof(struct B_NodeTable) << " bytes" << endl;
+    test_result("B_EXTEND mode is active", true);
+    
+    // Test memory-intensive operations in B_EXTEND mode
+    std::cout << "Testing high variable count operations..." << endl;
+    
+    // Create many variables to test 32-bit variable indices
+    for (int i = 1; i <= 200; ++i) {
+        int var = BDD_NewVar();
+        if (i <= 5 || i % 50 == 0) {
+            std::cout << "Created variable " << var << endl;
+        }
+    }
+
+    // Create single-element ZDDs with high variable indices using Change()
+    ZDD z1(1);
+    z1 = z1.Change(100);  // ZDD containing set {100}
+    ZDD z2(1);
+    z2 = z2.Change(150);  // ZDD containing set {150}
+    ZDD z3(1);
+    z3 = z3.Change(200);  // ZDD containing set {200}
+
+    // Test operator+ with high variable indices
+    ZDD union_result = z1 + z2 + z3;
+    test_result("Operator+ with high variable indices", union_result.Card() == 3);
+
+    // Test operator& with high variable indices
+    ZDD intersection_result = z1 & z2;
+    test_result("Operator& with high variable indices", intersection_result.Card() == 0);
+
+    // Test more complex operations
+    ZDD s50(1), s100(1), s150(1);
+    s50 = s50.Change(50);
+    s100 = s100.Change(100);
+    s150 = s150.Change(150);
+    ZDD complex_zdd = s50 + s100 + s150;
+    ZDD change_test = complex_zdd.Change(75);
+    test_result("Change operation with high variable indices", change_test.Card() >= complex_zdd.Card());
+    
+#else
+    std::cout << "B_EXTEND mode is DISABLED (standard mode)" << endl;
+    std::cout << "Variable ID width: 16 bits" << endl;
+    std::cout << "Reference counter width: 16 bits" << endl;
+    std::cout << "BDD pointer width: 40 bits (64-bit mode)" << endl;
+    //std::cout << "Node structure size: " << sizeof(struct B_NodeTable) << " bytes" << endl;
+    test_result("Standard mode is active", true);
+#endif
+    
+    std::cout << endl;
+}
+
 // Test initialization
 void test_init(double cache_ratio) {
     std::cout << "=== ZDD Operator Validation Test ===" << endl;
     std::cout << "Start Time: " << __DATE__ << " " << __TIME__ << endl;
     std::cout << "=====================================" << endl << endl;
-    
-    // Initialize BDD package
-    size_t memory_bytes = (size_t)(1024 * 1024 * 1024);
+
+    // Initialize BDD package first
+#ifdef B_EXTEND
+    size_t memory_bytes = (size_t)2048 * 1024 * 1024; // 2GB for B_EXTEND mode
+    BDD_Init(1024, memory_bytes, cache_ratio);
+#else
+    size_t memory_bytes = (size_t)1024 * 1024 * 1024;
     BDD_Init(256, memory_bytes, cache_ratio);
+#endif
+
+    // Test B_EXTEND mode after initialization
+    test_b_extend_mode();
 }
 
 // Test cleanup
