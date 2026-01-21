@@ -21,7 +21,7 @@ namespace sapporobdd {
 #ifdef B_EXTEND
 #  define B_VAR_WIDTH 32U  /* Width of variable index */
 #else
-#  define B_VAR_WIDTH 16U  /* Width of variable index */
+#  define B_VAR_WIDTH 20U  /* Width of variable index (supports 2^20 variables) */
 #endif
 #ifdef B_EXTEND
 #  define B_VAR_MASK       ((1ULL << B_VAR_WIDTH) - 1ULL)
