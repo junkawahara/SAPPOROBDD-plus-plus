@@ -26,6 +26,7 @@ First go to ./src (cd src) and execute a script (source INSTALL) or (source INST
 - ZBDD is renamed to ZDD.
   - Functions including "ZBDD" are also renamed. For example, ZBDD_Meet is renamed to ZDD_Meet.
   - You can still use "ZBDD".
+- The width of bits representing a variable is changed from 16 to 20. Support 2^20 variables.
 - We can change the size of the cache table.
 - We added configurable GC threshold to throw exceptions when garbage collection frees insufficient nodes.
 - We can store an instance of the ZDD class into a `std::map` and `std::unordered_map` as a key.
