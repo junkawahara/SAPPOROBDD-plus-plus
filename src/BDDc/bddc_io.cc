@@ -199,8 +199,8 @@ int bddimportz(FILE *strm, bddp *p, int lim)
 
 int import(FILE *strm, bddp *p, int lim, int z)
 {
-  int n, m, v, i, lev, var, inv, e;
-  bddp n_nd, ix, f, f0, f1, nd, nd0, nd1, hashsize, ixx;
+  int n, m, v, lev, var, inv, e;
+  bddp n_nd, ix, f, nd, nd0, nd1, hashsize, ixx;
   /* Token buffer. The field width in the fscanf calls below ("%255s")
      must be kept equal to this size minus one. */
   char s[256];
@@ -243,6 +243,18 @@ int import(FILE *strm, bddp *p, int lim, int z)
   }
   for(ix=0; ix<hashsize; ix++) hash1[ix] = bddnull;
 
+  /* From here on, hash1/hash2, the BDDs registered in hash2 and the outputs
+     already written to p[] have to be released on every exit path.  Callees
+     such as bddvaroflev(), get{b,z}ddp() and err() can all throw, so the body
+     is wrapped and the whole cleanup lives in a single handler.
+     f0/f1 are owned here until get{b,z}ddp() succeeds and takes them over;
+     i counts the outputs already written to p[]. */
+  int i = 0;
+  bddp f0 = bddnull;
+  bddp f1 = bddnull;
+  try
+  {
+
   e = 0;
   for(ix=0; ix<n_nd; ix++)
   {
@@ -267,14 +279,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
       while(hash1[ixx] != nd0)
       {
         if(hash1[ixx] == bddnull)
-        {
-          // Clean up before throwing
-          for(bddp j=0; j<hashsize; j++)
-            if(hash1[j] != bddnull) bddfree(hash2[j]);
-          free(hash2);
-          free(hash1);
           err("bddimport: internal error", ixx, ExceptionType::FileFormat);
-        }
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -282,7 +287,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
     }
 
     v = fscanf(strm, "%255s", s);
-    if(v == EOF) { e = 1; bddfree(f0); break; }
+    if(v == EOF) { e = 1; break; }
     if(strcmp(s, "F") == 0) f1 = bddfalse;
     else if(strcmp(s, "T") == 0) f1 = bddtrue;
     else
@@ -295,15 +300,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
       while(hash1[ixx] != nd1)
       {
         if(hash1[ixx] == bddnull)
-        {
-          bddfree(f0);
-          // Clean up before throwing
-          for(bddp j=0; j<hashsize; j++)
-            if(hash1[j] != bddnull) bddfree(hash2[j]);
-          free(hash2);
-          free(hash1);
           err("bddimport: internal error", ixx, ExceptionType::FileFormat);
-        }
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -311,25 +308,17 @@ int import(FILE *strm, bddp *p, int lim, int z)
     }
 
     f = (z)? getzddp(var, f0, f1): getbddp(var, f0, f1);
-    if(f == bddnull)
-    {
-      e = 1;
-      bddfree(f1);
-      bddfree(f0);
-      break;
-    }
+    if(f == bddnull) { e = 1; break; }
+    /* f0 and f1 are now owned by f */
+    f0 = bddnull;
+    f1 = bddnull;
 
     ixx = IMPORTHASH(nd);
     while(hash1[ixx] != bddnull)
     {
       if(hash1[ixx] == nd)
       {
-        // Clean up before throwing
-        bddfree(f);
-        for(bddp j=0; j<hashsize; j++)
-          if(hash1[j] != bddnull) bddfree(hash2[j]);
-        free(hash2);
-        free(hash1);
+        bddfree(f); /* not registered in hash2 yet */
         err("bddimport: internal error", ixx, ExceptionType::FileFormat);
       }
       ixx++;
@@ -340,29 +329,14 @@ int import(FILE *strm, bddp *p, int lim, int z)
   }
 
   if(e)
-  {
-    // Cleanup and throw exception for EOF or other errors
-    for(ix=0; ix<hashsize; ix++)
-      if(hash1[ix] != bddnull) bddfree(hash2[ix]);
-    free(hash2);
-    free(hash1);
     throw BDDFileFormatException("Import error: Unexpected end of file or format error", 0);
-  }
 
   for(i=0; i<m; i++)
   {
     if(i >= lim) break;
     v = fscanf(strm, "%255s", s);
     if(v == EOF)
-    {
-      // Cleanup on error
-      for(i--; i>=0; i--) bddfree(p[i]);
-      for(ix=0; ix<hashsize; ix++)
-        if(hash1[ix] != bddnull) bddfree(hash2[ix]);
-      free(hash2);
-      free(hash1);
       throw BDDFileFormatException("Import error: Unexpected end of file", 0);
-    }
     if(strcmp(s, "F") == 0) p[i] = bddfalse;
     else if(strcmp(s, "T") == 0) p[i] = bddtrue;
     else
@@ -375,15 +349,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
       while(hash1[ixx] != nd)
       {
         if(hash1[ixx] == bddnull)
-        {
-          // Cleanup on error
-          for(i--; i>=0; i--) bddfree(p[i]);
-          for(ix=0; ix<hashsize; ix++)
-            if(hash1[ix] != bddnull) bddfree(hash2[ix]);
-          free(hash2);
-          free(hash1);
           err("bddimport: internal error", ixx, ExceptionType::FileFormat);
-        }
         ixx++;
         ixx &= (hashsize-1);
       }
@@ -391,6 +357,19 @@ int import(FILE *strm, bddp *p, int lim, int z)
     }
   }
   if(i < lim) p[i] = bddnull;
+
+  }
+  catch(...)
+  {
+    bddfree(f1);
+    bddfree(f0);
+    for(int j=0; j<i; j++) bddfree(p[j]);
+    for(ix=0; ix<hashsize; ix++)
+      if(hash1[ix] != bddnull) bddfree(hash2[ix]);
+    free(hash2);
+    free(hash1);
+    throw;
+  }
 
   /* clear hash table */
   for(ix=0; ix<hashsize; ix++)
