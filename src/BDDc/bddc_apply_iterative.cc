@@ -939,6 +939,11 @@ static int check_cache_count(bddp f, unsigned char op, bddp *key, bddp *result) 
            f == B_GET_BDDP(cachep->f) &&
            bddfalse == B_GET_BDDP(cachep->g)) {
             *result = B_GET_BDDP(cachep->h);
+            /* BC_CARD2 shares this slot under op = BC_CARD, and its result can
+               be a reference into the multi-precision table, i.e. a value above
+               bddnull.  Such an entry is meaningless as a plain count, so
+               report it as saturated instead of handing the reference back. */
+            if(*result > bddnull) *result = bddnull;
             return 1;
         }
     }

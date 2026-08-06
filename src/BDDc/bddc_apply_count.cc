@@ -94,7 +94,13 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
          bddfalse == B_GET_BDDP(cachep->g))
       {
         /* Hit */
-        return B_GET_BDDP(cachep->h);
+        h = B_GET_BDDP(cachep->h);
+        /* BC_CARD2 shares this slot under op = BC_CARD, and its result can be
+           a reference into the multi-precision table, i.e. a value above
+           bddnull.  Such an entry is meaningless as a plain count, so report
+           it as saturated instead of handing the raw reference back. */
+        if(h > bddnull) h = bddnull;
+        return h;
       }
     }
     /* Get (f0, f1) */
