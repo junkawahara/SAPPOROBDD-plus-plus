@@ -1,10 +1,14 @@
 cd BDDc
 make 64
-cd ../BDDXc
-make 64
+# See INSTALL for why the X11 headers are probed this way.
+if echo '#include <X11/Xlib.h>' | g++ -I/opt/X11/include -E -x c++ - > /dev/null 2>&1; then
+    cd ../BDDXc
+    make 64
+else
+    echo "X11 not found: skipping BDDXc. XPrint() will not be available."
+fi
 cd ../BDD+
 make 64
 cd ../BDDLCM
 make 64
 cd ..
-

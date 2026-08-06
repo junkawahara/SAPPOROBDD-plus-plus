@@ -1,10 +1,14 @@
 cd BDDc
 make 64
-if [ -e /opt/X11/include/X11/Xlib.h ]; then
+# Build the graphic viewer only if the compiler can find Xlib. The check
+# uses the same -I as BDDXc/Makefile, so it agrees with the real compile
+# and works both on macOS (/opt/X11) and on Linux (standard include path).
+if echo '#include <X11/Xlib.h>' | g++ -I/opt/X11/include -E -x c++ - > /dev/null 2>&1; then
     cd ../BDDXc
     make 64
+else
+    echo "X11 not found: skipping BDDXc. XPrint() will not be available."
 fi
 cd ../BDD+
 make 64
 cd ..
-

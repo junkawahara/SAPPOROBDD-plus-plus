@@ -1,62 +1,36 @@
-CC    = gcc
+CC    = g++
 DIR   = ../..
 INCL  = $(DIR)/include
-OPT   = -O3 -Wall -Wextra -Wshadow -I$(INCL) -I/opt/X11/include
+OPT   = -O3 -Wall -Wextra -Wshadow -I$(INCL) -I. -I/opt/X11/include
 OPT32 = $(OPT) -DB_32
 
 WINDOWDEF = -DLINE
 
-all:	graph_64.o interface_64.o location_64.o parts11_64.o \
-	reorder_64.o train_64.o window11_64.o
+SRCS = graph.cc interface.cc location.cc parts11.cc \
+       reorder.cc train.cc window11.cc
 
-32:	graph_32.o interface_32.o location_32.o parts11_32.o \
-	reorder_32.o train_32.o window11_32.o
+OBJS_64 = $(SRCS:.cc=_64.o)
+OBJS_32 = $(SRCS:.cc=_32.o)
 
-64:	graph_64.o interface_64.o location_64.o parts11_64.o \
-	reorder_64.o train_64.o window11_64.o
+HDRS = bddxc_internal.h defs.h train.h interface.h reorder.h \
+       $(INCL)/bddc.h $(INCL)/BDDException.h
+
+all:	$(OBJS_64)
+
+32:	$(OBJS_32)
+
+64:	$(OBJS_64)
 
 clean:
 	rm -f *.o *.a *~
 
-graph_32.o: graph.c train.h defs.h reorder.h $(INCL)/bddc.h
-	$(CC) $(OPT32) -c graph.c -o graph_32.o
+%_64.o: %.cc $(HDRS)
+	$(CC) $(OPT) $(WINDOWDEF) -c $< -o $@
 
-graph_64.o: graph.c train.h defs.h reorder.h $(INCL)/bddc.h
-	$(CC) $(OPT) -c graph.c -o graph_64.o
+%_32.o: %.cc $(HDRS)
+	$(CC) $(OPT32) $(WINDOWDEF) -c $< -o $@
 
-interface_32.o: interface.c $(INCL)/bddc.h
-	$(CC) $(OPT32) -c interface.c -o interface_32.o
+X11HDRS = x11globals.h yubi.ic yubi_mask.ic wait.ic wait_mask.ic
 
-interface_64.o: interface.c $(INCL)/bddc.h
-	$(CC) $(OPT) -c interface.c  -o interface_64.o
-
-location_32.o: location.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT32) -c location.c -o location_32.o
-
-location_64.o: location.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT) -c location.c -o location_64.o
-
-parts11_32.o: parts11.c defs.h $(INCL)/bddc.h
-	$(CC) $(OPT32) $(WINDOWDEF) -c parts11.c -o parts11_32.o
-
-parts11_64.o: parts11.c defs.h $(INCL)/bddc.h
-	$(CC) $(OPT) $(WINDOWDEF) -c parts11.c -o parts11_64.o
-
-reorder_32.o: reorder.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT32) -c reorder.c -o reorder_32.o
-
-reorder_64.o: reorder.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT) -c reorder.c -o reorder_64.o
-
-train_32.o: train.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT32) -c train.c -o train_32.o
-
-train_64.o: train.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT) -c train.c -o train_64.o
-
-window11_32.o: window11.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT32) $(WINDOWDEF) -c window11.c -o window11_32.o
-
-window11_64.o: window11.c train.h $(INCL)/bddc.h
-	$(CC) $(OPT) $(WINDOWDEF) -c window11.c -o window11_64.o
-
+parts11_64.o parts11_32.o: x11globals.h
+window11_64.o window11_32.o: $(X11HDRS)

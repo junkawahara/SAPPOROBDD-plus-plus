@@ -1,30 +1,43 @@
+/****************************************
+ * BDD Graphic Viewer (SAPPORO-1.94)    *
+ * (Variable sized element container)   *
+ ****************************************/
 
-#define N 100
+#ifndef BDDXC_TRAIN_H
+#define BDDXC_TRAIN_H
+
+namespace sapporobdd {
+
+/* Number of elements held by one container */
+#define TRAIN_CONTAINER_SIZE 100
 
 typedef char dummy;
 
-struct _container{
-  dummy		*nodes;
-  dummy		*tail;
-  int		rest;
-  struct _container	*next;
+struct container {
+  dummy     *nodes;
+  dummy     *tail;
+  int       rest;
+  container *next;
 };
 
-typedef struct _container container;
+struct train {
+  container *head;
+  container *tail;
+  int       size;
+  int       bound;
+};
 
-typedef
-  struct{
-    container	*head;
-    container	*tail;
-    int		size;
-    int		bound;
-  } train;
+/* Comparator given to TrainComp() */
+typedef int (*TrainCompFunc)(const void *a, const void *b);
 
-void	TrainReset();		/* ( train *root, int size ) */
-void	TrainFree();		/* ( train *root ) */
-void	TrainLoad();		/* ( train *root, dummy *node ) */
-int	TrainCheck();		/* ( train *root, dummy *node ) */
-int	TrainComp();		/* ( train *root, dummy *node,
-				      (*func)( *a1, *a2 ) ) */
-dummy	*TrainIndex();		/* ( train *root, int x ) */
-int	TrainBound();		/* ( train *root ) */
+void  TrainReset(train *root, int size);
+void  TrainFree(train *root);
+void  TrainLoad(train *root, const void *node);
+int   TrainCheck(train *root, const void *node);
+int   TrainComp(train *root, const void *node, TrainCompFunc func);
+void *TrainIndex(train *root, int x);
+int   TrainBound(train *root);
+
+} // namespace sapporobdd
+
+#endif /* BDDXC_TRAIN_H */
