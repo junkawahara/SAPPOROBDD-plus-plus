@@ -201,29 +201,31 @@ int import(FILE *strm, bddp *p, int lim, int z)
 {
   int n, m, v, i, lev, var, inv, e;
   bddp n_nd, ix, f, f0, f1, nd, nd0, nd1, hashsize, ixx;
+  /* Token buffer. The field width in the fscanf calls below ("%255s")
+     must be kept equal to this size minus one. */
   char s[256];
   bddp *hash1;
   bddp *hash2;
 
-  v = fscanf(strm, "%s", s);
+  v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   if(strcmp(s, "_i") != 0) throw BDDFileFormatException("Import error: Expected '_i' marker", 0);
-  v = fscanf(strm, "%s", s);
+  v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   n = strtol(s, 0, 10);
   while(n > (int)bddvarused()) bddnewvar();
 
-  v = fscanf(strm, "%s", s);
+  v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   if(strcmp(s, "_o") != 0) throw BDDFileFormatException("Import error: Expected '_o' marker", 0);
-  v = fscanf(strm, "%s", s);
+  v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   m = strtol(s, 0, 10);
 
-  v = fscanf(strm, "%s", s);
+  v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   if(strcmp(s, "_n") != 0) throw BDDFileFormatException("Import error: Expected '_n' marker", 0);
-  v = fscanf(strm, "%s", s);
+  v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   n_nd = B_STRTOI(s, 0, 10);
 
@@ -244,16 +246,16 @@ int import(FILE *strm, bddp *p, int lim, int z)
   e = 0;
   for(ix=0; ix<n_nd; ix++)
   {
-    v = fscanf(strm, "%s", s);
+    v = fscanf(strm, "%255s", s);
     if(v == EOF) { e = 1; break; }
     nd = B_STRTOI(s, 0, 10);
 
-    v = fscanf(strm, "%s", s);
+    v = fscanf(strm, "%255s", s);
     if(v == EOF) { e = 1; break; }
     lev = strtol(s, 0, 10);
     var = bddvaroflev(lev);
 
-    v = fscanf(strm, "%s", s);
+    v = fscanf(strm, "%255s", s);
     if(v == EOF) { e = 1; break; }
     if(strcmp(s, "F") == 0) f0 = bddfalse;
     else if(strcmp(s, "T") == 0) f0 = bddtrue;
@@ -279,7 +281,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
       f0 = bddcopy(hash2[ixx]);
     }
 
-    v = fscanf(strm, "%s", s);
+    v = fscanf(strm, "%255s", s);
     if(v == EOF) { e = 1; bddfree(f0); break; }
     if(strcmp(s, "F") == 0) f1 = bddfalse;
     else if(strcmp(s, "T") == 0) f1 = bddtrue;
@@ -350,7 +352,7 @@ int import(FILE *strm, bddp *p, int lim, int z)
   for(i=0; i<m; i++)
   {
     if(i >= lim) break;
-    v = fscanf(strm, "%s", s);
+    v = fscanf(strm, "%255s", s);
     if(v == EOF)
     {
       // Cleanup on error
