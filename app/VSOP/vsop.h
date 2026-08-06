@@ -1,6 +1,9 @@
 // VSOP - Header (v1.43)
 // Shin-ichi MINATO (May 14, 2021)
 
+#include "CtoI.h"
+using namespace sapporobdd;
+
 #define PROMPT "vsop> "
 #define DOCUMENT "vsop.help"
 
@@ -33,7 +36,6 @@ public:
 };
 
 struct FuncEntry;
-class CtoI;
 
 class FuncTable
 {

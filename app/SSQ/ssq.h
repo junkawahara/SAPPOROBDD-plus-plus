@@ -1,6 +1,9 @@
 // SSQ - Header (v0.2)
 // Shin-ichi MINATO (May 14, 2021)
 
+#include "SeqBDD.h"
+using namespace sapporobdd;
+
 #define PROMPT "ssq> "
 #define DOCUMENT "ssq.help"
 #define NDEF 400000
@@ -30,7 +33,6 @@ public:
 };
 
 struct FuncEntry;
-class SeqBDD;
 
 class FuncTable
 {

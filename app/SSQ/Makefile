@@ -8,14 +8,15 @@ LIB	= $(DIR)/lib/BDD32.a
 LIB64	= $(DIR)/lib/BDD64.a
 #XLIB64  = -lX11
 #XLIB64  = /usr/X11R6/lib64/libX11.a
-XLIB64 = -L/opt/X11/lib -lX11
+XLIB64  =
 
 PRG     = ssq32
 PRG64   = ssq
 PRG_ST  = ssq32-static
 PRG64_ST = ssq-static
 
-OPT 	= -O3 -Wall -Wextra -Wshadow -DYY_ALWAYS_INTERACTIVE -I$(INCL)
+# B_STATIC: disables X11 plot (BDDXc is not buildable as C since the namespace change)
+OPT 	= -O3 -Wall -Wextra -Wshadow -DYY_ALWAYS_INTERACTIVE -I$(INCL) -DB_STATIC
 OPT64   = $(OPT) -DB_64
 OPT_ST  = $(OPT) -DB_STATIC -static
 OPT64_ST = $(OPT64) -DB_STATIC -static
@@ -34,7 +35,7 @@ static:	$(PRG64_ST)
 32static: $(PRG_ST)    
 
 $(PRG): $(OBJ) $(LIB)
-	$(CC) $(OPT) $(OBJ) $(LIB) -lX11 -o $(PRG)
+	$(CC) $(OPT) $(OBJ) $(LIB) -o $(PRG)
 
 $(PRG64): $(OBJ64) $(LIB64)
 	$(CC) $(OPT64) $(OBJ64) $(LIB64) $(XLIB64) -o $(PRG64)

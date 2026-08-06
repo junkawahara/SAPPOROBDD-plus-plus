@@ -483,7 +483,12 @@ output
       }
       else if(strcmp($3.str, "plot") == 0)
       {
+#ifdef B_STATIC
+        bout << "sorry, not supported in this version.";
+        bout.Return();
+#else
         $4 -> GetZDD().XPrint();
+#endif
         delete $4;
       }
       else if(strcmp($3.str, "export") == 0)

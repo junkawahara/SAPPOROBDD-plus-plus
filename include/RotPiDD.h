@@ -3,7 +3,7 @@
  * (C) Yuma INOUE  (June 1, 2022)               *
  ************************************************/
 
-class RotPiDD;
+namespace sapporobdd { class RotPiDD; }
 
 #ifndef _RotPiDD_
 #define _RotPiDD_

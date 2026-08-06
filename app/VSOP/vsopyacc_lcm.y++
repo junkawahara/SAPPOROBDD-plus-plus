@@ -182,7 +182,7 @@ CtoI Product(CtoI ac, CtoI bc)
     else if(atop > 1)
       c = Product(a0,b0) + (Product(a1,b0)+Product(a0,b1)).TimesSysVar(atop)
         + Product(a1,b1).TimesSysVar(atop - 1);
-    else BDDerr("CtoI::operator*(): SysVar overflow.");
+    else BDDerr("CtoI::operator*(): SysVar overflow.", ExceptionType::InternalError);
   }
 
   BDD_RECUR_DEC;

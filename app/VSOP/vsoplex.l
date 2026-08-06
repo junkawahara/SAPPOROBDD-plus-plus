@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include "CtoI.h"
+using namespace sapporobdd;
 #include "y.tab.h"
 
 static const int	textMax = 256;

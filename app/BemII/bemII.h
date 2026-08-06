@@ -1,6 +1,9 @@
 // BEM-II - Header (SAPPORO-1.31)
 // Shin-ichi MINATO (May 14, 2021)
 
+#include "BtoI.h"
+using namespace sapporobdd;
+
 #define PROMPT "> "
 #define DOCUMENT "bemII.help"
 #define NDEF 400000
@@ -31,7 +34,6 @@ public:
 };
 
 struct FuncEntry;
-class BtoI;
 
 class FuncTable
 {

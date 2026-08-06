@@ -11,6 +11,7 @@
 #include "GBase.h"
 #include "gpm.h"
 using namespace std;
+using namespace sapporobdd;
 
 static GBase* G = 0;
 static BDDCT* CT = 0;

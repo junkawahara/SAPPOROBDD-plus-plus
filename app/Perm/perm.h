@@ -1,6 +1,9 @@
 // Perm - Header (v0.4)
 // Shin-ichi MINATO (May 14, 2021)
 
+#include "PiDD.h"
+using namespace sapporobdd;
+
 #define PROMPT "perm> "
 #define DOCUMENT "perm.help"
 #define NDEF 400000
@@ -29,7 +32,6 @@ public:
 };
 
 struct FuncEntry;
-class PiDD;
 
 class FuncTable
 {

@@ -3,7 +3,7 @@
  * (C) Shin-ichi MINATO  (Jul. 23, 2022)        *
  ************************************************/
 
-class GBase;
+namespace sapporobdd { class GBase; }
 
 #ifndef _GBase_
 #define _GBase_

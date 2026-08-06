@@ -34,3 +34,44 @@
 # Yacc/Lex generated files
 lex.yy*.*
 y.tab*.*
+
+# Yacc/Lex generated files (BN builds with -p bn / -Pbn)
+lex.bn*.*
+y.output
+
+# Application executables
+/app/BDDQueen/bddqueen
+/app/BN/bn
+/app/BemII/bemII
+/app/BemII/bemII32
+/app/BemII/bemII-static
+/app/BemII/bemII32-static
+/app/GPM/gpm
+/app/GPM/gpm32
+/app/GPM/gpm-static
+/app/GPM/gpm32-static
+/app/GStest/GStest
+/app/ISOP/isop
+/app/ISOP/isop32
+/app/ISOP/isop-static
+/app/ISOP/isop32-static
+/app/Perm/perm
+/app/Perm/perm32
+/app/Perm/perm-static
+/app/Perm/perm32-static
+/app/SSQ/ssq
+/app/SSQ/ssq32
+/app/SSQ/ssq-static
+/app/SSQ/ssq32-static
+/app/VSOP/vsop
+/app/VSOP/vsop32
+/app/VSOP/vsop-static
+/app/VSOP/vsop32-static
+/app/VSOP/vsop-lcm
+
+# Test executables and generated data (sources are kept below)
+/tests/test_*
+/tests/testsbddh
+!/tests/test_*.cpp
+!/tests/test_*.c
+!/tests/test_*.h

@@ -3,6 +3,7 @@
 #include <cstring>
 #include "SOP.h"
 using namespace std;
+using namespace sapporobdd;
 
 int main(int argc, char *argv[])
 {

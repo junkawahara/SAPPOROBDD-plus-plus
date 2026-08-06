@@ -4,7 +4,7 @@ DIR	= ../..
 INCL    = $(DIR)/include
 LIB	= $(DIR)/lib/BDD32.a
 LIB64	= $(DIR)/lib/BDD64.a
-XLIB64  = -lX11
+XLIB64  =
 #XLIB64  = /usr/X11R6/lib64/libX11.a
 
 PRG     = isop32
@@ -31,7 +31,7 @@ static:	$(PRG64_ST)
 32static: $(PRG_ST)    
 
 $(PRG): $(OBJ) $(LIB)
-	$(CC) $(OPT) $(OBJ) $(LIB) -lX11 -o $(PRG)
+	$(CC) $(OPT) $(OBJ) $(LIB) -o $(PRG)
 
 $(PRG64): $(OBJ64) $(LIB64)
 	$(CC) $(OPT64) $(OBJ64) $(LIB64) $(XLIB64) -o $(PRG64)

@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include "BtoI.h"
+using namespace sapporobdd;
 #include "y.tab.h"
 using namespace std;
 

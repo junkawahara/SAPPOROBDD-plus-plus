@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include "bddc.h"
 
+using namespace sapporobdd;
+
 #ifdef B_64
 #  define B_STRTOI strtoll
 #  define B_ITOSTR(n, s) sprintf(s, "%lld", n)
@@ -45,10 +47,10 @@ int main(int argc, char *argv[])
   }
 
   /**** Generate BDDs for respective queens ****/
-  X = malloc(sizeof(bddp*) * q);
+  X = (bddp**)malloc(sizeof(bddp*) * q);
   for(i=0; i<q; i++)
   {
-    X[i] = malloc(sizeof(bddp) * q);
+    X[i] = (bddp*)malloc(sizeof(bddp) * q);
     for(j=0; j<q; j++) X[i][j] = bddprime(bddnewvar());
   }
     

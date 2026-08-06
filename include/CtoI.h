@@ -4,7 +4,7 @@
  * (C) Shin-ichi MINATO  (Dec. 15, 2015)  *
  ******************************************/
 
-class CtoI;
+namespace sapporobdd { class CtoI; }
 
 #ifndef _CtoI_
 #define _CtoI_

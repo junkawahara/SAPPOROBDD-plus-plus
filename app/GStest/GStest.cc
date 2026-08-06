@@ -1,7 +1,8 @@
 #include <iostream>
 #include <cstring>
-#include "GraphSupport.h"
+#include "GBase.h"
 using namespace std;
+using namespace sapporobdd;
 
 int main(int argc, char *argv[])
 {
@@ -22,7 +23,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  GraphSupport g;
+  GBase g;
   g.Import(fp);
 
   /*

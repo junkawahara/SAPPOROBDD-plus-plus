@@ -3,7 +3,7 @@
  * (C) Shin-ichi MINATO  (Dec. 11, 2012)        *
  ************************************************/
 
-class PiDD;
+namespace sapporobdd { class PiDD; }
 
 #ifndef _PiDD_
 #define _PiDD_
