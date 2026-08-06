@@ -183,24 +183,23 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
       mpt = mptable + mp.len-1;
       if(mpt->word == 0)
       {
+        /* Allocation failure is reported through B_MP_NULL, the same channel
+           as the table-size overflow below.  The bookkeeping fields are
+           updated only after the block is secured, so that a failed attempt
+           leaves the table entry untouched instead of size = 16 with a null
+           word pointer. */
+        wp = B_MALLOC(bddp, mp.len * 16);
+        if(!wp) { h = B_MP_NULL; break; }
         mpt->size = 16;
         mpt->used = 0;
-        mpt->word = B_MALLOC(bddp, mp.len * mpt->size);
-        if (!mpt->word) {
-          err("apply: not enough memory for mp table", sizeof(bddp) * mp.len * mpt->size,
-          ExceptionType::OutOfMemory);
-        }
+        mpt->word = wp;
       }
       if(mpt->size == mpt->used)
       {
         size2 = mpt->size << 1;
         if(size2 > (B_CST_MASK>>B_MP_LWID)) { h = B_MP_NULL; break; }
-        wp = 0;
         wp = B_MALLOC(bddp, mp.len * size2);
-        if(!wp) {
-          err("apply: not enough memory for mp table", sizeof(bddp) * mp.len * size2,
-          ExceptionType::OutOfMemory);
-        }
+        if(!wp) { h = B_MP_NULL; break; }
         for(i=0; i<mp.len*(mpt->size); i++) wp[i] = mpt->word[i];
         mpt->size = size2;
         free(mpt->word);
@@ -237,7 +236,9 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
   BDD_RECUR_DEC;
 
   /* Saving to Cache */
-  if(key != bddnull)
+  /* A B_MP_NULL result of BC_CARD2 only means that the multi-precision table
+     could not be grown; it is not a property of f, so it must not be cached. */
+  if(key != bddnull && !(op == BC_CARD2 && h == B_MP_NULL))
   {
     cachep = Cache + key;
     if(op == BC_CARD2)
