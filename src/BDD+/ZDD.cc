@@ -167,7 +167,7 @@ int ZDD::SymChk(int v1, int v2) const
   if(v2 <= 0) BDDerr("ZDD::SymChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(*this == 0 || *this == 1) return 1;
   if(v1 == v2) return 1;
-  if(v1 < v2) { int tmp = v1; v1 = v2; v2 = tmp; }
+  if(BDD_LevOfVar(v1) < BDD_LevOfVar(v2)) { int tmp = v1; v1 = v2; v2 = tmp; }
 
   ZDD S = ZDD(1).Change(v1) + ZDD(1).Change(v2);
   bddword fx = GetID();
