@@ -75,3 +75,12 @@ y.output
 !/tests/test_*.cpp
 !/tests/test_*.c
 !/tests/test_*.h
+
+# Editor settings
+/.vscode/
+
+# Claude Code instructions (local)
+/CLAUDE.md
+
+# Test logs
+/tests/error_log.txt
