@@ -47,25 +47,28 @@ namespace sapporobdd {
 #define B_REALLOC(ptr, type, size) \
   (type *)realloc(ptr, sizeof(type) * size)
 
-/* Printf format of bddp */
+/* Printf format of bddp.  bddp is an unsigned type, so the conversions have
+   to be unsigned as well: a signed conversion would print node numbers close
+   to the top of the range as negative values, which bddimport() could not
+   read back. */
 #ifdef B_32
-#  define B_BDDP_FD "%d"
+#  define B_BDDP_FD "%u"
 #  define B_BDDP_FX "0x%X"
 #elif defined(B_EXTEND)
-#  define B_BDDP_FD "%lld"
+#  define B_BDDP_FD "%llu"
 #  define B_BDDP_FX "0x%llX"
 #else
-#  define B_BDDP_FD "%lld"
+#  define B_BDDP_FD "%llu"
 #  define B_BDDP_FX "0x%llX"
 #endif
 
-/* strtol or strtoll */
+/* strtoul or strtoull (unsigned, to match bddp and B_BDDP_FD) */
 #ifdef B_32
-#  define B_STRTOI strtol
+#  define B_STRTOI strtoul
 #elif defined(B_EXTEND)
-#  define B_STRTOI strtoll
+#  define B_STRTOI strtoull
 #else
-#  define B_STRTOI strtoll
+#  define B_STRTOI strtoull
 #endif
 
 /* Table spaces */
