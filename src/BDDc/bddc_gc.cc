@@ -115,7 +115,6 @@ int bddgc()
     case BC_INTERSEC:
     case BC_UNION:
     case BC_SUBTRACT:
-    case BC_CHANGE:
       f = B_GET_BDDP(cachep->f);
       if(!B_CST(f) && (fp=B_NP(f))<Node+NodeSpc && fp->varrfc == 0)
       {
@@ -135,10 +134,12 @@ int bddgc()
         break;
       }
       break;
+    /* g holds a VarID, not a bddp, so only f and h are node references */
     case BC_AT0:
     case BC_AT1:
     case BC_OFFSET:
     case BC_ONSET:
+    case BC_CHANGE:
       f = B_GET_BDDP(cachep->f);
       if(!B_CST(f) && (fp=B_NP(f))<Node+NodeSpc && fp->varrfc == 0)
       {
