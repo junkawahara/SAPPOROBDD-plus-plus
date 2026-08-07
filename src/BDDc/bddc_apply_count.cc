@@ -183,13 +183,20 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
       mpt = mptable + mp.len-1;
       if(mpt->word == 0)
       {
-        /* Allocation failure is reported through B_MP_NULL, the same channel
-           as the table-size overflow below.  The bookkeeping fields are
-           updated only after the block is secured, so that a failed attempt
-           leaves the table entry untouched instead of size = 16 with a null
-           word pointer. */
+        /* Allocation failure unwinds through B_MP_NULL rather than throwing
+           from inside the recursion, so that BDD_RecurCount and the node
+           references of the enclosing frames stay consistent; MPAllocFailSize
+           records it so bddcardmp16() can raise BDDOutOfMemoryException at the
+           API boundary.  The bookkeeping fields are updated only after the
+           block is secured, so that a failed attempt leaves the table entry
+           untouched instead of size = 16 with a null word pointer. */
         wp = B_MALLOC(bddp, mp.len * 16);
-        if(!wp) { h = B_MP_NULL; break; }
+        if(!wp)
+        {
+          MPAllocFailSize = sizeof(bddp) * mp.len * 16;
+          h = B_MP_NULL;
+          break;
+        }
         mpt->size = 16;
         mpt->used = 0;
         mpt->word = wp;
@@ -197,9 +204,16 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
       if(mpt->size == mpt->used)
       {
         size2 = mpt->size << 1;
+        /* Table index space exhausted: not an allocation failure, so
+           MPAllocFailSize is left untouched. */
         if(size2 > (B_CST_MASK>>B_MP_LWID)) { h = B_MP_NULL; break; }
         wp = B_MALLOC(bddp, mp.len * size2);
-        if(!wp) { h = B_MP_NULL; break; }
+        if(!wp)
+        {
+          MPAllocFailSize = sizeof(bddp) * mp.len * size2;
+          h = B_MP_NULL;
+          break;
+        }
         for(i=0; i<mp.len*(mpt->size); i++) wp[i] = mpt->word[i];
         mpt->size = size2;
         free(mpt->word);

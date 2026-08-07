@@ -39,6 +39,7 @@ bddp RFCT_Used = 0;
 
 /* MP-Count Table */
 struct B_MPTable mptable[B_MP_LMAX] = {{0, 0, NULL}};
+bddp MPAllocFailSize = 0;
 
 /* ------------------ External functions ------------------ */
 int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
@@ -148,6 +149,7 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
     mptable[i].used = 0;
     if(mptable[i].word) { free(mptable[i].word); mptable[i].word = 0; }
   }
+  MPAllocFailSize = 0;
 
   return 0;
 }

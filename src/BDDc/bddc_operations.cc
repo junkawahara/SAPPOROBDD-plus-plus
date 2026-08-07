@@ -587,8 +587,23 @@ char *bddcardmp16(bddp f, char *s)
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddcardmp16: Invalid bddp", f, ExceptionType::InvalidBDDValue);
     if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
+    MPAllocFailSize = 0;
     h = apply(B_ABS(f), bddfalse, BC_CARD2, 0);
-    if(h == B_MP_NULL) mp.len = 0;
+    if(h == B_MP_NULL)
+    {
+      /* Out of memory while counting: the documented contract is to raise
+         BDDOutOfMemoryException.  A B_MP_NULL without a recorded allocation
+         failure means the multi-precision table index space is exhausted,
+         which keeps its historical behaviour of storing an empty string. */
+      if(MPAllocFailSize != 0)
+      {
+        bddp failsize = MPAllocFailSize;
+        MPAllocFailSize = 0;
+        err("bddcardmp16: not enough memory for mp table", failsize,
+            ExceptionType::OutOfMemory);
+      }
+      mp.len = 0;
+    }
     else
     {
       mp.word[0] = B_NEG(f)? 1: 0;

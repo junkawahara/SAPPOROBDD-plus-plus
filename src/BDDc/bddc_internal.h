@@ -313,6 +313,11 @@ extern bddp RFCT_Spc;              /* Current RFC-table size */
 extern bddp RFCT_Used;             /* Current RFC-table used entries */
 
 extern struct B_MPTable mptable[B_MP_LMAX]; /* MP-Count Table */
+/* Byte size of the multi-precision table allocation that failed during
+   the current bddcardmp16() call, or 0 if no allocation failed.  It lets
+   the caller tell a genuine out-of-memory condition apart from the
+   B_MP_NULL that merely reports an exhausted table index space. */
+extern bddp MPAllocFailSize;
 
 /* ----- Declaration of internal functions ------ */
 /* Error handling */
