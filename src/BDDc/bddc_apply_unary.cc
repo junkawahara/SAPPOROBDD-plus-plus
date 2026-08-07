@@ -198,7 +198,9 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
   BDD_RECUR_DEC;
 
   /* Saving to Cache */
-  if(key != bddnull)
+  /* h == bddnull means out of memory; not a property of (op, f, g),
+     so it must not be cached (see APPLY_CACHE_STORE). */
+  if(key != bddnull && h != bddnull)
   {
     cachep = Cache + key;
     cachep->op = op;

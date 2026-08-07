@@ -19,6 +19,8 @@
 
 // Include bddc internal header to access internal functions
 #include "../src/BDDc/bddc_internal.h"
+// Include the apply macros to test the cache store guard
+#include "../src/BDDc/bddc_apply_common.h"
 
 // Only include the minimal headers we need, avoid BDD.h to prevent macro conflicts
 #include "../include/bddc.h"
@@ -175,6 +177,51 @@ void test_setcacheratiovalue() {
     }
 }
 
+// Regression test for review item C-5:
+// A node-producing operation that runs out of memory returns bddnull.  That
+// result describes the current memory state, not the operation itself, so it
+// must never be written to the cache: bddgc() cannot clear such an entry
+// (B_NP(bddnull) lies outside the node table, so the cache sweep skips it),
+// and the operation would keep reporting a stale failure even after memory
+// has been reclaimed.
+void test_apply_cache_store_rejects_bddnull() {
+    std::cout << "\n=== Testing APPLY_CACHE_STORE with a bddnull result ===" << endl;
+
+    /* APPLY_CACHE_STORE substitutes its parameter names into cachep->op,
+       cachep->f, ... so the arguments must be variables with these very
+       names, exactly as the apply functions call it. */
+    struct B_CacheTable *cachep = 0;
+    struct B_CacheTable *entry;
+    bddp key = 0;              /* any valid cache index */
+    bddp f = 2, g = 4, h;      /* arbitrary operands */
+    unsigned char op = BC_AND;
+
+    entry = Cache + key;
+    entry->op = BC_NULL;
+
+    h = bddnull;
+    APPLY_CACHE_STORE(key, op, f, g, h, cachep);
+    test_result("bddnull result is not written to the cache",
+                entry->op == BC_NULL);
+
+    h = 6;
+    APPLY_CACHE_STORE(key, op, f, g, h, cachep);
+    test_result("a valid result is written to the cache",
+                entry->op == BC_AND &&
+                B_GET_BDDP(entry->f) == f &&
+                B_GET_BDDP(entry->g) == g &&
+                B_GET_BDDP(entry->h) == h);
+
+    op = BC_UNION;
+    h = bddnull;
+    APPLY_CACHE_STORE(key, op, f, g, h, cachep);
+    test_result("bddnull does not overwrite a valid entry",
+                entry->op == BC_AND &&
+                B_GET_BDDP(entry->h) == 6);
+
+    entry->op = BC_NULL;
+}
+
 // Test allocatecache function
 void test_allocatecache() {
     std::cout << "\n=== Testing allocatecache function ===" << endl;
@@ -209,6 +256,7 @@ int main() {
     }
     
     try {
+        test_apply_cache_store_rejects_bddnull();
         test_setcacheratiovalue();
         test_allocatecache();
         

@@ -78,9 +78,14 @@ namespace sapporobdd {
   } while(0)
 
 /* Save result to cache */
+/* An h of bddnull means the operation ran out of memory.  That is a property
+   of the current memory state, not of (op, f, g), so it must not be cached:
+   the entry would survive bddgc() (B_NP(bddnull) is outside the node table,
+   so the cache sweep never clears it) and keep reporting a stale failure
+   even after memory has been reclaimed. */
 #define APPLY_CACHE_STORE(key, op, f, g, h, cachep) \
   do { \
-    if(key != bddnull) { \
+    if(key != bddnull && (h) != bddnull) { \
       cachep = Cache + key; \
       cachep->op = op; \
       B_SET_BDDP(cachep->f, f); \

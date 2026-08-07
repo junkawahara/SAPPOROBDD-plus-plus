@@ -186,10 +186,12 @@ static int check_cache_binary(bddp f, bddp g, unsigned char op,
 
 /*
  * Store result in cache
+ * An h of bddnull means out of memory; that is not a property of (op, f, g)
+ * and bddgc() never clears such an entry, so it must not be cached.
  */
 static void store_cache(bddp key, unsigned char op, bddp f, bddp g, bddp h) {
     struct B_CacheTable *cachep;
-    if(key != bddnull) {
+    if(key != bddnull && h != bddnull) {
         cachep = Cache + key;
         cachep->op = op;
         B_SET_BDDP(cachep->f, f);
@@ -573,12 +575,13 @@ static int check_cache_unary(bddp f, bddp g, unsigned char op,
 
 /*
  * Store cache with additional entries for related operations
+ * An h of bddnull means out of memory and must not be cached (see store_cache).
  */
 static void store_cache_unary(bddp key, unsigned char op, bddp f, bddp g, bddp h) {
     struct B_CacheTable *cachep;
     bddp key2;
 
-    if(key == bddnull) return;
+    if(key == bddnull || h == bddnull) return;
 
     cachep = Cache + key;
     cachep->op = op;

@@ -131,7 +131,7 @@ test_mp_oom_iterative: $(OBJ_MP_OOM_ITERATIVE)
 test_ZBDD.o: test_ZBDD.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_ZBDD.cpp
 
-test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
+test_bddc_cache.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c test_bddc_cache.cpp
 
 test_operator.o: test_operator.cpp $(HEADERS)
@@ -150,7 +150,7 @@ test_ZBDD_extend.o: test_ZBDD.cpp $(HEADERS)
 test_operator_extend.o: test_operator.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS_EXTEND) -c test_operator.cpp -o test_operator_extend.o
 
-test_bddc_cache_extend.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
+test_bddc_cache_extend.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h
 	$(CXX) $(CXXFLAGS_EXTEND) -I../src/BDDc -c test_bddc_cache.cpp -o test_bddc_cache_extend.o
 
 test_iterative_extend.o: test_iterative.cpp $(HEADERS)
@@ -166,7 +166,7 @@ test_ZBDD_iterative.o: test_ZBDD.cpp $(HEADERS)
 test_operator_iterative.o: test_operator.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS_ITERATIVE) -c test_operator.cpp -o test_operator_iterative.o
 
-test_bddc_cache_iterative.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h
+test_bddc_cache_iterative.o: test_bddc_cache.cpp $(HEADERS) ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h
 	$(CXX) $(CXXFLAGS_ITERATIVE) -I../src/BDDc -c test_bddc_cache.cpp -o test_bddc_cache_iterative.o
 
 test_mp_oom_iterative.o: test_mp_oom.cpp $(HEADERS)
