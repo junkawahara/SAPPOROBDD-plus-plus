@@ -5,6 +5,7 @@
  ****************************************/
 
 #include "GBase.h"
+#include "bddplus_internal.h"
 
 using std::cout;
 using std::cerr;
@@ -108,41 +109,41 @@ int GBase::Pack()
 
 int GBase::Import(FILE *strm)
 {
-  char s[256];
+  std::string s;
 
-  do if(fscanf(strm, "%s", s) == EOF) return 1;
+  do if(ReadToken(strm, s) == EOF) return 1;
   while(s[0] == '#');
-  int n = strtol(s, NULL, 10);
+  int n = strtol(s.c_str(), NULL, 10);
 
-  do if(fscanf(strm, "%s", s) == EOF) return 1;
+  do if(ReadToken(strm, s) == EOF) return 1;
   while(s[0] == '#');
-  int m = strtol(s, NULL, 10);
+  int m = strtol(s.c_str(), NULL, 10);
 
   if(Init(n, m)) return 1;
 
   GB_v v;
   GB_e e = 0;
-  do if(fscanf(strm, "%s", s) == EOF) { if(m > 0) e = 1; break; }
+  do if(ReadToken(strm, s) == EOF) { if(m > 0) e = 1; break; }
   while(s[0] == '#');
   for(int i=0; i<m; i++)
   {
-    v = strtol(s, NULL, 10);
+    v = strtol(s.c_str(), NULL, 10);
     if(v <= 0 || v > n) { e = 1; break; }
     _e[i]._ev[0] = v;
-    do if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
+    do if(ReadToken(strm, s) == EOF) { e = 1; break; }
     while(s[0] == '#');
-    v = strtol(s, NULL, 10);
+    v = strtol(s.c_str(), NULL, 10);
     if(v <= 0 || v > n) { e = 1; break; }
     _e[i]._ev[1] = v;
     do
     {
-      if(fscanf(strm, "%s", s) == EOF)
+      if(ReadToken(strm, s) == EOF)
       {
         if(i < m - 1) e = 1;
         break;
       }
-      if(s[0] == '#' && s[1] == 'c' && s[2] == ':')
-        _e[i]._cost = strtol(s+3, NULL, 10);
+      if(s.size() >= 3 && s[0] == '#' && s[1] == 'c' && s[2] == ':')
+        _e[i]._cost = strtol(s.c_str()+3, NULL, 10);
     } while(s[0] == '#');
   }
 

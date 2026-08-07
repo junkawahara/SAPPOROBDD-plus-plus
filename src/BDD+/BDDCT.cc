@@ -4,6 +4,7 @@
  ****************************************/
 
 #include "BDDCT.h"
+#include "bddplus_internal.h"
 using namespace std;
 
 namespace sapporobdd {
@@ -102,23 +103,23 @@ int BDDCT::Alloc(const int n, const bddcost cost)
 
 int BDDCT::Import(FILE *fp)
 {
-  char s[256];
-  do if(fscanf(fp, "%s", s) == EOF) return 1;
+  std::string s;
+  do if(ReadToken(fp, s) == EOF) return 1;
   while(s[0] == '#'); // go next word
-  int n = strtol(s, NULL, 10);
+  int n = strtol(s.c_str(), NULL, 10);
   if(Alloc(n)) return 1;
 
-  do if(fscanf(fp, "%s", s) == EOF) return 1;
+  do if(ReadToken(fp, s) == EOF) return 1;
   while(s[0] == '#'); // go next word
   int e = 0;
   for(int ix=0; ix<_n; ix++)
   {
-    if((e = SetCost(ix, strtol(s, NULL, 10)))) break;
-    if(fscanf(fp, "%s", s) == EOF) { if(ix<_n-1) e = 1; break; }
+    if((e = SetCost(ix, strtol(s.c_str(), NULL, 10)))) break;
+    if(ReadToken(fp, s) == EOF) { if(ix<_n-1) e = 1; break; }
     if(s[0] == '#') 
     {
-      if((e = SetLabel(ix, s+1))) break;
-      do if(fscanf(fp, "%s", s) == EOF) { if(ix<_n-1) e = 1; break; }
+      if((e = SetLabel(ix, s.c_str()+1))) break;
+      do if(ReadToken(fp, s) == EOF) { if(ix<_n-1) e = 1; break; }
       while(s[0] == '#'); // go next word
     }
   }
