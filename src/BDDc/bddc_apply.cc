@@ -97,8 +97,9 @@ int andfalse(bddp f, bddp g)
   /* Check trivial cases */
   if(f == bddfalse || g == bddfalse || f == B_NOT(g)) return 0;
   if(f == bddtrue || g == bddtrue || f == g) return 1;
-  /* Check operand swap */
-  if(f > g) { h = f; f = g; g = h; } /* swap (f, g) */
+  /* Check operand swap (same direction as apply's BC_AND, so that both
+     share the BC_AND cache entries) */
+  if(f < g) { h = f; f = g; g = h; } /* swap (f, g) */
 
   /* Non-trivial operations */
   /* Try cache? */
