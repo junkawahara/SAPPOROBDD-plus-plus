@@ -133,10 +133,12 @@ void bddvdump(bddp *p, int n)
   struct B_NodeTable *fp;
   int i;
 
-  /* Check operands */
+  /* Check operands.  A bddnull entry is skipped rather than abandoning the
+     whole array: the loops below already handle it element by element and
+     print it as "NULL". */
   for(i=0; i<n; i++)
   {
-    if(p[i] == bddnull) return;
+    if(p[i] == bddnull) continue;
     if(!B_CST(p[i])&&
        ((fp=B_NP(p[i]))>=Node+NodeSpc || fp->varrfc==0))
       err("bddvdump: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
