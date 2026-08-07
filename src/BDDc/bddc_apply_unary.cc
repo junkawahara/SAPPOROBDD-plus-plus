@@ -170,13 +170,13 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
       {
         newlev = flev + (bddvar)g;
         if(newlev > VarUsed || newlev < flev)
-          err("apply: Invald shift", newlev, ExceptionType::OutOfRange);
+          err("apply: Invalid shift", newlev, ExceptionType::OutOfRange);
       }
       else
       {
         newlev = flev - (bddvar)g;
         if(newlev == 0 || newlev > flev)
-          err("apply: Invald shift", newlev, ExceptionType::OutOfRange);
+          err("apply: Invalid shift", newlev, ExceptionType::OutOfRange);
       }
       v = bddvaroflev(newlev);
     }

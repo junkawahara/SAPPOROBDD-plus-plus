@@ -83,7 +83,7 @@ void bddexport(FILE *strm, bddp *p, int lim)
     }
     if(!B_CST(p[i])&&
        ((fp=B_NP(p[i]))>=Node+NodeSpc || fp->varrfc==0))
-      err("bddvexport: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
+      err("bddexport: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
     lev0 = bddlevofvar(bddtop(p[i]));
     if(lev0 > lev) lev = lev0;
   }

@@ -147,22 +147,22 @@ bddp bddxor(bddp f, bddp g)
   if(f == bddnull) return bddnull;
   if(g == bddnull) return bddnull;
   if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddand: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
+  { if(B_ABS(f) != bddfalse) err("bddxor: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddxor: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddxor: applying ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
+  { if(B_ABS(g) != bddfalse) err("bddxor: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
       err("bddxor: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g, ExceptionType::InvalidBDDValue);
+    if(B_Z_NP(fp)) err("bddxor: applying ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_XOR, 0);
@@ -513,17 +513,17 @@ bddp bddsubtract(bddp f, bddp g)
   {
     fp = B_NP(f);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddsubtarct: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
+      err("bddsubtract: Invalid bddp", f, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddsubtract: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
   }
   if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddsubtarct: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
+  { if(B_ABS(g) != bddfalse) err("bddsubtract: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
   else
   {
     fp = B_NP(g);
     if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddsubtarct: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddsubtarct: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
+      err("bddsubtract: Invalid bddp", g, ExceptionType::InvalidBDDValue);
+    if(!B_Z_NP(fp)) err("bddsubtract: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
   }
 
   return apply(f, g, BC_SUBTRACT, 0);
