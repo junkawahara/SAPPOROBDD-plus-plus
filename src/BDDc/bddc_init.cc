@@ -106,7 +106,6 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
     if(Node){ free(Node); Node = 0; }
     NodeLimit = 0;
     err("bddinit: Memory allocation failed", 0, ExceptionType::OutOfMemory);
-    return 1;
   }
 
   /* Initialize */

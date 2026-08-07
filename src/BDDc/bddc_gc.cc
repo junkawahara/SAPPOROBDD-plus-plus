@@ -279,7 +279,6 @@ int rfc_inc_ovf(struct B_NodeTable *np)
     if(!RFCT)
     {
       err("B_RFC_INC_NP: rfc memory over flow", np-Node, ExceptionType::OutOfMemory);
-      return 1;
     }
     for(ix=0; ix<B_RFCT_SPC0; ix++)
     {
@@ -327,7 +326,6 @@ int rfc_inc_ovf(struct B_NodeTable *np)
     if(!RFCT)
     {
       err("B_RFC_INC_NP: rfc memory over flow", np-Node, ExceptionType::OutOfMemory);
-      return 1;
     }
     for(ix=0; ix<RFCT_Spc; ix++)
     {

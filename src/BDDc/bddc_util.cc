@@ -612,7 +612,7 @@ int mp_add(struct B_MP *p, bddp ix)
   return 0;
 }
 
-int err(const char *msg, bddp num, ExceptionType exType)
+[[noreturn]] int err(const char *msg, bddp num, ExceptionType exType)
 {
   const int msg_buf_size = 1024;
   char msg_buf[msg_buf_size];
@@ -646,8 +646,6 @@ int err(const char *msg, bddp num, ExceptionType exType)
     default:
       throw BDDInternalErrorException(errorMsg, num);
   }
-
-  return 1; // This line will never be reached but kept for compatibility
 }
 
 } // namespace sapporobdd

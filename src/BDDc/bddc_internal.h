@@ -320,8 +320,11 @@ extern struct B_MPTable mptable[B_MP_LMAX]; /* MP-Count Table */
 extern bddp MPAllocFailSize;
 
 /* ----- Declaration of internal functions ------ */
-/* Error handling */
-int  err(const char *msg, bddp num, ExceptionType exType);
+/* Error handling.  err() never returns: it always throws the BDDException
+   subclass that corresponds to exType.  The int return type is kept only so
+   that err() can be used inside the conditional expressions of the
+   B_RFC_DEC_NP / BDD_RECUR_INC macros. */
+[[noreturn]] int err(const char *msg, bddp num, ExceptionType exType);
 
 /* Reference count overflow handling */
 int  rfc_inc_ovf(struct B_NodeTable *np);
