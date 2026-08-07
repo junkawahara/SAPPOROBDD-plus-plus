@@ -9,6 +9,7 @@
 #define BDD_CPP
 #include "bddc.h"
 #include "BDDException.h"
+#include "bddplus_internal.h"
 
 using std::cout;
 
@@ -802,25 +803,25 @@ ZDDV ZDDV_Import(FILE *strm)
   int inv, e;
   bddword hashsize;
   ZDD f, f0, f1;
-  char s[256];
+  std::string s;
   bddword *hash1 = 0;
   ZDD *hash2 = 0;
 
-  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _i tag", ExceptionType::FileFormat);
-  if(strcmp(s, "_i") != 0) BDDerr("ZDDV_Import(): File format error, expected _i tag", ExceptionType::FileFormat);
-  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading variable count", ExceptionType::FileFormat);
-  int n = strtol(s, NULL, 10);
+  if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _i tag", ExceptionType::FileFormat);
+  if(s != "_i") BDDerr("ZDDV_Import(): File format error, expected _i tag", ExceptionType::FileFormat);
+  if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading variable count", ExceptionType::FileFormat);
+  int n = strtol(s.c_str(), NULL, 10);
   while(n > BDD_TopLev()) BDD_NewVar();
 
-  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _o tag", ExceptionType::FileFormat);
-  if(strcmp(s, "_o") != 0) BDDerr("ZDDV_Import(): File format error, expected _o tag", ExceptionType::FileFormat);
-  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading output count", ExceptionType::FileFormat);
-  int m = strtol(s, NULL, 10);
+  if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _o tag", ExceptionType::FileFormat);
+  if(s != "_o") BDDerr("ZDDV_Import(): File format error, expected _o tag", ExceptionType::FileFormat);
+  if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading output count", ExceptionType::FileFormat);
+  int m = strtol(s.c_str(), NULL, 10);
 
-  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _n tag", ExceptionType::FileFormat);
-  if(strcmp(s, "_n") != 0) BDDerr("ZDDV_Import(): File format error, expected _n tag", ExceptionType::FileFormat);
-  if(fscanf(strm, "%s", s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading node count", ExceptionType::FileFormat);
-  bddword n_nd = B_STRTOI(s, NULL, 10);
+  if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _n tag", ExceptionType::FileFormat);
+  if(s != "_n") BDDerr("ZDDV_Import(): File format error, expected _n tag", ExceptionType::FileFormat);
+  if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading node count", ExceptionType::FileFormat);
+  bddword n_nd = B_STRTOI(s.c_str(), NULL, 10);
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
@@ -837,19 +838,19 @@ ZDDV ZDDV_Import(FILE *strm)
   e = 0;
   for(bddword ix=0; ix<n_nd; ix++)
   {
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    bddword nd = B_STRTOI(s, NULL, 10);
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    int lev = strtol(s, NULL, 10);
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    int lev = strtol(s.c_str(), NULL, 10);
     int var = bddvaroflev(lev);
 
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    if(strcmp(s, "F") == 0) f0 = 0;
-    else if(strcmp(s, "T") == 0) f0 = 1;
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    if(s == "F") f0 = 0;
+    else if(s == "T") f0 = 1;
     else
     {
-      bddword nd0 = B_STRTOI(s, NULL, 10);
+      bddword nd0 = B_STRTOI(s.c_str(), NULL, 10);
 
       bddword ixx = IMPORTHASH(nd0);
       while(hash1[ixx] != nd0)
@@ -862,12 +863,12 @@ ZDDV ZDDV_Import(FILE *strm)
       f0 = hash2[ixx];
     }
 
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    if(strcmp(s, "F") == 0) f1 = 0;
-    else if(strcmp(s, "T") == 0) f1 = 1;
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    if(s == "F") f1 = 0;
+    else if(s == "T") f1 = 1;
     else
     {
-      bddword nd1 = B_STRTOI(s, NULL, 10);
+      bddword nd1 = B_STRTOI(s.c_str(), NULL, 10);
       if(nd1 & 1) { inv = 1; nd1 ^= 1; }
       else inv = 0;
   
@@ -907,15 +908,15 @@ ZDDV ZDDV_Import(FILE *strm)
   ZDDV v = ZDDV();
   for(int i=0; i<m; i++)
   {
-    if(fscanf(strm, "%s", s) == EOF)
+    if(ReadToken(strm, s) == EOF)
     {
       delete[] hash2;
       delete[] hash1;
       BDDerr("ZDDV_Import(): Unexpected end of file reading output values", ExceptionType::FileFormat);
     }
-    bddword nd = B_STRTOI(s, NULL, 10);
-    if(strcmp(s, "F") == 0) v += ZDDV(0, i);
-    else if(strcmp(s, "T") == 0) v += ZDDV(1, i);
+    bddword nd = B_STRTOI(s.c_str(), NULL, 10);
+    if(s == "F") v += ZDDV(0, i);
+    else if(s == "T") v += ZDDV(1, i);
     else
     {
       if(nd & 1) { inv = 1; nd ^= 1; }

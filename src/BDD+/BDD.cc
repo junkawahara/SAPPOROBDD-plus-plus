@@ -6,6 +6,7 @@
 
 #include "BDDException.h"
 #include "BDD.h"
+#include "bddplus_internal.h"
 
 using std::cout;
 using std::cerr;
@@ -402,34 +403,34 @@ BDDV BDDV_Import(FILE *strm)
   int inv, e;
   bddword hashsize;
   BDD f, f0, f1;
-  char s[256];
+  std::string s;
   bddword *hash1 = 0;
   BDD *hash2 = 0;
 
-  if(fscanf(strm, "%s", s) == EOF) 
+  if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  if(strcmp(s, "_i") != 0) 
+  if(s != "_i") 
     BDDerr("BDDV_Import: Invalid format, expected '_i'.", ExceptionType::FileFormat);
-  if(fscanf(strm, "%s", s) == EOF) 
+  if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  int n = strtol(s, NULL, 10);
+  int n = strtol(s.c_str(), NULL, 10);
   while(n > BDD_TopLev()) BDD_NewVar();
 
-  if(fscanf(strm, "%s", s) == EOF) 
+  if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  if(strcmp(s, "_o") != 0) 
+  if(s != "_o") 
     BDDerr("BDDV_Import: Invalid format, expected '_o'.", ExceptionType::FileFormat);
-  if(fscanf(strm, "%s", s) == EOF) 
+  if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  int m = strtol(s, NULL, 10);
+  int m = strtol(s.c_str(), NULL, 10);
 
-  if(fscanf(strm, "%s", s) == EOF) 
+  if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  if(strcmp(s, "_n") != 0) 
+  if(s != "_n") 
     BDDerr("BDDV_Import: Invalid format, expected '_n'.", ExceptionType::FileFormat);
-  if(fscanf(strm, "%s", s) == EOF) 
+  if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  bddword n_nd = B_STRTOI(s, NULL, 10);
+  bddword n_nd = B_STRTOI(s.c_str(), NULL, 10);
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
@@ -450,19 +451,19 @@ BDDV BDDV_Import(FILE *strm)
   e = 0;
   for(bddword ix=0; ix<n_nd; ix++)
   {
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    bddword nd = B_STRTOI(s, NULL, 10);
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    int lev = strtol(s, NULL, 10);
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    int lev = strtol(s.c_str(), NULL, 10);
     int var = bddvaroflev(lev);
 
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    if(strcmp(s, "F") == 0) f0 = 0;
-    else if(strcmp(s, "T") == 0) f0 = 1;
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    if(s == "F") f0 = 0;
+    else if(s == "T") f0 = 1;
     else
     {
-      bddword nd0 = B_STRTOI(s, NULL, 10);
+      bddword nd0 = B_STRTOI(s.c_str(), NULL, 10);
 
       bddword ixx = IMPORTHASH(nd0);
       while(hash1[ixx] != nd0)
@@ -475,12 +476,12 @@ BDDV BDDV_Import(FILE *strm)
       f0 = hash2[ixx];
     }
 
-    if(fscanf(strm, "%s", s) == EOF) { e = 1; break; }
-    if(strcmp(s, "F") == 0) f1 = 0;
-    else if(strcmp(s, "T") == 0) f1 = 1;
+    if(ReadToken(strm, s) == EOF) { e = 1; break; }
+    if(s == "F") f1 = 0;
+    else if(s == "T") f1 = 1;
     else
     {
-      bddword nd1 = B_STRTOI(s, NULL, 10);
+      bddword nd1 = B_STRTOI(s.c_str(), NULL, 10);
       if(nd1 & 1) { inv = 1; nd1 ^= 1; }
       else inv = 0;
   
@@ -524,15 +525,15 @@ BDDV BDDV_Import(FILE *strm)
   BDDV v = BDDV();
   for(int i=0; i<m; i++)
   {
-    if(fscanf(strm, "%s", s) == EOF)
+    if(ReadToken(strm, s) == EOF)
     {
       delete[] hash2;
       delete[] hash1;
       BDDerr("BDDV_Import: Unexpected end of file during vector processing.", ExceptionType::FileFormat);
     }
-    bddword nd = B_STRTOI(s, NULL, 10);
-    if(strcmp(s, "F") == 0) v = v || BDD(0);
-    else if(strcmp(s, "T") == 0) v = v || BDD(1);
+    bddword nd = B_STRTOI(s.c_str(), NULL, 10);
+    if(s == "F") v = v || BDD(0);
+    else if(s == "T") v = v || BDD(1);
     else
     {
       if(nd & 1) { inv = 1; nd ^= 1; }
@@ -557,46 +558,46 @@ BDDV BDDV_Import(FILE *strm)
 
 BDDV BDDV_ImportPla(FILE *strm, int sopf)
 {
-  char s[256];
+  std::string s;
   int n = 0;
   int m = 0;
   int mode = 1; // 0:f 1:fd 2:fr 3:fdr
 
-  do if(fscanf(strm, "%s", s) == EOF) 
+  do if(ReadToken(strm, s) == EOF) 
       BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   while(s[0] == '#');
 
   // declaration part 
   while(s[0] == '.')
   {
-    if(strcmp(s, ".i") == 0)
+    if(s == ".i")
     {
-      if(fscanf(strm, "%s", s) == EOF)
+      if(ReadToken(strm, s) == EOF)
         BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
-      n = strtol(s, NULL, 10);
+      n = strtol(s.c_str(), NULL, 10);
     }
-    else if(strcmp(s, ".o") == 0)
+    else if(s == ".o")
     {
-      if(fscanf(strm, "%s", s) == EOF)
+      if(ReadToken(strm, s) == EOF)
         BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
-      m = strtol(s, NULL, 10);
+      m = strtol(s.c_str(), NULL, 10);
     }
-    else if(strcmp(s, ".type") == 0)
+    else if(s == ".type")
     {
-      if(fscanf(strm, "%s", s) == EOF)
+      if(ReadToken(strm, s) == EOF)
         BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
-      if(strcmp(s, "f") == 0) mode = 0;
-      else if(strcmp(s, "fd") == 0) mode = 1;
-      else if(strcmp(s, "fr") == 0) mode = 2;
-      else if(strcmp(s, "fdr") == 0) mode = 3;
+      if(s == "f") mode = 0;
+      else if(s == "fd") mode = 1;
+      else if(s == "fr") mode = 2;
+      else if(s == "fdr") mode = 3;
       else { } // nop
     }
     else 
     {
-      if(fscanf(strm, "%s", s) == EOF)
+      if(ReadToken(strm, s) == EOF)
         BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
     }
-    if(fscanf(strm, "%s", s) == EOF)
+    if(ReadToken(strm, s) == EOF)
       BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   }
   
@@ -613,7 +614,7 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
   // logic description part
   while(s[0] != '.')
   {
-    if((int)strlen(s) != n)
+    if((int)s.size() != n)
       BDDerr("BDDV_ImportPla: Error at product term.", ExceptionType::FileFormat);
     term = 1;
     for(int i=0; i<n; i++)
@@ -632,9 +633,9 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
         BDDerr("BDDV_ImportPla: Error at product term.", ExceptionType::FileFormat);
       }
     }
-    if(fscanf(strm, "%s", s) == EOF)
+    if(ReadToken(strm, s) == EOF)
       BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
-    if((int)strlen(s) != m) 
+    if((int)s.size() != m) 
       BDDerr("BDDV_ImportPla: Error at output symbol.", ExceptionType::FileFormat);
     for(int i=0; i<m; i++)
     {
@@ -656,7 +657,7 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
         BDDerr("BDDV_ImportPla: Error at output symbol.", ExceptionType::FileFormat);
       }
     }
-    if(fscanf(strm, "%s", s) == EOF)
+    if(ReadToken(strm, s) == EOF)
       BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   }
 
