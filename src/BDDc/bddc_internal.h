@@ -41,11 +41,28 @@ namespace sapporobdd {
 #define BC_LEN        18
 #define BC_CARD2      19
 
-/* Macros for malloc, realloc */
+/* Allocation helpers behind B_MALLOC / B_REALLOC.  They return a null pointer
+   when sizeof(type) * count would wrap around size_t, so an implausible
+   element count cannot produce a buffer shorter than the caller asked for. */
+inline void *b_alloc_checked(size_t elemsize, size_t count)
+{
+  if(elemsize != 0 && count > ((size_t)-1) / elemsize) return 0;
+  return malloc(elemsize * count);
+}
+
+inline void *b_realloc_checked(void *ptr, size_t elemsize, size_t count)
+{
+  if(elemsize != 0 && count > ((size_t)-1) / elemsize) return 0;
+  return realloc(ptr, elemsize * count);
+}
+
+/* Macros for malloc, realloc.  The element count has to be parenthesised:
+   B_MALLOC(char, n*2+1) would otherwise expand to sizeof(char)*n*2+1, which
+   only happens to be right because sizeof(char) is 1. */
 #define B_MALLOC(type, size) \
-  (type *)malloc(sizeof(type) * size)
+  ((type *)b_alloc_checked(sizeof(type), (size_t)(size)))
 #define B_REALLOC(ptr, type, size) \
-  (type *)realloc(ptr, sizeof(type) * size)
+  ((type *)b_realloc_checked((void *)(ptr), sizeof(type), (size_t)(size)))
 
 /* Printf format of bddp.  bddp is an unsigned type, so the conversions have
    to be unsigned as well: a signed conversion would print node numbers close
