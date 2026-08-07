@@ -93,6 +93,7 @@ int andfalse(bddp f, bddp g)
   struct B_CacheTable *cachep;
   bddp key, f0, f1, g0, g1, h;
   bddvar flev, glev;
+  int r;
 
   /* Check trivial cases */
   if(f == bddfalse || g == bddfalse || f == B_NOT(g)) return 0;
@@ -141,9 +142,19 @@ int andfalse(bddp f, bddp g)
     if(B_NEG(f)) { f0 = B_NOT(f0); f1 = B_NOT(f1); }
   }
 
-  /* Get result */
-  if(andfalse(f0, g0) == 1) return 1;
-  if(andfalse(f1, g1) == 1) return 1;
+  /* Stack overflow limitter.  The recursion descends one level per call just
+     like apply's, so without the limitter a deep BDD overflows the machine
+     stack instead of reporting the limit. */
+  BDD_RECUR_INC;
+
+  /* Get result.  || keeps the short circuit of the original two ifs, so the
+     second branch is still skipped once the first one has answered 1. */
+  r = (andfalse(f0, g0) == 1 || andfalse(f1, g1) == 1);
+
+  /* Stack overflow limitter */
+  BDD_RECUR_DEC;
+
+  if(r) return 1;
 
   /* Saving to Cache */
   if(key != bddnull)
