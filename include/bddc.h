@@ -3,6 +3,16 @@
 *  (C) Shin-ichi MINATO  (Apr. 19, 2022)  *
 ******************************************/
 
+/* Threading and lifetime model
+ *
+ * The package keeps the node table, the operation cache and the variable
+ * table in global state, so a process has exactly one BDD manager and the
+ * whole API is not thread safe: all calls have to come from one thread, or be
+ * serialised by the caller.  bddinit() may be called again to start over, but
+ * doing so discards those tables, which invalidates every bddp value obtained
+ * before the call.  Both are by design.
+ */
+
 #ifndef bddc_h
 #define bddc_h
 
