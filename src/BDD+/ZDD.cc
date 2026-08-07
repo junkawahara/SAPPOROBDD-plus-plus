@@ -173,8 +173,13 @@ int ZDD::SymChk(int v1, int v2) const
   ZDD S = ZDD(1).Change(v1) + ZDD(1).Change(v2);
   bddword fx = GetID();
   bddword gx = S.GetID();
-  int Y = BDD_CacheInt(BC_ZDD_SYMCHK, fx, gx);
-  if(Y != -1) return Y;
+  /* The miss value of BDD_CacheInt() is bddnull, which has to be compared as
+     a bddword: truncating it to int only happens to yield -1 in the 64 bit
+     build, whereas in the 32 bit build bddnull is INT_MAX, so every miss would
+     be taken for a hit and SymChk would answer INT_MAX. */
+  bddword c = BDD_CacheInt(BC_ZDD_SYMCHK, fx, gx);
+  if(c != bddnull) return (int)c;
+  int Y;
   BDD_RECUR_INC;
 
   int t = Top();
