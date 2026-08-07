@@ -616,19 +616,17 @@ int mp_add(struct B_MP *p, bddp ix)
 {
   const int msg_buf_size = 1024;
   char msg_buf[msg_buf_size];
-  snprintf(msg_buf, msg_buf_size, "***** ERROR  %s ( ", msg);
-  snprintf(msg_buf, msg_buf_size, B_BDDP_FX, num);
-  snprintf(msg_buf, msg_buf_size, " ) *****\n");
-  snprintf(msg_buf, msg_buf_size, " NodeLimit : ");
-  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, NodeLimit);
-  snprintf(msg_buf, msg_buf_size, "\t NodeSpc : ");
-  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, NodeSpc);
-  snprintf(msg_buf, msg_buf_size, "\t VarSpc : %d", VarSpc);
-  snprintf(msg_buf, msg_buf_size, "\n CacheSpc : ");
-  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, CacheSpc);
-  snprintf(msg_buf, msg_buf_size, "\t NodeUsed : ");
-  snprintf(msg_buf, msg_buf_size, B_BDDP_FD, NodeUsed);
-  snprintf(msg_buf, msg_buf_size, "\t VarUsed : %d\n", VarUsed);
+  /* The whole message has to be built by a single snprintf: every snprintf
+     call starts writing at the beginning of the buffer, so a sequence of
+     calls (as in the fprintf(stderr, ...) chain this code was derived from)
+     would leave only the last fragment and drop msg and num. */
+  snprintf(msg_buf, msg_buf_size,
+           "***** ERROR  %s ( " B_BDDP_FX " ) *****\n"
+           " NodeLimit : " B_BDDP_FD "\t NodeSpc : " B_BDDP_FD
+           "\t VarSpc : %d\n"
+           " CacheSpc : " B_BDDP_FD "\t NodeUsed : " B_BDDP_FD
+           "\t VarUsed : %d\n",
+           msg, num, NodeLimit, NodeSpc, VarSpc, CacheSpc, NodeUsed, VarUsed);
 
   std::string errorMsg(msg_buf);
 
