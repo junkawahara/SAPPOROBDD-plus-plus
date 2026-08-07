@@ -330,8 +330,11 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
     }
   }
 
-  /* Check hash-table overflow */
-  if(++ varp->hashUsed >= varp->hashSpc)
+  /* Check hash-table overflow.  hashUsed counts the entries that are really
+     in the table, so it is incremented only once both the hash table and the
+     node table are secured; an exception thrown on the way out would
+     otherwise leave the counter permanently too high. */
+  if(varp->hashUsed + 1U >= varp->hashSpc)
   {
     if(hash_enlarge(v)) throw BDDOutOfMemoryException("getnode: "
       "not enough memory for hash table", sizeof(bddp_32) * varp->hashSpc); /* Hash-table overflow */
@@ -349,6 +352,7 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
     }
     /* Node-table enlarged or GC succeeded */
   }
+  varp->hashUsed++;
   NodeUsed++;
 
   /* Creating a new node */
