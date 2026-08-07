@@ -91,7 +91,15 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   case BC_UNIV:
-    if(g0 != g1)
+    if(f0 == f1)
+    {
+      /* f does not depend on v, so both branches would recur on the same
+         (f0, g0) pair.  Both combining rules collapse to that single result:
+         apply(h, h, BC_AND) returns h, and getbddp(v, h, h) returns h by the
+         elimination rule; the reference count works out the same either way. */
+      h = apply(f0, g0, op, 0);
+    }
+    else if(g0 != g1)
     {
       h0 = apply(f0, g0, op, 0);
       if(h0 == bddnull) { h = h0; break; }

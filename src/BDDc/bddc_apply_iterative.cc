@@ -1446,6 +1446,34 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                 }
             }
 
+            /* For UNIV, f may not depend on v.  Both branches would then
+               recur on the same (f0, g0) pair and both combining rules
+               collapse to that single result, so recurse once through the
+               same single-recursion state the COFACTOR shortcut uses. */
+            if (frame->op == BC_UNIV && frame->f0 == frame->f1) {
+                bddp saved_f0 = frame->f0;
+                bddp saved_g0 = frame->g0;
+                unsigned char saved_op = frame->op;
+                frame->state = 4; /* Special state for single recursion */
+                if (!stack_push(&stack)) {
+                    frame = stack_current(&stack);
+                    frame->result = bddnull;
+                    goto pop_frame;
+                }
+                {
+                    struct ApplyStackFrame *child = stack_current(&stack);
+                    child->f = saved_f0;
+                    child->g = saved_g0;
+                    child->op = saved_op;
+                    child->skip = 0;
+                    child->state = 0;
+                    child->h0 = bddnull;
+                    child->h1 = bddnull;
+                    child->result = bddnull;
+                }
+                break;
+            }
+
             /* Push frame for first recursive call */
             /* Save values before push */
             {

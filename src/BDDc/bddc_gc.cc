@@ -228,24 +228,28 @@ int bddgc()
       B_SET_BDDP(*p, bddnull);
     }
 
-    /* restore hash entry */
-    for(i=0; i<oldSpc; i++)
+    /* restore hash entry.  The old buckets that fall into new bucket "key"
+       are exactly key, key+newSpc, key+2*newSpc, ..., so walking them in that
+       order lets the tail of the chain assembled so far be carried from one
+       old bucket to the next.  Rescanning the merged chain from its head for
+       every old bucket, as an index-major loop has to, costs time quadratic
+       in the length of the merged chain.  The concatenation order, and hence
+       the resulting chains, are the same as before. */
+    for(key=0; key<newSpc; key++)
     {
-      key = i & (newSpc-1U);
-      np = 0;
-      B_SET_NXP(p, newhash, key);
-      nx = B_GET_BDDP(*p);
-      while(nx != bddnull)
+      np = 0; /* last node of the chain built in newhash[key] so far */
+      for(i=key; i<oldSpc; i+=newSpc)
       {
-        np = Node + nx;
-        nx = B_GET_BDDP(np->nx);
-      }
-      if(np) { B_SET_NXP(p2, varp->hash, i); B_CPY_BDDP(np->nx, *p2); }
-      else
-      {
-        B_SET_NXP(p, newhash, key);
         B_SET_NXP(p2, varp->hash, i);
-        B_CPY_BDDP(*p, *p2);
+        nx = B_GET_BDDP(*p2);
+        if(nx == bddnull) continue; /* nothing to concatenate */
+        if(np) B_CPY_BDDP(np->nx, *p2);
+        else { B_SET_NXP(p, newhash, key); B_CPY_BDDP(*p, *p2); }
+        do
+        {
+          np = Node + nx;
+          nx = B_GET_BDDP(np->nx);
+        } while(nx != bddnull);
       }
     }
     varp->hashSpc = newSpc;
