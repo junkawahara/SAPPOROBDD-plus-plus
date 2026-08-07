@@ -176,8 +176,16 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
       mp.word[0] = 0;
       if(B_NEG(f0)) mp.word[0]++;
       if(B_NEG(f1)) mp.word[0]++;
-      mp_add(&mp, h0);
-      mp_add(&mp, h1);
+      /* Saturation means the sum no longer fits in B_MP_LMAX words.  The
+         all-ones value mp_add() leaves behind is not the cardinality, so the
+         count unwinds through B_MP_NULL just like an allocation failure and
+         MPCountOverflowed lets bddcardmp16() report it. */
+      if(mp_add(&mp, h0) || mp_add(&mp, h1))
+      {
+        MPCountOverflowed = 1;
+        h = B_MP_NULL;
+        break;
+      }
       if(mp.len == 1 && mp.word[0] <= bddnull)
         { h = mp.word[0]; break; }
       mpt = mptable + mp.len-1;

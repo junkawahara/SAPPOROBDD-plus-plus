@@ -1175,8 +1175,16 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                     mp.word[0] = 0;
                     if(B_NEG(frame->f0)) mp.word[0]++;
                     if(B_NEG(frame->f1)) mp.word[0]++;
-                    mp_add(&mp, frame->h0);
-                    mp_add(&mp, frame->h1);
+                    /* Saturation means the sum no longer fits in B_MP_LMAX
+                       words.  The all-ones value mp_add() leaves behind is not
+                       the cardinality, so the count unwinds through B_MP_NULL
+                       just like an allocation failure and MPCountOverflowed
+                       lets bddcardmp16() report it. */
+                    if(mp_add(&mp, frame->h0) || mp_add(&mp, frame->h1)) {
+                        MPCountOverflowed = 1;
+                        frame->result = B_MP_NULL;
+                        break;
+                    }
                     if(mp.len == 1 && mp.word[0] <= bddnull) {
                         frame->result = mp.word[0];
                         break;

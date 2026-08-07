@@ -588,6 +588,7 @@ char *bddcardmp16(bddp f, char *s)
       err("bddcardmp16: Invalid bddp", f, ExceptionType::InvalidBDDValue);
     if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
     MPAllocFailSize = 0;
+    MPCountOverflowed = 0;
     h = apply(B_ABS(f), bddfalse, BC_CARD2, 0);
     if(h == B_MP_NULL)
     {
@@ -602,12 +603,20 @@ char *bddcardmp16(bddp f, char *s)
         err("bddcardmp16: not enough memory for mp table", failsize,
             ExceptionType::OutOfMemory);
       }
+      if(MPCountOverflowed)
+      {
+        MPCountOverflowed = 0;
+        err("bddcardmp16: cardinality does not fit in B_MP_LMAX words",
+            B_MP_LMAX, ExceptionType::OutOfRange);
+      }
       mp.len = 0;
     }
     else
     {
       mp.word[0] = B_NEG(f)? 1: 0;
-      mp_add(&mp, h);
+      if(mp_add(&mp, h))
+        err("bddcardmp16: cardinality does not fit in B_MP_LMAX words",
+            B_MP_LMAX, ExceptionType::OutOfRange);
     }
   }
   if(!s) s = B_MALLOC(char, mp.len*sizeof(bddp)*2+1);

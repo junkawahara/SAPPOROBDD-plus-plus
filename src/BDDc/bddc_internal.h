@@ -338,6 +338,11 @@ extern struct B_MPTable mptable[B_MP_LMAX]; /* MP-Count Table */
    the caller tell a genuine out-of-memory condition apart from the
    B_MP_NULL that merely reports an exhausted table index space. */
 extern bddp MPAllocFailSize;
+/* Set when mp_add() had to saturate during the current bddcardmp16() call,
+   i.e. the cardinality no longer fits in B_MP_LMAX words.  The saturated
+   all-ones value must not be handed back as a result, so the count unwinds
+   through B_MP_NULL and bddcardmp16() reports it at the API boundary. */
+extern int MPCountOverflowed;
 
 /* ----- Declaration of internal functions ------ */
 /* Error handling.  err() never returns: it always throws the BDDException
