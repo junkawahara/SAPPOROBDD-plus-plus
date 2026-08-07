@@ -301,7 +301,12 @@ void BDDV::Export(FILE *strm) const
 
 BDDV BDDV::Spread(int k) const
 {
-  if(Uniform()) return _bdd.Spread(k);
+  /* The uniform result has to be rebuilt with the original length: returning
+     the BDD alone went through BDDV(const BDD&), which fixes the length at 1,
+     so a uniform vector of length 4 came back as length 1 and the callers that
+     concatenate the result silently lost the rest of the vector.  operator<<
+     and operator>> keep _len over the same branch. */
+  if(Uniform()) return BDDV(_bdd.Spread(k), _len);
   return Former().Spread(k) || Latter().Spread(k);
 }
 
