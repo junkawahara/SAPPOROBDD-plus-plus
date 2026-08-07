@@ -672,13 +672,16 @@ bddp    bddpush(bddp f, bddvar v)
 /* Returns bddnull if not enough memory */
 {
   struct B_NodeTable *fp;
+  bddp h;
 
   /* Check operands */
   if(v > VarUsed || v == 0) err("bddpush: Invalid VarID", v, ExceptionType::OutOfRange);
   if(f == bddnull) return bddnull;
 
   if(!B_CST(f)) { fp = B_NP(f); B_RFC_INC_NP(fp); }
-  return getzddp(v, bddfalse, f);
+  h = getzddp(v, bddfalse, f);
+  if(h == bddnull) bddfree(f);
+  return h;
 }
 
 void bddsetcacheratio(double cacheRatio)
