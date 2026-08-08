@@ -117,6 +117,11 @@ typedef ZDD ZBDD; // for backward compatibility
 extern ZDD operator*(const ZDD&, const ZDD&);
 extern ZDD operator/(const ZDD&, const ZDD&);
 extern ZDD ZDD_Meet(const ZDD&, const ZDD&);
+/* Draws a random family over the top "lev" variables by deciding every one of
+   the 2^lev subsets independently (included with probability density%), so it
+   costs 2^lev calls to std::rand() and takes time exponential in its first
+   argument.  Sampling the whole power set is what the result is defined to be,
+   so keep the level small. */
 extern ZDD ZDD_Random(int, int density = 50);
 extern ZDD ZDD_Import(FILE *strm = stdin);
 

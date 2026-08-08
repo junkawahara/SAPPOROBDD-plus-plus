@@ -118,6 +118,11 @@ extern double  BDD_GetCacheRatio(void);
 extern void    BDD_SetGCThreshold(bddword threshold);
 extern bddword BDD_GetGCThreshold(void);
 extern BDD BDD_Import(FILE *strm = stdin);
+/* Draws a random function of the top "level" variables by deciding every row
+   of its truth table independently (true with probability density%), so it
+   costs 2^level calls to std::rand() and takes time exponential in its first
+   argument.  Sampling the whole truth table is what the result is defined to
+   be, so keep the level small. */
 extern BDD BDD_Random(int, int density = 50);
 extern void BDDerr(const char *, ExceptionType);
 extern void BDDerr(const char *, bddword, ExceptionType);
