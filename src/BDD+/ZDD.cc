@@ -213,10 +213,16 @@ int ZDD::SymChk(int v1, int v2) const
 
 ZDD ZDD::SymGrp() const
 {
+  if(*this == -1) return -1;
   ZDD h = 0;
   ZDD g = Support();
   while(g != 0)
   {
+    /* Support() and OffSet() answer -1 when they run out of memory. Entering
+       the body with g == -1 would make g.Top() return 0, and the Change(0) /
+       OffSet(0) below would throw "invalid VarID" instead of letting the
+       failure propagate, so return -1 as the rest of this file does. */
+    if(g == -1) return -1;
     int t = g.Top();
     ZDD hh = ZDD(1).Change(t);
     g = g.OffSet(t);
@@ -224,6 +230,7 @@ ZDD ZDD::SymGrp() const
     ZDD g2 = g;
     while(g2 != 0)
     {
+      if(g2 == -1) return -1;
       int t2 = g2.Top();
       g2 = g2.OffSet(t2);
       int y = SymChk(t, t2);
@@ -234,6 +241,7 @@ ZDD ZDD::SymGrp() const
 	g = g.OffSet(t2);
       }
     }
+    if(hh == -1) return -1;
     if(hh.OnSet0(t) != 1) h += hh;
   }
   return h;
@@ -241,27 +249,37 @@ ZDD ZDD::SymGrp() const
 
 ZDD ZDD::SymGrpNaive() const
 {
+  if(*this == -1) return -1;
   ZDD h = 0;
   ZDD g = Support();
   while(g != 0)
   {
+    if(g == -1) return -1;
     int t = g.Top();
     ZDD hh = ZDD(1).Change(t);
     g = g.OffSet(t);
     ZDD f0 = OffSet(t);
     ZDD f1 = OnSet0(t);
+    if(f0 == -1 || f1 == -1) return -1;
 
     ZDD g2 = g;
     while(g2 != 0)
     {
+      if(g2 == -1) return -1;
       int t2 = g2.Top();
       g2 = g2.OffSet(t2);
-      if(f0.OnSet0(t2) == f1.OffSet(t2))
+      /* Compare the two cofactors only after checking them: two failed
+         (-1) results would compare equal and be taken for a symmetric pair. */
+      ZDD c0 = f0.OnSet0(t2);
+      ZDD c1 = f1.OffSet(t2);
+      if(c0 == -1 || c1 == -1) return -1;
+      if(c0 == c1)
       {
 	hh = hh.Change(t2);
 	g = g.OffSet(t2);
       }
     }
+    if(hh == -1) return -1;
     h += hh;
   }
   return h;
@@ -413,9 +431,12 @@ ZDD ZDD::Divisor() const
   int t;
   while(g != 0)
   {
+    if(g == -1) return -1;
     t = g.Top();
     g = g.OffSet(t);
     ZDD f1 = f.OnSet0(t);
+    /* IsPoly() answers 0 for -1, which would silently keep the old f. */
+    if(f1 == -1) return -1;
     if(f1.IsPoly()) f = f1;
   }
   return f;
