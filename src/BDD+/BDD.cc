@@ -4,6 +4,9 @@
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
 
+#include <memory>
+#include <new>
+
 #include "BDDException.h"
 #include "BDD.h"
 #include "bddplus_internal.h"
@@ -397,6 +400,17 @@ BDDV BDDV_Mask2(int index, int len)
 
 #define IMPORTHASH(x) ((((x)>>1)^((x)<<8)^((x)<<16)) & (hashsize-1))
 
+/* Bounds accepted for the counts in the header of an imported file.  Anything
+   above them describes a corrupt file rather than a huge one: no more levels
+   than the manager can hold variables, no vector longer than BDDV_MaxLen, and
+   no more nodes than the node table can address.  Rejecting them early is also
+   what keeps the n_nd<<1 below from wrapping around. */
+static const unsigned long long ImportMaxLev =
+  ((unsigned long long)bddvarmax < (unsigned long long)INT_MAX)?
+    (unsigned long long)bddvarmax: (unsigned long long)INT_MAX;
+static const unsigned long long ImportMaxLen = (unsigned long long)BDDV_MaxLen;
+static const unsigned long long ImportMaxNode = (unsigned long long)BDD_MaxNode;
+
 #ifdef B_32
 #  define B_STRTOI strtol
 #else
@@ -409,8 +423,9 @@ BDDV BDDV_Import(FILE *strm)
   bddword hashsize;
   BDD f, f0, f1;
   std::string s;
-  bddword *hash1 = 0;
-  BDD *hash2 = 0;
+  unsigned long long uval;
+  std::unique_ptr<bddword[]> hash1;
+  std::unique_ptr<BDD[]> hash2;
 
   if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
@@ -418,7 +433,9 @@ BDDV BDDV_Import(FILE *strm)
     BDDerr("BDDV_Import: Invalid format, expected '_i'.", ExceptionType::FileFormat);
   if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  int n = strtol(s.c_str(), NULL, 10);
+  if(ReadDecimal(s, ImportMaxLev, uval))
+    BDDerr("BDDV_Import: Invalid number of levels.", ExceptionType::FileFormat);
+  int n = (int)uval;
   while(n > BDD_TopLev()) BDD_NewVar();
 
   if(ReadToken(strm, s) == EOF) 
@@ -427,7 +444,9 @@ BDDV BDDV_Import(FILE *strm)
     BDDerr("BDDV_Import: Invalid format, expected '_o'.", ExceptionType::FileFormat);
   if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  int m = strtol(s.c_str(), NULL, 10);
+  if(ReadDecimal(s, ImportMaxLen, uval))
+    BDDerr("BDDV_Import: Invalid vector length.", ExceptionType::FileFormat);
+  int m = (int)uval;
 
   if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
@@ -435,18 +454,23 @@ BDDV BDDV_Import(FILE *strm)
     BDDerr("BDDV_Import: Invalid format, expected '_n'.", ExceptionType::FileFormat);
   if(ReadToken(strm, s) == EOF) 
     BDDerr("BDDV_Import: Unexpected end of file.", ExceptionType::FileFormat);
-  bddword n_nd = B_STRTOI(s.c_str(), NULL, 10);
+  if(ReadDecimal(s, ImportMaxNode, uval))
+    BDDerr("BDDV_Import: Invalid number of nodes.", ExceptionType::FileFormat);
+  bddword n_nd = (bddword)uval;
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
-  hash1 = new bddword[hashsize];
-  if(hash1 == 0) 
+  /* A plain new would throw std::bad_alloc, which is not a BDDException and
+     would escape every handler this library asks its users to write; nothrow
+     keeps the failure on the library's own error path.  Holding the tables in
+     unique_ptr also releases them when one of the format errors below throws,
+     which the explicit delete[] calls could not do. */
+  hash1.reset(new(std::nothrow) bddword[hashsize]);
+  if(!hash1)
     BDDerr("BDDV_Import: Failed to allocate memory for hash1.", ExceptionType::OutOfMemory);
-  hash2 = new BDD[hashsize];
-  if(hash2 == 0) { 
-    delete[] hash1; 
+  hash2.reset(new(std::nothrow) BDD[hashsize]);
+  if(!hash2)
     BDDerr("BDDV_Import: Failed to allocate memory for hash2.", ExceptionType::OutOfMemory);
-  }
   for(bddword ix=0; ix<hashsize; ix++)
   {
     hash1[ix] = B_VAL_MASK;
@@ -460,8 +484,11 @@ BDDV BDDV_Import(FILE *strm)
     bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
-    int lev = strtol(s.c_str(), NULL, 10);
-    int var = bddvaroflev(lev);
+    /* A level the file made up would make bddvaroflev() throw an out-of-range
+       error of its own; report it as the file format error that it is. */
+    if(ReadDecimal(s, (unsigned long long)BDD_TopLev(), uval) || uval == 0)
+      { e = 1; break; }
+    int var = bddvaroflev((bddvar)uval);
 
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
     if(s == "F") f0 = 0;
@@ -521,21 +548,13 @@ BDDV BDDV_Import(FILE *strm)
   }
 
   if(e)
-  {
-    delete[] hash2;
-    delete[] hash1;
     BDDerr("BDDV_Import: Error during node processing.", ExceptionType::FileFormat);
-  }
 
   BDDV v = BDDV();
   for(int i=0; i<m; i++)
   {
     if(ReadToken(strm, s) == EOF)
-    {
-      delete[] hash2;
-      delete[] hash1;
       BDDerr("BDDV_Import: Unexpected end of file during vector processing.", ExceptionType::FileFormat);
-    }
     bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     if(s == "F") v = v || BDD(0);
     else if(s == "T") v = v || BDD(1);
@@ -556,14 +575,13 @@ BDDV BDDV_Import(FILE *strm)
     }
   }
 
-  delete[] hash2;
-  delete[] hash1;
   return v;
 }
 
 BDDV BDDV_ImportPla(FILE *strm, int sopf)
 {
   std::string s;
+  unsigned long long uval;
   int n = 0;
   int m = 0;
   int mode = 1; // 0:f 1:fd 2:fr 3:fdr
@@ -579,13 +597,19 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
     {
       if(ReadToken(strm, s) == EOF)
         BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
-      n = strtol(s.c_str(), NULL, 10);
+      /* Levels up to 2*n are used below, so half the level bound is the
+         largest input count that can be honoured. */
+      if(ReadDecimal(s, ImportMaxLev / 2ULL, uval))
+        BDDerr("BDDV_ImportPla: Error in input size.", ExceptionType::FileFormat);
+      n = (int)uval;
     }
     else if(s == ".o")
     {
       if(ReadToken(strm, s) == EOF)
         BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
-      m = strtol(s.c_str(), NULL, 10);
+      if(ReadDecimal(s, ImportMaxLen, uval))
+        BDDerr("BDDV_ImportPla: Error in output size.", ExceptionType::FileFormat);
+      m = (int)uval;
     }
     else if(s == ".type")
     {
@@ -606,8 +630,6 @@ BDDV BDDV_ImportPla(FILE *strm, int sopf)
       BDDerr("BDDV_ImportPla: Unexpected end of file.", ExceptionType::FileFormat);
   }
   
-  if(n < 0) 
-    BDDerr("BDDV_ImportPla: Error in input size.", ExceptionType::FileFormat);
   if(m <= 0) 
     BDDerr("BDDV_ImportPla: Error in output size.", ExceptionType::FileFormat);
   while(BDD_TopLev() < n*2) BDD_NewVar();

@@ -7,6 +7,7 @@
 #define BDDPLUS_INTERNAL_H
 
 #include <cctype>
+#include <climits>
 #include <cstdio>
 #include <string>
 
@@ -31,6 +32,37 @@ inline int ReadToken(FILE *strm, std::string& s)
   if(c == EOF) return EOF;
   do s += (char)c;
   while((c = fgetc(strm)) != EOF && !isspace(c));
+  return 0;
+}
+
+/* Parses one decimal token read from an imported file.  Stores the value and
+   returns 0 when the whole token is a decimal number in [0, limit], and
+   returns 1 otherwise (empty token, a sign, junk characters, or too large).
+
+   The importers used to hand the header counts straight to strtol()/strtoll()
+   without looking at what came back, so a corrupt or hostile file could make
+   them create every variable up to the manager's limit one at a time, keep a
+   count that overflowed the int it was stored in, wrap the "hashsize < n_nd<<1"
+   computation down to a one-entry table whose linear probing never terminates,
+   or ask for an allocation so large that operator new threw std::bad_alloc
+   straight past every BDDException handler.  Checking the token against a
+   sensible bound up front turns all of those into an ordinary format error. */
+inline int ReadDecimal(const std::string& s, unsigned long long limit,
+                       unsigned long long& val)
+{
+  unsigned long long v = 0;
+
+  if(s.empty()) return 1;
+  for(std::string::size_type i=0; i<s.size(); i++)
+  {
+    unsigned long long d;
+    if(!isdigit((unsigned char)s[i])) return 1;
+    d = (unsigned long long)(s[i] - '0');
+    if(v > (ULLONG_MAX - d) / 10ULL) return 1;
+    v = v * 10ULL + d;
+    if(v > limit) return 1;
+  }
+  val = v;
   return 0;
 }
 

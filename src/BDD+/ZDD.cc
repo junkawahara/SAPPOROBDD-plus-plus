@@ -4,6 +4,9 @@
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
 
+#include <memory>
+#include <new>
+
 #include "ZDD.h"
 
 #define BDD_CPP
@@ -818,6 +821,18 @@ int ZDDV::PrintPla() const
 
 #define IMPORTHASH(x) ((((x)>>1)^((x)<<8)^((x)<<16)) & (hashsize-1))
 
+/* Bounds accepted for the counts in the header of an imported file.  Anything
+   above them describes a corrupt file rather than a huge one: no more levels
+   than the manager can hold variables, no vector longer than BDDV_MaxLen (the
+   bound ZDDV::ZDDV() enforces on a location), and no more nodes than the node
+   table can address.  Rejecting them early is also what keeps the n_nd<<1
+   below from wrapping around. */
+static const unsigned long long ImportMaxLev =
+  ((unsigned long long)bddvarmax < (unsigned long long)INT_MAX)?
+    (unsigned long long)bddvarmax: (unsigned long long)INT_MAX;
+static const unsigned long long ImportMaxLen = (unsigned long long)BDDV_MaxLen;
+static const unsigned long long ImportMaxNode = (unsigned long long)BDD_MaxNode;
+
 #ifdef B_32
 #  define B_STRTOI strtol
 #else
@@ -830,31 +845,43 @@ ZDDV ZDDV_Import(FILE *strm)
   bddword hashsize;
   ZDD f, f0, f1;
   std::string s;
-  bddword *hash1 = 0;
-  ZDD *hash2 = 0;
+  unsigned long long uval;
+  std::unique_ptr<bddword[]> hash1;
+  std::unique_ptr<ZDD[]> hash2;
 
   if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _i tag", ExceptionType::FileFormat);
   if(s != "_i") BDDerr("ZDDV_Import(): File format error, expected _i tag", ExceptionType::FileFormat);
   if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading variable count", ExceptionType::FileFormat);
-  int n = strtol(s.c_str(), NULL, 10);
+  if(ReadDecimal(s, ImportMaxLev, uval))
+    BDDerr("ZDDV_Import(): Invalid number of levels", ExceptionType::FileFormat);
+  int n = (int)uval;
   while(n > BDD_TopLev()) BDD_NewVar();
 
   if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _o tag", ExceptionType::FileFormat);
   if(s != "_o") BDDerr("ZDDV_Import(): File format error, expected _o tag", ExceptionType::FileFormat);
   if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading output count", ExceptionType::FileFormat);
-  int m = strtol(s.c_str(), NULL, 10);
+  if(ReadDecimal(s, ImportMaxLen, uval))
+    BDDerr("ZDDV_Import(): Invalid vector length", ExceptionType::FileFormat);
+  int m = (int)uval;
 
   if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading _n tag", ExceptionType::FileFormat);
   if(s != "_n") BDDerr("ZDDV_Import(): File format error, expected _n tag", ExceptionType::FileFormat);
   if(ReadToken(strm, s) == EOF) BDDerr("ZDDV_Import(): Unexpected end of file reading node count", ExceptionType::FileFormat);
-  bddword n_nd = B_STRTOI(s.c_str(), NULL, 10);
+  if(ReadDecimal(s, ImportMaxNode, uval))
+    BDDerr("ZDDV_Import(): Invalid number of nodes", ExceptionType::FileFormat);
+  bddword n_nd = (bddword)uval;
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
-  hash1 = new bddword[hashsize];
-  if(hash1 == 0) BDDerr("ZDDV_Import(): Memory allocation failed for hash1", ExceptionType::OutOfMemory);
-  hash2 = new ZDD[hashsize];
-  if(hash2 == 0) { delete[] hash1; BDDerr("ZDDV_Import(): Memory allocation failed for hash2", ExceptionType::OutOfMemory); }
+  /* A plain new would throw std::bad_alloc, which is not a BDDException and
+     would escape every handler this library asks its users to write; nothrow
+     keeps the failure on the library's own error path.  Holding the tables in
+     unique_ptr also releases them when one of the format errors below throws,
+     which the explicit delete[] calls could not do. */
+  hash1.reset(new(std::nothrow) bddword[hashsize]);
+  if(!hash1) BDDerr("ZDDV_Import(): Memory allocation failed for hash1", ExceptionType::OutOfMemory);
+  hash2.reset(new(std::nothrow) ZDD[hashsize]);
+  if(!hash2) BDDerr("ZDDV_Import(): Memory allocation failed for hash2", ExceptionType::OutOfMemory);
   for(bddword ix=0; ix<hashsize; ix++)
   {
     hash1[ix] = B_VAL_MASK;
@@ -868,8 +895,11 @@ ZDDV ZDDV_Import(FILE *strm)
     bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
-    int lev = strtol(s.c_str(), NULL, 10);
-    int var = bddvaroflev(lev);
+    /* A level the file made up would make bddvaroflev() throw an out-of-range
+       error of its own; report it as the file format error that it is. */
+    if(ReadDecimal(s, (unsigned long long)BDD_TopLev(), uval) || uval == 0)
+      { e = 1; break; }
+    int var = bddvaroflev((bddvar)uval);
 
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
     if(s == "F") f0 = 0;
@@ -925,21 +955,13 @@ ZDDV ZDDV_Import(FILE *strm)
   }
 
   if(e)
-  {
-    delete[] hash2;
-    delete[] hash1;
     BDDerr("ZDDV_Import(): File format error while reading nodes", ExceptionType::FileFormat);
-  }
 
   ZDDV v = ZDDV();
   for(int i=0; i<m; i++)
   {
     if(ReadToken(strm, s) == EOF)
-    {
-      delete[] hash2;
-      delete[] hash1;
       BDDerr("ZDDV_Import(): Unexpected end of file reading output values", ExceptionType::FileFormat);
-    }
     bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     if(s == "F") v += ZDDV(0, i);
     else if(s == "T") v += ZDDV(1, i);
@@ -960,8 +982,6 @@ ZDDV ZDDV_Import(FILE *strm)
     }
   }
 
-  delete[] hash2;
-  delete[] hash1;
   return v;
 }
 

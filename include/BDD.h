@@ -36,6 +36,9 @@ extern const int BDD_MaxVar;
 extern int BDDV_Active;
 extern const int BDDV_SysVarTop;
 extern const int BDDV_MaxLen;
+/* Unused: BDDV_Import() bounds the vector length it accepts by BDDV_MaxLen,
+   not by this constant.  Kept only so that code referring to it still
+   compiles. */
 extern const int BDDV_MaxLenImport;
 
 //--------- Stack overflow limitter ---------
