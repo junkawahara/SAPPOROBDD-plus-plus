@@ -389,7 +389,7 @@ BDDV operator||(const BDDV& fv, const BDDV& gv)
   if((hv._bdd = (~x & fv._bdd)|(x & gv._bdd)) == -1) 
     BDDerr("BDDV::operator||: Operation failed.", ExceptionType::InternalError);
   if((hv._len = fv._len + gv._len) > BDDV_MaxLen)
-    BDDerr("BDDV::operatop||: Too large len.", hv._len, ExceptionType::OutOfRange);
+    BDDerr("BDDV::operator||: Too large len.", hv._len, ExceptionType::OutOfRange);
   hv._lev = fv._lev + 1;
   return hv;
 }

@@ -334,8 +334,8 @@ ZDD ZDD::SymSet(int v) const
 int ZDD::ImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
-  if(v2 <= 0) BDDerr("ZDD::IndImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
+  if(v1 <= 0) BDDerr("ZDD::ImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0) BDDerr("ZDD::ImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
