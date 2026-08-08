@@ -25,17 +25,19 @@ static const unsigned char BC_Spread = 61;
 const bddword BDD_MaxNode = B_VAL_MASK >> 1U;
 const int BDD_MaxVar = bddvarmax;
 
-//--- SBDD class for default initialization ----
+//--- Automatic initialization of the manager ----
 
 int BDDV_Active = 0;
 
-class SBDD
+/* Zero-initialized before any constructor runs, so the first BDD_InitGuard to
+   be constructed - in whichever translation unit that happens to be - is the
+   one that initializes the manager.  See the comment in BDD.h. */
+static int BDD_InitGuardCount = 0;
+
+BDD_InitGuard::BDD_InitGuard(void)
 {
-public:
-  //SBDD(bddword init, bddword limit) { bddinit(init, limit); }
-  SBDD(void) { BDD_Init(); }
-};
-static SBDD BDD_Manager;
+  if(BDD_InitGuardCount++ == 0) BDD_Init();
+}
 
 //-------------- class BDD --------------------
 

@@ -123,6 +123,25 @@ extern void BDDerr(const char *, ExceptionType);
 extern void BDDerr(const char *, bddword, ExceptionType);
 extern void BDDerr(const char *, const char *, ExceptionType);
 
+//--------- Automatic initialization of the manager ---------
+/* BDD_Init() has to have run before the first BDD operation, including one
+   issued from the constructor of a static object.  The order in which static
+   objects of different translation units are constructed is unspecified, so a
+   single manager object defined in BDD.cc would not be guaranteed to come
+   first.  Instead every translation unit that includes this header defines its
+   own guard below, and the one constructed first initializes the manager (the
+   counter is zero-initialized before any constructor runs, so the count is
+   reliable).  Within a translation unit the guard is constructed before every
+   static object declared after this #include, which is the ordering the
+   language does guarantee.  Calling BDD_Init() explicitly afterwards still
+   re-initializes the manager as before. */
+class BDD_InitGuard
+{
+public:
+  BDD_InitGuard(void);
+};
+static BDD_InitGuard BDD_InitGuardInstance;
+
 //--------- Inline functions for BDD ---------
 inline int BDD_TopLev(void)
   { return BDDV_Active? bddvarused() - BDDV_SysVarTop: bddvarused(); }
