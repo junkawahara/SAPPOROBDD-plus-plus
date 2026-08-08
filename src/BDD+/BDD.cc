@@ -219,11 +219,23 @@ BDDV::BDDV(const BDD& f, int len)
 {
   if(len < 0) BDDerr("BDDV::BDDV: len < 0.", len, ExceptionType::OutOfRange);
   if(len > BDDV_MaxLen) BDDerr("BDDV::BDDV: Too large len.", len, ExceptionType::OutOfRange);
+  if(f == -1)
+  {
+    /* An error vector carries no length of its own, so normalize it to what
+       BDDV(-1) builds.  Forcing _len to 1 while leaving _lev = GetLev(len)
+       from the requested length broke the invariant that _len <= 1<<_lev with
+       _lev minimal, and for len == 0 the assignment below even dropped the
+       error and stored the constant 0 instead. */
+    _bdd = f;
+    _len = 1;
+    _lev = 0;
+    return;
+  }
   int t = f.Top();
   if(t > 0 && BDD_LevOfVar(t) > BDD_TopLev())
     BDDerr("BDDV::BDDV: Invalid Top Var.", t, ExceptionType::InvalidBDDValue);
   _bdd = (len == 0)? 0: f;
-  _len = (f == -1)? 1: len;
+  _len = len;
   _lev = GetLev(len);
 }
 
