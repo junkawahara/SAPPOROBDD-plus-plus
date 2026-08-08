@@ -4,6 +4,7 @@
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
 
+#include <cstdlib>
 #include <memory>
 #include <new>
 
@@ -18,24 +19,19 @@ using std::cout;
 
 namespace sapporobdd {
 
-static const char BC_ZDD_MULT = 20;
-static const char BC_ZDD_DIV = 21;
-static const char BC_ZDD_RSTR = 22;
-static const char BC_ZDD_PERMIT = 23;
-static const char BC_ZDD_PERMITSYM = 24;
-static const char BC_ZDD_SYMCHK = 25;
-static const char BC_ZDD_ALWAYS = 26;
-static const char BC_ZDD_SYMSET = 27;
-static const char BC_ZDD_COIMPSET = 28;
-static const char BC_ZDD_MEET = 29;
+static const unsigned char BC_ZDD_MULT = 20;
+static const unsigned char BC_ZDD_DIV = 21;
+static const unsigned char BC_ZDD_RSTR = 22;
+static const unsigned char BC_ZDD_PERMIT = 23;
+static const unsigned char BC_ZDD_PERMITSYM = 24;
+static const unsigned char BC_ZDD_SYMCHK = 25;
+static const unsigned char BC_ZDD_ALWAYS = 26;
+static const unsigned char BC_ZDD_SYMSET = 27;
+static const unsigned char BC_ZDD_COIMPSET = 28;
+static const unsigned char BC_ZDD_MEET = 29;
 
-static const char BC_ZDD_ZSkip = 65;
-static const char BC_ZDD_INTERSEC = 66;
-
-extern "C"
-{
-	int rand();
-};
+static const unsigned char BC_ZDD_ZSkip = 65;
+static const unsigned char BC_ZDD_INTERSEC = 66;
 
 // class ZDD ---------------------------------------------
 
@@ -568,7 +564,7 @@ ZDD ZDD_Meet(const ZDD& fc, const ZDD& gc)
 ZDD ZDD_Random(int lev, int density)
 {
   if(lev < 0) BDDerr("ZDD_Random(): lev < 0.", lev, ExceptionType::OutOfRange);
-  if(lev == 0) return ((rand()%100) < density)? 1: 0;
+  if(lev == 0) return ((std::rand()%100) < density)? 1: 0;
   return ZDD_Random(lev-1, density) +
          ZDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
 }

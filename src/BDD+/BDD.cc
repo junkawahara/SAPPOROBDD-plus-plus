@@ -4,6 +4,7 @@
  * (C) Shin-ichi MINATO (May 14, 2021)  *
  ****************************************/
 
+#include <cstdlib>
 #include <memory>
 #include <new>
 
@@ -16,13 +17,8 @@ using std::cerr;
 
 namespace sapporobdd {
 
-static const char BC_Smooth = 60;
-static const char BC_Spread = 61;
-
-extern "C"
-{
-  int rand();
-};
+static const unsigned char BC_Smooth = 60;
+static const unsigned char BC_Spread = 61;
 
 //----- External constant data for BDD -------
 
@@ -154,7 +150,7 @@ BDD BDD_Random(int level, int density)
 {
   if(level < 0)
     BDDerr("BDD_Random: level < 0.", level, ExceptionType::OutOfRange);
-  if(level == 0) return ((rand()%100) < density)? 1: 0;
+  if(level == 0) return ((std::rand()%100) < density)? 1: 0;
   return (BDDvar(BDD_VarOfLev(level))
         & BDD_Random(level-1, density)) |
          (~BDDvar(BDD_VarOfLev(level))
