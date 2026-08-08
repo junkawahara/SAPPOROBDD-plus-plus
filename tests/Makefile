@@ -24,13 +24,17 @@ BDDC_SRCS = ../src/BDDc/bddc_init.cc ../src/BDDc/bddc_node.cc ../src/BDDc/bddc_g
             ../src/BDDc/bddc_apply_unary.cc ../src/BDDc/bddc_apply_count.cc \
             ../src/BDDc/bddc_apply_special.cc ../src/BDDc/bddc_apply_iterative.cc \
             ../src/BDDc/bddc_operations.cc ../src/BDDc/bddc_io.cc ../src/BDDc/bddc_util.cc
-SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc $(BDDC_SRCS)
-# Dynamically add the appropriate ZDD source file
+# The source of the ZDD class: its current name, or the old one when only that
+# one is present.  The compile rules below name this variable both as their
+# prerequisite and as the file they compile, so that editing the source really
+# does rebuild the object.
 ifneq ($(wildcard ../src/BDD+/ZDD.cc),)
-    SOURCES += ../src/BDD+/ZDD.cc
+    ZDD_SRC = ../src/BDD+/ZDD.cc
 else
-    SOURCES += ../src/BDD+/ZBDD.cc
+    ZDD_SRC = ../src/BDD+/ZBDD.cc
 endif
+
+SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc $(BDDC_SRCS) $(ZDD_SRC)
 
 HEADERS = ../include/BDD.h ../include/bddc.h
 # Dynamically add the appropriate ZDD source file
@@ -175,14 +179,9 @@ test_mp_oom_iterative.o: test_mp_oom.cpp $(HEADERS)
 test_ZBDD_Hash.o: test_ZBDD_Hash.cpp ../include/ZDD.h ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c test_ZBDD_Hash.cpp
 
-ZDD.o: $(HEADERS)
-	@if [ -f ../src/BDD+/ZDD.cc ]; then \
-		echo "Using ZDD.cc"; \
-		$(CXX) $(CXXFLAGS) -c ../src/BDD+/ZDD.cc -o ZDD.o; \
-	else \
-		echo "ZDD.cc not found, using ZBDD.cc instead"; \
-		$(CXX) $(CXXFLAGS) -c ../src/BDD+/ZBDD.cc -o ZDD.o; \
-	fi
+ZDD.o: $(ZDD_SRC) $(HEADERS)
+	@echo "Using $(ZDD_SRC)"
+	$(CXX) $(CXXFLAGS) -c $(ZDD_SRC) -o ZDD.o
 
 BDD.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDD.cc -o BDD.o
@@ -204,14 +203,9 @@ bddc.o: ../include/bddc.h ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_com
 	ld -r bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_apply_iterative.o bddc_operations.o bddc_io.o bddc_util.o -o bddc.o
 
 # B_EXTEND mode object compilation
-ZDD_extend.o: $(HEADERS)
-	@if [ -f ../src/BDD+/ZDD.cc ]; then \
-		echo "Using ZDD.cc with B_EXTEND"; \
-		$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/ZDD.cc -o ZDD_extend.o; \
-	else \
-		echo "ZDD.cc not found, using ZBDD.cc instead with B_EXTEND"; \
-		$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/ZBDD.cc -o ZDD_extend.o; \
-	fi
+ZDD_extend.o: $(ZDD_SRC) $(HEADERS)
+	@echo "Using $(ZDD_SRC) with B_EXTEND"
+	$(CXX) $(CXXFLAGS_EXTEND) -c $(ZDD_SRC) -o ZDD_extend.o
 
 BDD_extend.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/BDD.cc -o BDD_extend.o
@@ -233,14 +227,9 @@ bddc_extend.o: ../include/bddc.h ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_ap
 	ld -r bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_apply_iterative_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o -o bddc_extend.o
 
 # B_FORCE_ITERATIVE mode object compilation
-ZDD_iterative.o: $(HEADERS)
-	@if [ -f ../src/BDD+/ZDD.cc ]; then \
-		echo "Using ZDD.cc with B_FORCE_ITERATIVE"; \
-		$(CXX) $(CXXFLAGS_ITERATIVE) -c ../src/BDD+/ZDD.cc -o ZDD_iterative.o; \
-	else \
-		echo "ZDD.cc not found, using ZBDD.cc instead with B_FORCE_ITERATIVE"; \
-		$(CXX) $(CXXFLAGS_ITERATIVE) -c ../src/BDD+/ZBDD.cc -o ZDD_iterative.o; \
-	fi
+ZDD_iterative.o: $(ZDD_SRC) $(HEADERS)
+	@echo "Using $(ZDD_SRC) with B_FORCE_ITERATIVE"
+	$(CXX) $(CXXFLAGS_ITERATIVE) -c $(ZDD_SRC) -o ZDD_iterative.o
 
 BDD_iterative.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS_ITERATIVE) -c ../src/BDD+/BDD.cc -o BDD_iterative.o
