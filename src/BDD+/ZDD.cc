@@ -767,17 +767,18 @@ void ZDDV::Export(FILE *strm) const
   delete[] bddv;
 }
 
-static int Len;
-static char* Cube;
-static int ZDDV_PLA(const ZDDV&, int);
-static int ZDDV_PLA(const ZDDV& fv, int tlev)
+/* The cube being printed and the number of outputs used to live in file scope
+   statics, which made PrintPla() non-reentrant and unusable from more than one
+   thread.  They are state of a single printing run, so they travel as
+   arguments instead. */
+static int ZDDV_PLA(const ZDDV& fv, int tlev, int len, char* cube)
 {
   if(fv == ZDDV(-1)) return 1;
   if(fv == ZDDV()) return 0;
   if(tlev == 0)
   {
-    cout << Cube << " ";
-    for(int i=0; i<Len; i++)
+    cout << cube << " ";
+    for(int i=0; i<len; i++)
       if(fv.GetZDD(i) == 0) cout << "~";
       else cout << "1";
     cout << "\n";
@@ -785,14 +786,14 @@ static int ZDDV_PLA(const ZDDV& fv, int tlev)
     return 0;
   }
   BDD_RECUR_INC;
-  Cube[tlev-1] = '1';
-  if(ZDDV_PLA(fv.OnSet0(BDD_VarOfLev(tlev)), tlev-1) == 1)
+  cube[tlev-1] = '1';
+  if(ZDDV_PLA(fv.OnSet0(BDD_VarOfLev(tlev)), tlev-1, len, cube) == 1)
   {
     BDD_RECUR_DEC;
     return 1;
   }
-  Cube[tlev-1] = '0';
-  int err = ZDDV_PLA(fv.OffSet(BDD_VarOfLev(tlev)), tlev-1);
+  cube[tlev-1] = '0';
+  int err = ZDDV_PLA(fv.OffSet(BDD_VarOfLev(tlev)), tlev-1, len, cube);
   BDD_RECUR_DEC;
   return err;
 }
@@ -801,22 +802,23 @@ int ZDDV::PrintPla() const
 {
   if(*this == ZDDV(-1)) return 1;
   int tlev = BDD_LevOfVar(Top());
-  Len = Last() + 1;
+  int len = Last() + 1;
   cout << ".i " << tlev << "\n";
-  cout << ".o " << Len << "\n";
+  cout << ".o " << len << "\n";
   if(tlev == 0)
   {
-    for(int i=0; i<Len; i++)
+    for(int i=0; i<len; i++)
     if(GetZDD(i) == 0) cout << "0";
     else cout << "1";
     cout << "\n";
   }
   else
   {
-    Cube = new char[tlev + 1];
-    Cube[tlev] = 0;
-    int err = ZDDV_PLA(*this, tlev);
-    delete[] Cube;
+    /* unique_ptr so that the buffer is released even when the recursion below
+       throws, which BDD_RECUR_INC does on a stack overflow. */
+    std::unique_ptr<char[]> cube(new char[tlev + 1]);
+    cube[tlev] = 0;
+    int err = ZDDV_PLA(*this, tlev, len, cube.get());
     if(err == 1) return 1;
   }
   cout << ".e\n";
