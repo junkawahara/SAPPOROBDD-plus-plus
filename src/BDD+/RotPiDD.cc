@@ -14,17 +14,17 @@ namespace sapporobdd {
 
 
 //----------- Internal constant data for RotPiDD -----------
-static const char BC_RotPiDD_LeftRot = 100;
-static const char BC_RotPiDD_Swap = 101;
-static const char BC_RotPiDD_Reverse = 102;
-static const char BC_RotPiDD_COFACT = 103;
-static const char BC_RotPiDD_MULT = 104;
-static const char BC_RotPiDD_ODD = 105;
-static const char BC_RotPiDD_ORDER = 106;
-static const char BC_RotPiDD_Inverse = 107;
-static const char BC_RotPiDD_INSERT = 108;
-static const char BC_RotPiDD_NORMALIZE = 109;
-static const char BC_RotPiDD_REMOVEMAX = 110;
+static const unsigned char BC_RotPiDD_LeftRot = 100;
+static const unsigned char BC_RotPiDD_Swap = 101;
+static const unsigned char BC_RotPiDD_Reverse = 102;
+static const unsigned char BC_RotPiDD_COFACT = 103;
+static const unsigned char BC_RotPiDD_MULT = 104;
+static const unsigned char BC_RotPiDD_ODD = 105;
+static const unsigned char BC_RotPiDD_ORDER = 106;
+static const unsigned char BC_RotPiDD_Inverse = 107;
+static const unsigned char BC_RotPiDD_INSERT = 108;
+static const unsigned char BC_RotPiDD_NORMALIZE = 109;
+static const unsigned char BC_RotPiDD_REMOVEMAX = 110;
 
 //----------- Macros for operation cache -----------
 #define RotPiDD_CACHE_CHK_RETURN(op, fx, gx) \

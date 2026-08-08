@@ -138,7 +138,7 @@ inline ZDD ZDD_ID(bddword zdd)
 inline ZDD ZBDD_ID(bddword zdd)
   { return ZDD_ID(zdd); } // for backward compatibility
 
-inline ZDD BDD_CacheZDD(char op, bddword fx, bddword gx)
+inline ZDD BDD_CacheZDD(unsigned char op, bddword fx, bddword gx)
   { return ZDD_ID(bddcopy(bddrcache(op, fx, gx))); }
 
 inline ZDD operator&(const ZDD& f, const ZDD& g)

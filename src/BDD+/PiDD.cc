@@ -13,11 +13,11 @@ namespace sapporobdd {
 
 
 //----------- Internal constant data for PiDD -----------
-static const char BC_PiDD_SWAP = 80;
-static const char BC_PiDD_COFACT = 81;
-static const char BC_PiDD_MULT = 82;
-static const char BC_PiDD_DIV = 83;
-static const char BC_PiDD_ODD = 84;
+static const unsigned char BC_PiDD_SWAP = 80;
+static const unsigned char BC_PiDD_COFACT = 81;
+static const unsigned char BC_PiDD_MULT = 82;
+static const unsigned char BC_PiDD_DIV = 83;
+static const unsigned char BC_PiDD_ODD = 84;
 
 //----------- Macros for operation cache -----------
 #define PiDD_CACHE_CHK_RETURN(op, fx, gx) \

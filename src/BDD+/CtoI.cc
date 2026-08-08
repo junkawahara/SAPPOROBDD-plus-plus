@@ -11,17 +11,17 @@ using std::cout;
 namespace sapporobdd {
 
 
-static const char BC_CtoI_MULT = 40;
-static const char BC_CtoI_DIV =  41;
-static const char BC_CtoI_TV =  42;
-static const char BC_CtoI_TVI =  43;
+static const unsigned char BC_CtoI_MULT = 40;
+static const unsigned char BC_CtoI_DIV =  41;
+static const unsigned char BC_CtoI_TV =  42;
+static const unsigned char BC_CtoI_TVI =  43;
 
-static const char BC_CtoI_RI =  44;
-static const char BC_CtoI_FPA =  45;
-static const char BC_CtoI_FPAV =  46;
-static const char BC_CtoI_FPM =  47;
-static const char BC_CtoI_FPC =  48;
-static const char BC_CtoI_MEET =  49;
+static const unsigned char BC_CtoI_RI =  44;
+static const unsigned char BC_CtoI_FPA =  45;
+static const unsigned char BC_CtoI_FPAV =  46;
+static const unsigned char BC_CtoI_FPM =  47;
+static const unsigned char BC_CtoI_FPC =  48;
+static const unsigned char BC_CtoI_MEET =  49;
 
 //----------- Macros for operation cache -----------
 #define CtoI_CACHE_CHK_RETURN(op, fx, gx) \

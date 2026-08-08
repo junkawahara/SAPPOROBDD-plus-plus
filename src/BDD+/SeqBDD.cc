@@ -11,8 +11,8 @@ using std::cout;
 namespace sapporobdd {
 
 //------------ Internal constant data for SeqBDD ----------
-static const char BC_SeqBDD_MULT = 70;
-static const char BC_SeqBDD_DIV = 71;
+static const unsigned char BC_SeqBDD_MULT = 70;
+static const unsigned char BC_SeqBDD_DIV = 71;
 
 //----------- Macros for operation cache -----------
 #define SeqBDD_CACHE_CHK_RETURN(op, fx, gx) \

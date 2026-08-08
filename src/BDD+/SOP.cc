@@ -12,13 +12,13 @@ namespace sapporobdd {
 
 
 //----------- Internal constant data for SOP -----------
-static const char BC_SOP_MULT = 30;
-static const char BC_SOP_DIV = 31;
-static const char BC_SOP_BDD = 33;
-static const char BC_ISOP1 = 34;
-static const char BC_ISOP2 = 35;
-static const char BC_SOP_IMPL = 36;
-//static const char BC_SOP_SUPPORT = 37;
+static const unsigned char BC_SOP_MULT = 30;
+static const unsigned char BC_SOP_DIV = 31;
+static const unsigned char BC_SOP_BDD = 33;
+static const unsigned char BC_ISOP1 = 34;
+static const unsigned char BC_ISOP2 = 35;
+static const unsigned char BC_SOP_IMPL = 36;
+//static const unsigned char BC_SOP_SUPPORT = 37;
 
 //----------- Macros for operation cache -----------
 #define SOP_CACHE_CHK_RETURN(op, fx, gx) \
