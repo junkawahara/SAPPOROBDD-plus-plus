@@ -222,6 +222,48 @@ void test_apply_cache_store_rejects_bddnull() {
     entry->op = BC_NULL;
 }
 
+// Regression test for review_20260808_1 item 32:
+// bddgc() collects the dead nodes with gc1() before it looks at GCThreshold,
+// so the collected slots can be reused by any later allocation.  It used to
+// skip the cache sweep when the threshold made it report failure, leaving
+// stale entries whose bddp values silently resolved to the new, unrelated
+// nodes on the next cache hit.  The sweep must run whenever nodes were
+// collected, even if the GC is reported as failed.
+void test_gc_threshold_sweeps_cache() {
+    std::cout << "\n=== Testing cache sweep when GC is below GCThreshold ===" << endl;
+
+    bddinit(256, 100000);
+    bddsetgcthreshold(1000000); /* every GC reports failure from now on */
+
+    for (int i = 0; i < 4; ++i) bddnewvar();
+    bddp x1 = bddprime(1), x2 = bddprime(2);
+    bddp x3 = bddprime(3), x4 = bddprime(4);
+    bddp a = bddand(x1, x2);
+    bddp b = bddand(x3, x4);
+
+    bddp c = bddand(a, b);
+    bddfree(c);
+    bddgc(); /* collects the nodes only c used, then reports failure */
+
+    /* Reuse the collected slots for different functions, then recompute:
+       a stale (BC_AND, a, b, c) entry would resolve a & b to one of the
+       new nodes occupying c's old slots. */
+    bddp n2 = bddnot(x2);
+    bddp d1 = bddand(x1, n2);
+    bddp n3 = bddnot(x3);
+    bddp d2 = bddand(n3, x4);
+    bddp e = bddand(a, b);
+    bddp r = bddat0(e, 2); /* (a & b) with x2 = 0 is constant false */
+    test_result("a & b recomputed after the GC is still a & b",
+                r == bddfalse);
+
+    bddfree(r); bddfree(e); bddfree(d2); bddfree(n3);
+    bddfree(d1); bddfree(n2);
+    bddfree(b); bddfree(a);
+    bddfree(x4); bddfree(x3); bddfree(x2); bddfree(x1);
+    bddsetgcthreshold(0);
+}
+
 // Test allocatecache function
 void test_allocatecache() {
     std::cout << "\n=== Testing allocatecache function ===" << endl;
@@ -257,6 +299,7 @@ int main() {
     
     try {
         test_apply_cache_store_rejects_bddnull();
+        test_gc_threshold_sweeps_cache();
         test_setcacheratiovalue();
         test_allocatecache();
         

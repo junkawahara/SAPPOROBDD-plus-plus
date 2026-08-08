@@ -98,10 +98,11 @@ int bddgc()
   bddp freedNodes = n - NodeUsed;
   if(freedNodes == 0) return 1; /* No free node */
 
-  /* Check if freed nodes count is below threshold */
-  if(GCThreshold > 0 && freedNodes <= GCThreshold) {
-    return 1;
-  }
+  /* Once any node has been collected, its slot may be reused by a later
+     allocation, so the operation caches and the MP-Count table, which hold
+     raw bddp values, must be swept even when the GC is reported as failed
+     below because of GCThreshold.  Only the hash-table packing, a pure
+     memory optimization, may be skipped. */
 
   /* Cache clear */
   for(cachep=Cache; cachep<Cache+CacheSpc; cachep++)
@@ -182,6 +183,12 @@ int bddgc()
     mptable[i].used = 0;
     free(mptable[i].word);
     mptable[i].word = 0;
+  }
+
+  /* Report the GC as failed when it freed too few nodes, so that the
+     caller enlarges the node table instead of thrashing on tiny GCs. */
+  if(GCThreshold > 0 && freedNodes <= GCThreshold) {
+    return 1;
   }
 
   /* Hash-table packing */
