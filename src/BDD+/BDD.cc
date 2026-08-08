@@ -97,6 +97,11 @@ BDD BDD::Spread(const int& k) const
   if(t == 0) return *this;
   if(k == 0) return *this;
   if(k < 0) BDDerr("BDD::Spread: k < 0.", k, ExceptionType::OutOfRange);
+  /* k doubles as a variable ID that keys the operation cache, so a k above the
+     number of variables in use used to be reported by bddprime() under its own
+     name instead of this function's.  Check it here, next to the k < 0 case. */
+  if(k > BDD_TopLev())
+    BDDerr("BDD::Spread: k > BDD_TopLev().", k, ExceptionType::OutOfRange);
   bddword fx = GetID();
   bddword gx = BDDvar(k).GetID();
   BDD_CACHE_CHK_RETURN(BC_Spread, fx, gx);
