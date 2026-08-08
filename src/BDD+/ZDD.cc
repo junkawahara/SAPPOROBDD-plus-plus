@@ -417,7 +417,10 @@ int ZDD::IsPoly() const
   ZDD f1 = OnSet0(top);
   ZDD f0 = OffSet(top);
   if(f0 != 0) return 1;
-  return f1.IsPoly();
+  BDD_RECUR_INC;
+  int r = f1.IsPoly();
+  BDD_RECUR_DEC;
+  return r;
 }
 
 ZDD ZDD::Divisor() const
@@ -781,11 +784,17 @@ static int ZDDV_PLA(const ZDDV& fv, int tlev)
     cout.flush();
     return 0;
   }
+  BDD_RECUR_INC;
   Cube[tlev-1] = '1';
   if(ZDDV_PLA(fv.OnSet0(BDD_VarOfLev(tlev)), tlev-1) == 1)
+  {
+    BDD_RECUR_DEC;
     return 1;
+  }
   Cube[tlev-1] = '0';
-  return ZDDV_PLA(fv.OffSet(BDD_VarOfLev(tlev)), tlev-1);
+  int err = ZDDV_PLA(fv.OffSet(BDD_VarOfLev(tlev)), tlev-1);
+  BDD_RECUR_DEC;
+  return err;
 }
 
 int ZDDV::PrintPla() const
@@ -1046,6 +1055,7 @@ void ZDD::SetZSkip() const
   bddword fx = GetID();
   ZDD g = BDD_CacheZDD(BC_ZDD_ZSkip, fx, fx);
   if(g != -1) return;
+  BDD_RECUR_INC;
   ZDD f0 = OffSet(t);
   f0.SetZSkip();
   g = ZLev(ZLevNum(lev), 1);
@@ -1053,6 +1063,7 @@ void ZDD::SetZSkip() const
   bddword gx = g.GetID();
   BDD_CacheEnt(BC_ZDD_ZSkip, fx, fx, gx);
   OnSet0(t).SetZSkip();
+  BDD_RECUR_DEC;
 }
 
 ZDD ZDD::Intersec(const ZDD& g) const
