@@ -161,15 +161,19 @@ int BDDCT::Import(FILE *fp)
   do if(ReadToken(fp, s) == EOF) { Alloc(0); return 1; }
   while(s[0] == '#'); // go next word
   int e = 0;
-  for(int ix=0; ix<_n; ix++)
+  int eof = 0;
+  for(int ix=0; ix<_n && !e && !eof; ix++)
   {
     if((e = SetCost(ix, strtol(s.c_str(), NULL, 10)))) break;
-    if(ReadToken(fp, s) == EOF) { if(ix<_n-1) e = 1; break; }
+    if(ReadToken(fp, s) == EOF) { eof = 1; if(ix<_n-1) e = 1; break; }
     if(s[0] == '#') 
     {
       if((e = SetLabel(ix, s.c_str()+1))) break;
-      do if(ReadToken(fp, s) == EOF) { if(ix<_n-1) e = 1; break; }
-      while(s[0] == '#'); // go next word
+      /* an EOF inside this skip has to end the outer loop as well: it used
+         to only leave the do-while, and the next round then reused the
+         label token as a cost and overwrote the error flag */
+      do if(ReadToken(fp, s) == EOF) { eof = 1; if(ix<_n-1) e = 1; break; }
+      while(!eof && s[0] == '#'); // go next word
     }
   }
   if(e) { Alloc(0); return 1; }

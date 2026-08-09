@@ -860,7 +860,7 @@ static void test_export_import(void)
     BDDCT a, b;
     test_result("P1-19: a cost shortfall is refused",
                 ImportFromString(a, "3 1 2") != 0);
-    test_result("P1-19: an EOF right after a label is refused [known bug: a stale token is reused as the next cost]",
+    test_result("P1-19: an EOF right after a label is refused",
                 ImportFromString(b, "2 5 #lab") != 0);
   }
   {
