@@ -144,6 +144,32 @@ int BDDCT::Alloc(const int n, const bddcost cost)
   return 0;
 }
 
+/* Parses one decimal token, with an optional sign, into a bddcost.  Returns
+   0 and stores the value when the whole token is a number whose magnitude is
+   at most bddcost_null, and 1 otherwise; strtol() used to accept junk as 0
+   and to truncate values past the int range silently.  SetCost() then still
+   rejects the two magnitude-bddcost_null values themselves. */
+static int ParseCost(const std::string& s, bddcost& val)
+{
+  std::string::size_type i = 0;
+  int neg = 0;
+  if(i < s.size() && (s[i] == '+' || s[i] == '-'))
+  {
+    neg = (s[i] == '-');
+    i++;
+  }
+  if(i >= s.size()) return 1;
+  long long v = 0;
+  for(; i<s.size(); i++)
+  {
+    if(!isdigit((unsigned char)s[i])) return 1;
+    v = v * 10 + (s[i] - '0');
+    if(v > (long long)bddcost_null) return 1;
+  }
+  val = (bddcost)(neg? -v: v);
+  return 0;
+}
+
 int BDDCT::Import(FILE *fp)
 {
   /* every failure leaves the empty table: the early returns used to keep
@@ -167,7 +193,9 @@ int BDDCT::Import(FILE *fp)
   int eof = 0;
   for(int ix=0; ix<_n && !e && !eof; ix++)
   {
-    if((e = SetCost(ix, strtol(s.c_str(), NULL, 10)))) break;
+    bddcost cost;
+    if((e = ParseCost(s, cost))) break;
+    if((e = SetCost(ix, cost))) break;
     if(ReadToken(fp, s) == EOF) { eof = 1; if(ix<_n-1) e = 1; break; }
     if(s[0] == '#') 
     {
