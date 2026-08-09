@@ -173,14 +173,20 @@ int BDDCT::Import(FILE *fp)
 int BDDCT::AllocRand(const int n, const bddcost min, const bddcost max)
 {
   Alloc(n);
-  bddcost m = max - min + 1;
-  if(m < 0) m = 1;
+  /* the width of the widest valid range does not fit in bddcost, and
+     max - min + 1 used to overflow it; min > max keeps its historical
+     meaning of "the min everywhere" */
+  unsigned long long m = (min <= max)?
+    (unsigned long long)((long long)max - (long long)min) + 1ULL: 1ULL;
   for(int ix=0; ix<_n; ix++)
-    if(SetCost(ix, (bddcost)(((double)rand()/((double)RAND_MAX+1)) * m) + min))
+  {
+    long long r = (long long)(((double)rand()/((double)RAND_MAX+1)) * (double)m);
+    if(SetCost(ix, (bddcost)(r + (long long)min)))
     {
       Alloc(0);
       return 1;
     }
+  }
   return 0;
 }
 

@@ -909,8 +909,8 @@ static void test_allocrand(void)
   if(ok) for(int i=0; i<5; i++) if(ct.Cost(i) != 10) ok = false;
   test_result("P1-24: min > max falls back to the min everywhere", ok);
 
-  /* the full valid range; the range width overflows int inside AllocRand()
-     (the UBSan build reports it), but every stored cost must still be valid */
+  /* the full valid range; its width does not fit in bddcost, which the
+     range arithmetic has to survive without an overflow */
   ok = ct.AllocRand(6, kCostMin, kCostMax) == 0 && ct.Size() == 6;
   if(ok)
     for(int i=0; i<6; i++)
