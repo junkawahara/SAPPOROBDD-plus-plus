@@ -3,8 +3,10 @@
  *  (C) Shin-ichi MINATO (Jan. 2, 2023)  *
  *****************************************/
 
-#ifndef _BDDCT_
-#define _BDDCT_
+/* The include guard used to be _BDDCT_, and an identifier that starts with an
+   underscore followed by a capital is reserved to the implementation. */
+#ifndef BDDCT_H
+#define BDDCT_H
 
 #include <cstdio>
 #include <cstdlib>
@@ -16,8 +18,19 @@
 namespace sapporobdd {
 
 typedef int bddcost;
-#define bddcost_null 0x7FFFFFFF
-#define CT_STRLEN 15
+
+/* These two were macros, so every translation unit that included this header
+   carried them in its global macro space, where a short general name like
+   CT_STRLEN collides with the code of whoever uses the library, and where the
+   namespace around them means nothing.  As constants they follow the same
+   scope rules as bddcost itself.
+
+   bddcost_null is the "no value" mark of the class: Cost() answers with it
+   for an index outside the table, MinCost() and MaxCost() for the empty
+   family, and the two caches use it for an empty slot, so it is not a cost a
+   table can hold.  CT_STRLEN is the longest label a table stores. */
+const bddcost bddcost_null = 0x7FFFFFFF;
+const int CT_STRLEN = 15;
 
 typedef std::map<bddcost, ZDD> Zmap;
 
@@ -169,4 +182,4 @@ private:
 
 } // namespace sapporobdd
 
-#endif // _BDDCT_
+#endif // BDDCT_H
