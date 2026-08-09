@@ -680,7 +680,7 @@ static void test_alloc_accessors(void)
     BDDCT ct;
     test_result("P1-01: a fresh table is empty and answers by its contract",
                 ct.Size() == 0 && ct.Cost(0) == bddcost_null &&
-                ct.Cost(-1) == 1 && ct.Label(0) == 0);
+                ct.Cost(-1) == bddcost_null && ct.Label(0) == 0);
   }
   {
     BDDCT ct;
@@ -688,8 +688,13 @@ static void test_alloc_accessors(void)
     for(int i=0; i<5; i++)
       if(ct.Cost(i) != 7 || !ct.Label(i) || ct.Label(i)[0]) ok = false;
     test_result("P1-02: Alloc(N, 7) fills every cost and empties every label", ok);
-    test_result("P1-03: Cost(-1) is 1 and Cost(Size()) is the bddcost_null mark",
-                ct.Cost(-1) == 1 && ct.Cost(ct.Size()) == bddcost_null);
+    /* an index outside the table answers with the mark on both sides; a
+       negative one, that is a variable above the table, used to answer 1 */
+    test_result("P1-03: Cost() is the bddcost_null mark on both sides of the table",
+                ct.Cost(-1) == bddcost_null &&
+                ct.Cost(ct.Size()) == bddcost_null &&
+                ct.CostOfLev(0) == bddcost_null &&
+                ct.CostOfLev(ct.Size() + 1) == bddcost_null);
     test_result("P1-04: Alloc(-1) yields the empty table",
                 ct.Alloc(-1) == 0 && ct.Size() == 0);
   }
@@ -1188,7 +1193,10 @@ static void test_deep_recursion_guard(void)
   for(int i=0; i<depth; i++) f = f.Change(deep_var[i]);
 
   BDDCT ct;
-  ct.Alloc(depth);
+  /* the chain sits on the levels above the NV variables of the other tests,
+     and a table that does not cover every level of the diagram is refused
+     before the recursion even starts */
+  ct.Alloc(NV + depth);
 
   bool threw = false;
   try { ct.MinCost(f); } catch(const BDDException&) { threw = true; }
@@ -1219,6 +1227,48 @@ static void test_deep_recursion_guard(void)
   ZDD g = Set(0) + Set(1);
   test_result("a shallow MinCost() still works after the failures",
               ct2.MinCost(g) == 10 && BDD_RecurCount == 0);
+}
+
+/* ---- a diagram the cost table does not cover ----
+   Cost() answered 1 for a variable above the table, and no recursion looked
+   at what came back, so a family over more variables than the table describes
+   was filtered as if every unknown variable cost 1. */
+
+static void test_variable_outside_table(void)
+{
+  cout << endl << "--- a variable the cost table has no entry for ---" << endl;
+  BDDCT ct;
+  ct.Alloc(2);                    /* levels 1 and 2 only */
+  SetVarCost(ct, 0, 10);          /* var[0] is on level 1 */
+  SetVarCost(ct, 1, 20);          /* var[1] is on level 2 */
+
+  ZDD in = Set(0) + Set(1);
+  ZDD out = Set(0) + Set(7);      /* var[7] is on level 8, above the table */
+  bddcost c;
+  ZDD z;
+
+  test_result("the family inside the table is still answered",
+              ct.MinCost(in) == 10 && ct.MaxCost(in) == 20 &&
+              ct.ZDD_CostLE(in, 15) == Set(0) &&
+              ct.ZDD_CostLE0(in, 15) == Set(0));
+
+  test_result("MinCost() refuses a variable outside the table",
+              TryMinCost(ct, out, c) == 1);
+  test_result("MaxCost() refuses a variable outside the table",
+              TryMaxCost(ct, out, c) == 1);
+  test_result("ZDD_CostLE() refuses a variable outside the table",
+              TryCostLE(ct, out, 15, z) == 1 && TryCostLE2(ct, out, 15, z) == 1);
+  test_result("ZDD_CostLE0() refuses a variable outside the table",
+              TryCostLE0(ct, out, 15, z) == 1);
+
+  /* the empty table covers no level at all, so even a one-variable family
+     is outside it, while the constants stay answerable */
+  BDDCT empty;
+  test_result("the empty table refuses every family with a variable",
+              TryMinCost(empty, Set(0), c) == 1 &&
+              TryCostLE0(empty, Set(0), 0, z) == 1);
+  test_result("the empty table still answers for the constants",
+              empty.MinCost(ZDD(1)) == 0 && empty.MaxCost(ZDD(0)) == bddcost_null);
 }
 
 /* ---- CallCount(): the recursion counter of the operation that ran last ----
@@ -1313,6 +1363,7 @@ int main(void)
     test_compat_api();
     test_stress_fixed_seed();
     test_deep_recursion_guard();
+    test_variable_outside_table();
     test_call_count();
     test_env_notes();
   }

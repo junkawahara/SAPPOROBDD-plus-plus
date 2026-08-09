@@ -73,9 +73,25 @@ BDDCT::~BDDCT()
   if(_ca0) delete[] _ca0; 
 }
 
+/* Cost() answers with the bddcost_null mark for every index outside the
+   table, on both sides.  A negative index, that is a variable at a level
+   above the table, used to answer 1 instead, and none of the recursions
+   looked at what came back: a diagram over more variables than the table
+   describes was then filtered, minimised and maximised as if each of the
+   variables the table knows nothing about cost 1, without a word.  The
+   recursions now refuse such a variable through TopCost(). */
 bddcost BDDCT::Cost(const int ix) const
 {
-  return (ix >= _n)? bddcost_null: (ix < 0)? 1: _cost[ix];
+  return (ix < 0 || ix >= _n)? bddcost_null: _cost[ix];
+}
+
+/* the cost of the variable a node tests, refusing the ones the table has no
+   entry for; what names the operation in the error message */
+bddcost BDDCT::TopCost(const int top, const char* what) const
+{
+  bddcost cost = CostOfLev(BDD_LevOfVar(top));
+  if(cost == bddcost_null) BDDerr(what, ExceptionType::OutOfRange);
+  return cost;
 }
 
 const char* BDDCT::Label(const int ix) const
@@ -477,7 +493,8 @@ ZDD BDDCT::CLE(const ZDD& f, const bddcost bound,
   if(h != -1) return h;
   BDD_RECUR_INC;
   int top = f.Top();
-  bddcost cost = CostOfLev(BDD_LevOfVar(top));
+  bddcost cost = TopCost(top,
+    "BDDCT::ZDD_CostLE(): variable outside the cost table");
   bddcost aw0, aw1, rb0, rb1;
   ZDD f1 = f.OnSet0(top);
   ZDD f0 = f.OffSet(top);
@@ -529,10 +546,11 @@ bddcost BDDCT::MinC(const ZDD& f)
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::MinCost(): memory overflow", ExceptionType::OutOfMemory);
+  bddcost cost = TopCost(top,
+    "BDDCT::MinCost(): variable outside the cost table");
   min = MinC(f0);
   bddcost min1 = MinC(f1);
-  if(min1 != bddcost_null)
-    min1 = AddCost(min1, CostOfLev(BDD_LevOfVar(top)));
+  if(min1 != bddcost_null) min1 = AddCost(min1, cost);
   min = (min != bddcost_null && min < min1)? min: min1;
   Cache0Ent(4, f, min);
   BDD_RECUR_DEC;
@@ -560,10 +578,11 @@ bddcost BDDCT::MaxC(const ZDD& f)
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::MaxCost(): memory overflow", ExceptionType::OutOfMemory);
+  bddcost cost = TopCost(top,
+    "BDDCT::MaxCost(): variable outside the cost table");
   max = MaxC(f0);
   bddcost max1 = MaxC(f1);
-  if(max1 != bddcost_null)
-    max1 = AddCost(max1, CostOfLev(BDD_LevOfVar(top)));
+  if(max1 != bddcost_null) max1 = AddCost(max1, cost);
   max = (max != bddcost_null && max > max1)? max: max1;
   Cache0Ent(5, f, max);
   BDD_RECUR_DEC;
@@ -611,14 +630,14 @@ ZDD BDDCT::CLE0(const ZDD& f, const bddcost bound, const bddcost spent,
   }
   BDD_RECUR_INC;
   int top = f.Top();
-  int tlev = BDD_LevOfVar(top);
+  bddcost cost = TopCost(top,
+    "BDDCT::ZDD_CostLE0(): variable outside the cost table");
   ZDD f0 = f.OffSet(top);
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
   bddcost min0, max0, min1, max1;
   ZDD h = CLE0(f0, bound, spent, min0, max0);
-  bddcost cost = CostOfLev(tlev);
   ZDD h1 = CLE0(f1, bound, AddCost(spent, cost), min1, max1).Change(top);
   if(h1 == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);

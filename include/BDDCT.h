@@ -58,6 +58,9 @@ public:
 
   inline int Size(void) const { return _n; }
 
+  /* Cost() and CostOfLev() answer with the bddcost_null mark for a variable
+     the table has no entry for, on both sides of it; the four cost
+     operations refuse such a variable rather than pricing it. */
   bddcost Cost(const int ix) const;
   inline bddcost CostOfLev(const int lev) const 
   { return Cost(_n-lev); }
@@ -174,6 +177,7 @@ private:
      with the bound and the two cost results of ZDD_CostLE0() handed around
      through three more file-static variables; as members they take their
      context as arguments instead. */
+  bddcost TopCost(const int, const char *) const;
   ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
   bddcost MinC(const ZDD &);
   bddcost MaxC(const ZDD &);
