@@ -432,7 +432,13 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
 }
 
 
-/* The four recursions below are members of the class.  They used to be
+/* Every one of the four recursions below counts its own calls in _call, and
+   every entry point resets the counter before it recurses, so CallCount()
+   always reports the operation that ran last.  The counter used to be kept by
+   ZDD_CostLE() alone, and MinCost(), MaxCost() and ZDD_CostLE0() left whatever
+   the last ZDD_CostLE() had counted in place.
+
+   The four recursions below are members of the class.  They used to be
    file-static functions that reached their table through a file-static
    BDDCT* and handed the bound and the two cost results of ZDD_CostLE0() to
    each other through three more file-static variables.  That made every one
@@ -512,6 +518,7 @@ ZDD BDDCT::ZDD_CostLE(const ZDD& f, const bddcost bound,
 
 bddcost BDDCT::MinC(const ZDD& f)
 {
+  _call++;
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
   bddcost min = Cache0Ref(4, f);
@@ -536,11 +543,13 @@ bddcost BDDCT::MinCost(const ZDD& f)
 {
   if(f == -1)
     BDDerr("BDDCT::MinCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  _call = 0;
   return MinC(f);
 }
 
 bddcost BDDCT::MaxC(const ZDD& f)
 {
+  _call++;
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
   bddcost max = Cache0Ref(5, f);
@@ -565,6 +574,7 @@ bddcost BDDCT::MaxCost(const ZDD& f)
 {
   if(f == -1)
     BDDerr("BDDCT::MaxCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  _call = 0;
   return MaxC(f);
 }
 
@@ -574,6 +584,7 @@ bddcost BDDCT::MaxCost(const ZDD& f)
 ZDD BDDCT::CLE0(const ZDD& f, const bddcost bound, const bddcost spent,
                 bddcost& retmin, bddcost& retmax)
 {
+  _call++;
   if(f == 0)
   {
     retmin = bddcost_null; retmax = bddcost_null;
@@ -635,6 +646,7 @@ ZDD BDDCT::ZDD_CostLE0(const ZDD& f, const bddcost bound)
 {
   if(f == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  _call = 0;
   bddcost retmin, retmax;
   ZDD h = CLE0(f, bound, 0, retmin, retmax);
   return h;

@@ -92,7 +92,9 @@ public:
   bddcost MinCost(const ZDD &);
   bddcost MaxCost(const ZDD &);
 
-  /* how many recursive calls the cost operation that ran last needed */
+  /* How many recursive calls the cost operation that ran last needed.  Each
+     of ZDD_CostLE(), ZDD_CostLE0(), MinCost() and MaxCost() resets the count
+     when it starts, so it always describes that one call. */
   inline bddword CallCount(void) const { return _call; }
 
 /* Everything below is the implementation of the class.  It all used to be

@@ -1215,6 +1215,52 @@ static void test_deep_recursion_guard(void)
               ct2.MinCost(g) == 10 && BDD_RecurCount == 0);
 }
 
+/* ---- CallCount(): the recursion counter of the operation that ran last ----
+   The counter used to be kept by ZDD_CostLE() alone, so MinCost(), MaxCost()
+   and ZDD_CostLE0() reported whatever the last ZDD_CostLE() had left. */
+
+static void test_call_count(void)
+{
+  cout << endl << "--- CallCount() ---" << endl;
+  BDDCT ct;
+  ct.Alloc(NV);
+  for(int i=0; i<NV; i++) SetVarCost(ct, i, (i + 1) * 10);
+  ZDD f = Set(0) * Set(1) + Set(2) * Set(3) + Set(4);
+
+  bddcost mn = ct.MinCost(f);
+  bddword deep_min = ct.CallCount();
+  ct.MaxCost(f);
+  bddword deep_max = ct.CallCount();
+  bddcost aw, rb;
+  ct.ZDD_CostLE(f, mn, aw, rb);
+  bddword deep_le = ct.CallCount();
+  ct.ZDD_CostLE0(f, mn);
+  bddword deep_le0 = ct.CallCount();
+  test_result("every cost operation counts its own recursive calls",
+              deep_min > 1 && deep_max > 1 && deep_le > 1 && deep_le0 > 1);
+
+  /* one call each: the recursion returns at once on the empty family, and the
+     count of the operation before it is gone */
+  ct.MinCost(ZDD(0));
+  bool one = ct.CallCount() == 1;
+  ct.MaxCost(ZDD(0));
+  one = one && ct.CallCount() == 1;
+  ct.ZDD_CostLE(ZDD(0), 5, aw, rb);
+  one = one && ct.CallCount() == 1;
+  ct.ZDD_CostLE0(ZDD(0), 5);
+  one = one && ct.CallCount() == 1;
+  test_result("every entry point resets the count before it recurses", one);
+
+  /* repeating an operation stops at the root entry of the cache */
+  ct.MinCost(f);
+  bool hit = ct.CallCount() == 1;
+  ct.MaxCost(f);
+  hit = hit && ct.CallCount() == 1;
+  ct.ZDD_CostLE(f, mn, aw, rb);
+  hit = hit && ct.CallCount() == 1;
+  test_result("a repeated operation counts the one call the cache serves", hit);
+}
+
 /* ---- P2-06, P2-07: out of reach in this build ---- */
 
 static void test_env_notes(void)
@@ -1261,6 +1307,7 @@ int main(void)
     test_compat_api();
     test_stress_fixed_seed();
     test_deep_recursion_guard();
+    test_call_count();
     test_env_notes();
   }
   catch(const std::exception& e)
