@@ -16,6 +16,7 @@ namespace sapporobdd {
    is the one value whose negation does not exist and the cache keys are
    negated costs. */
 static const bddcost CostMin = -bddcost_null;
+static const bddcost CostMax = bddcost_null - 1;
 
 static bddcost NegCost(const bddcost a)
 {
@@ -29,8 +30,10 @@ static bddcost AddCost(const bddcost a, const bddcost b)
   if(a < CostMin || b < CostMin)
     BDDerr("BDDCT: cost out of range", ExceptionType::OutOfRange);
   /* both operands are in [CostMin, bddcost_null] now, so the bounds compared
-     against here cannot overflow themselves */
-  if((b > 0)? (a > bddcost_null - b): (a < CostMin - b))
+     against here cannot overflow themselves.  The result is held to CostMax
+     so that a computed cost never comes out as the bddcost_null mark, which
+     the callers read as "no value". */
+  if((b > 0)? (a > CostMax - b): (a < CostMin - b))
     BDDerr("BDDCT: cost overflow", ExceptionType::OutOfRange);
   return a + b;
 }
@@ -80,9 +83,17 @@ char* BDDCT::Label(const int ix) const
   return (ix >= _n || ix < 0)? 0: _label[ix];
 }
 
+/* bddcost_null is the "no value" mark: Cost() returns it for an index past
+   the table and the recursions read it as "this branch holds no set", so it
+   cannot double as a cost.  CostMin is left out as well, as it is the one
+   value the negated cache keys have no room for. */
+static int CostChk(const bddcost cost)
+{ return (cost > CostMax || cost <= CostMin)? 1: 0; }
+
 int BDDCT::SetCost(const int ix, const bddcost cost)
 {
   if(ix < 0 || ix >= _n) return 1;
+  if(CostChk(cost)) return 1;
   _cost[ix] = cost;
   if(_caent > 0) if(CacheClear()) return 1;
   if(_ca0ent > 0) if(Cache0Clear()) return 1;
@@ -104,6 +115,7 @@ int BDDCT::SetLabel(const int ix, const char* label)
 
 int BDDCT::Alloc(const int n, const bddcost cost)
 {
+  if(CostChk(cost)) return 1;
   if(_cost) { delete[] _cost; _cost = 0; }
   if(_label)
   {
@@ -352,6 +364,10 @@ bddcost BDDCT::Cache0Ref(const unsigned char op, const bddword id) const
 
 int BDDCT::Cache0Ent(const unsigned char op, const bddword id, const bddcost b)
 {
+  /* An entry holding bddcost_null is the mark for an empty slot, so storing
+     one would make Cache0Ref miss this entry, hide the entries behind it on
+     the same probe chain, and have Cache0Enlarge drop them all. */
+  if(b == bddcost_null) return 1;
   if(!_ca0size) return 1;
   if(_ca0ent >= (_ca0size >> 1) && Cache0Enlarge()) return 1;
   bddword k = Hash0(op, id) & (_ca0size - 1);
