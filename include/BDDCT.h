@@ -26,55 +26,6 @@ class BDDCT;
 class BDDCT
 {
 public:
-  /* Both caches are keyed by the node ID of the argument ZDD.  An ID is only
-     unique while the node it names is alive: once the last reference to the
-     node goes away, the garbage collector may reclaim it and hand the same ID
-     to an unrelated node, and the stale entry would then be returned for that
-     other function.  Each entry therefore holds the key ZDD itself, which
-     keeps the key node alive for as long as the entry lives.  The cost is
-     that a cached node is not collectable until the cache is released by
-     CacheClear() / Cache0Clear(), which SetCost() and Alloc() also do. */
-  struct CacheEntry
-  {
-    ZDD _key;
-    Zmap* _zmap;
-    CacheEntry(void)
-    {
-      _zmap = 0;
-    }
-    ~CacheEntry(void)
-    {
-      delete _zmap;
-    }
-  };
-
-  struct Cache0Entry
-  {
-    ZDD _key;
-    bddcost _b;
-    unsigned char _op;
-    Cache0Entry(void)
-    {
-      _b = bddcost_null;
-      _op = 255;
-    }
-    ~Cache0Entry(void) { }
-  };
-
-  int _n;
-  bddcost *_cost;
-  char **_label;
-
-  bddword _casize;
-  bddword _caent;
-  CacheEntry* _ca;
-
-  bddword _ca0size;
-  bddword _ca0ent;
-  Cache0Entry* _ca0;
-  
-  bddword _call;
-
   BDDCT(void);
   ~BDDCT(void);
 
@@ -141,7 +92,63 @@ public:
   bddcost MinCost(const ZDD &);
   bddcost MaxCost(const ZDD &);
 
+  /* how many recursive calls the cost operation that ran last needed */
+  inline bddword CallCount(void) const { return _call; }
+
+/* Everything below is the implementation of the class.  It all used to be
+   public, which let any user of the class swap an array out, resize the
+   table without its arrays, or edit a cache entry, and so break the
+   invariants the code above relies on. */
 private:
+  /* Both caches are keyed by the node ID of the argument ZDD.  An ID is only
+     unique while the node it names is alive: once the last reference to the
+     node goes away, the garbage collector may reclaim it and hand the same ID
+     to an unrelated node, and the stale entry would then be returned for that
+     other function.  Each entry therefore holds the key ZDD itself, which
+     keeps the key node alive for as long as the entry lives.  The cost is
+     that a cached node is not collectable until the cache is released by
+     CacheClear() / Cache0Clear(), which SetCost() and Alloc() also do. */
+  struct CacheEntry
+  {
+    ZDD _key;
+    Zmap* _zmap;
+    CacheEntry(void)
+    {
+      _zmap = 0;
+    }
+    ~CacheEntry(void)
+    {
+      delete _zmap;
+    }
+  };
+
+  struct Cache0Entry
+  {
+    ZDD _key;
+    bddcost _b;
+    unsigned char _op;
+    Cache0Entry(void)
+    {
+      _b = bddcost_null;
+      _op = 255;
+    }
+    ~Cache0Entry(void) { }
+  };
+
+  int _n;
+  bddcost *_cost;
+  char **_label;
+
+  bddword _casize;
+  bddword _caent;
+  CacheEntry* _ca;
+
+  bddword _ca0size;
+  bddword _ca0ent;
+  Cache0Entry* _ca0;
+  
+  bddword _call;
+
   /* The recursions behind the four entry points above.  They used to be
      file-static functions reaching the table through a file-static BDDCT*,
      with the bound and the two cost results of ZDD_CostLE0() handed around
