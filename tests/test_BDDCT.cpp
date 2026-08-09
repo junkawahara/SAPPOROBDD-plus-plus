@@ -911,10 +911,17 @@ static void test_allocrand(void)
   test_result("P1-23: a zero-size table is allowed",
               ct.AllocRand(0, 1, 2) == 0 && ct.Size() == 0);
 
-  /* the current contract, pinned here: min > max yields the min everywhere */
-  ok = ct.AllocRand(5, 10, 3) == 0 && ct.Size() == 5;
-  if(ok) for(int i=0; i<5; i++) if(ct.Cost(i) != 10) ok = false;
-  test_result("P1-24: min > max falls back to the min everywhere", ok);
+  /* an empty range is a mistake -- swapped arguments -- and used to be
+     answered with a table of the min everywhere */
+  ct.Alloc(3, 8);
+  ok = ct.AllocRand(5, 10, 3) != 0 && ct.Size() == 3;
+  if(ok) for(int i=0; i<3; i++) if(ct.Cost(i) != 8) ok = false;
+  test_result("P1-24: min > max is refused and leaves the table alone", ok);
+
+  ok = ct.AllocRand(5, 1, bddcost_null) != 0 &&
+       ct.AllocRand(5, -bddcost_null, 1) != 0 && ct.Size() == 3;
+  if(ok) for(int i=0; i<3; i++) if(ct.Cost(i) != 8) ok = false;
+  test_result("P1-24: an invalid range bound is refused the same way", ok);
 
   /* the full valid range; its width does not fit in bddcost, which the
      range arithmetic has to survive without an overflow */

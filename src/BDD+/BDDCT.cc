@@ -256,14 +256,22 @@ int BDDCT::Import(FILE *fp)
   return 0;
 }
 
+/* Fills a fresh table of n variables with costs drawn uniformly from the
+   closed range [min, max].  The numbers come from the C library's rand(), so
+   a program that never calls srand() gets the same table on every run. */
 int BDDCT::AllocRand(const int n, const bddcost min, const bddcost max)
 {
-  Alloc(n);
+  /* An invalid or empty range is refused before the table it would replace is
+     dropped.  min > max used to mean "the min everywhere", which answers a
+     mistake -- swapped arguments -- with a table rather than with an error. */
+  if(CostChk(min) || CostChk(max) || min > max) return 1;
+  /* the result of Alloc() used to be dropped, and a failure then left the
+     empty table behind and reported success */
+  if(Alloc(n)) return 1;
   /* the width of the widest valid range does not fit in bddcost, and
-     max - min + 1 used to overflow it; min > max keeps its historical
-     meaning of "the min everywhere" */
-  unsigned long long m = (min <= max)?
-    (unsigned long long)((long long)max - (long long)min) + 1ULL: 1ULL;
+     max - min + 1 used to overflow it */
+  unsigned long long m =
+    (unsigned long long)((long long)max - (long long)min) + 1ULL;
   for(int ix=0; ix<_n; ix++)
   {
     long long r = (long long)(((double)rand()/((double)RAND_MAX+1)) * (double)m);

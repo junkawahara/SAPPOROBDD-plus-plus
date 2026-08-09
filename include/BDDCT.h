@@ -82,7 +82,10 @@ public:
 
   int Alloc(const int n, const bddcost cost = 1);
   int Import(FILE* fp = stdin);
-  int AllocRand(const int, const bddcost, const bddcost);
+  /* costs drawn from the closed range [min, max] with the C library's
+     rand(), which a program that never calls srand() draws the same way on
+     every run; an empty or invalid range is refused */
+  int AllocRand(const int n, const bddcost min, const bddcost max);
   void Export(void) const;
 
   int CacheClear(void);
