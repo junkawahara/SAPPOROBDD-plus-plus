@@ -850,6 +850,19 @@ static void test_export_import(void)
     test_result("P1-16: comment tokens are read over", ok);
   }
   {
+    /* the comment rule is about tokens, not lines -- it cannot be about
+       lines, as the size follows the "#n" comment on the first line -- so a
+       free-text comment is refused rather than read over silently */
+    BDDCT a;
+    test_result("P1-16: a comment token does not reach over the rest of a line",
+                ImportFromString(a, "#to be revised\n2\n1\n2\n") != 0 &&
+                a.Size() == 0);
+    BDDCT b;
+    bool ok = ImportFromString(b, "#to-be-revised\n2\n1\n2\n") == 0 &&
+              b.Size() == 2 && b.Cost(0) == 1 && b.Cost(1) == 2;
+    test_result("P1-16: the same comment written as one token is read over", ok);
+  }
+  {
     BDDCT a;
     bool ok = ImportFromString(a, "1 5 #123456789012345\n") == 0 &&
               a.Size() == 1 && strcmp(a.Label(0), "123456789012345") == 0;

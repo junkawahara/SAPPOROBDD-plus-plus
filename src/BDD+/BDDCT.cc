@@ -218,6 +218,28 @@ static int ParseCost(const std::string& s, bddcost& val)
   return 0;
 }
 
+/* Reads a cost table in the format Export() writes:
+
+     #n 5
+     123 #lev5
+     456 #lev4
+     789
+     -987 #lev2
+     -321 #lev1
+
+   which is a stream of whitespace-separated tokens: the number of variables,
+   then one cost per variable, from the top level down.  A token that starts
+   with '#' is a comment, except directly after a cost, where it is that
+   variable's label; a label ends at the first whitespace, like every other
+   token, and holds at most CT_STRLEN characters.  The '#n' of the first line
+   is a comment token like any other, standing in front of the count.
+
+   The comment rule is therefore about tokens and not about lines, and it
+   cannot be about lines: the count of the first line follows its comment
+   token on that same line.  A comment in the usual free-text form, say
+   "# to be revised", is four tokens of which only the first is skipped, so
+   "to" is read where a number belongs and the file is refused as malformed.
+   Written as one token, "#to-be-revised", it is read over. */
 int BDDCT::Import(FILE *fp)
 {
   /* every failure leaves the empty table: the early returns used to keep
