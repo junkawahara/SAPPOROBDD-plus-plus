@@ -1325,8 +1325,11 @@ static void test_env_notes(void)
   cout << "[INFO] P2-06 not applicable: the BDD core is single-threaded, so"
           " concurrent use is outside the contract (the recursions themselves"
           " no longer pass their context through file statics)." << endl;
-  cout << "[INFO] P2-07 not applicable: BDDCT allocates with operator new and"
-          " this build has no allocation-failure hook for it." << endl;
+  cout << "[INFO] P2-07 not applicable: BDDCT allocates with the nothrow"
+          " operator new and reports a failure as the library's own"
+          " out-of-memory error, but this build has no hook to make an"
+          " allocation fail on demand, and a table large enough to exhaust"
+          " memory for real cannot be asked for safely from a test." << endl;
 }
 
 int main(void)

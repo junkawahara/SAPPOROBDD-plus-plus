@@ -3,6 +3,8 @@
  * (C) Shin-ichi MINATO (Jan. 2, 2023)  *
  ****************************************/
 
+#include <new>
+
 #include "BDDCT.h"
 #include "bddplus_internal.h"
 using namespace std;
@@ -111,8 +113,11 @@ int BDDCT::SetCost(const int ix, const bddcost cost)
   if(ix < 0 || ix >= _n) return 1;
   if(CostChk(cost)) return 1;
   _cost[ix] = cost;
-  if(_caent > 0) if(CacheClear()) return 1;
-  if(_ca0ent > 0) if(Cache0Clear()) return 1;
+  /* the costs behind every cached result just changed; both clears raise the
+     out-of-memory error themselves, so the 1 returned above is the index or
+     the cost being wrong and nothing else */
+  if(_caent > 0) CacheClear();
+  if(_ca0ent > 0) Cache0Clear();
   return 0;
 }
 
@@ -143,20 +148,44 @@ int BDDCT::Alloc(const int n, const bddcost cost)
 
   if(_n > 0)
   {
-    if(!(_cost = new bddcost[_n])) { Alloc(0); return 1; }
-    if(!(_label = new char*[_n])) { Alloc(0); return 1; }
+    /* The null checks below used to guard a plain new, which never returns
+       null: it throws std::bad_alloc, which is not a BDDException and would
+       escape every handler this library asks its users to write, so the
+       checks were dead and the failure left the class's own error path.
+       With nothrow the checks are real, and the failure is reported as the
+       library's out-of-memory error, on the empty table Alloc(0) leaves. */
+    _cost = new(std::nothrow) bddcost[_n];
+    if(!_cost)
+    {
+      Alloc(0);
+      BDDerr("BDDCT::Alloc(): memory overflow", ExceptionType::OutOfMemory);
+    }
+    _label = new(std::nothrow) char*[_n];
+    if(!_label)
+    {
+      Alloc(0);
+      BDDerr("BDDCT::Alloc(): memory overflow", ExceptionType::OutOfMemory);
+    }
     for(int i=0; i<_n; i++)
     {
       _cost[i] = cost;
       _label[i] = 0;
     }
     for(int i=0; i<_n; i++)
-      if((_label[i] = new char[CT_STRLEN + 1])) _label[i][0] = 0;
-      else { Alloc(0); return 1; }
+    {
+      _label[i] = new(std::nothrow) char[CT_STRLEN + 1];
+      if(!_label[i])
+      {
+        Alloc(0);
+        BDDerr("BDDCT::Alloc(): memory overflow", ExceptionType::OutOfMemory);
+      }
+      _label[i][0] = 0;
+    }
   }
 
-  if(CacheClear()) return 1;
-  if(Cache0Clear()) return 1;
+  /* both raise the out-of-memory error themselves if they cannot allocate */
+  CacheClear();
+  Cache0Clear();
   return 0;
 }
 
@@ -259,12 +288,21 @@ void BDDCT::Export() const
   }
 }
 
+/* Releases the cache and starts a new empty one.  The return value is kept
+   at 0: a failure to allocate the new table raises the out-of-memory error
+   instead, as the null check on the plain new never fired. */
 int BDDCT::CacheClear()
 {
   if(_ca) { delete[] _ca; _ca = 0; }
-  _casize = 1 << 4;
+  _casize = 0;
   _caent = 0;
-  if(!(_ca = new CacheEntry[_casize])) return 1;
+  CacheEntry* ca = new(std::nothrow) CacheEntry[1 << 4];
+  /* the empty cache left behind is consistent: CacheRef() misses and
+     CacheEnt() declines while _casize is 0 */
+  if(!ca) BDDerr("BDDCT::CacheClear(): memory overflow",
+                 ExceptionType::OutOfMemory);
+  _ca = ca;
+  _casize = 1 << 4;
   return 0;
 }
 
@@ -274,8 +312,10 @@ int BDDCT::CacheEnlarge()
 {
   bddword newsize = _casize << 2;
   //cout << "enlarge: " << newsize << "\n";
-  CacheEntry* newca = 0;
-  if(!(newca = new CacheEntry[newsize])) return 1;
+  /* growing the cache is optional: the failure is reported to the caller,
+     which goes on with the cache it has */
+  CacheEntry* newca = new(std::nothrow) CacheEntry[newsize];
+  if(!newca) return 1;
   for(bddword i=0; i<_casize; i++)
   {
     if(_ca[i]._zmap)
@@ -353,9 +393,13 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
   {
     if(!_ca[k]._zmap)
     {
-      _caent++;
-      if(!(_ca[k]._zmap = new Zmap)) return 1;
+      /* the count used to go up before the allocation, so a failure left the
+         table counting one entry more than it holds */
+      Zmap* zm = new(std::nothrow) Zmap;
+      if(!zm) return 1;
+      _ca[k]._zmap = zm;
       _ca[k]._key = f;
+      _caent++;
       break;
     }
     if(_ca[k]._key.GetID() == id) break;
@@ -363,19 +407,30 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
     k &= _casize - 1;
   }
   Zmap* zm = _ca[k]._zmap;
-  if(acc_worst != bddcost_null) (*zm)[NegCost(acc_worst)] = h;
-  else if(h == 0) (*zm)[bddcost_null] = 0;
-  if(rej_best != bddcost_null)
-     if(zm->find(NegCost(rej_best)) == zm->end()) (*zm)[NegCost(rej_best)] = -1;
+  /* the map allocates a node per cost; caching is an optimisation, so a
+     failure here costs the entry and not the computation */
+  try
+  {
+    if(acc_worst != bddcost_null) (*zm)[NegCost(acc_worst)] = h;
+    else if(h == 0) (*zm)[bddcost_null] = 0;
+    if(rej_best != bddcost_null)
+       if(zm->find(NegCost(rej_best)) == zm->end()) (*zm)[NegCost(rej_best)] = -1;
+  }
+  catch(const std::bad_alloc&) { return 1; }
   return 0;
 }
 
+/* as CacheClear(), for the cost cache */
 int BDDCT::Cache0Clear()
 {
   if(_ca0) { delete[] _ca0; _ca0 = 0; }
-  _ca0size = 1 << 4;
+  _ca0size = 0;
   _ca0ent = 0;
-  if(!(_ca0 = new Cache0Entry[_ca0size])) return 1;
+  Cache0Entry* ca0 = new(std::nothrow) Cache0Entry[1 << 4];
+  if(!ca0) BDDerr("BDDCT::Cache0Clear(): memory overflow",
+                  ExceptionType::OutOfMemory);
+  _ca0 = ca0;
+  _ca0size = 1 << 4;
   return 0;
 }
 
@@ -385,8 +440,9 @@ int BDDCT::Cache0Enlarge()
 {
   bddword newsize = _ca0size << 2;
   //cout << "enlarge: " << newsize << "\n";
-  Cache0Entry* newca0 = 0;
-  if(!(newca0 = new Cache0Entry[newsize])) return 1;
+  /* as CacheEnlarge(): the caller goes on with the cache it has */
+  Cache0Entry* newca0 = new(std::nothrow) Cache0Entry[newsize];
+  if(!newca0) return 1;
   for(bddword i=0; i<_ca0size; i++)
   {
     if(_ca0[i]._b != bddcost_null)
