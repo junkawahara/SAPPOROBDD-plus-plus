@@ -779,6 +779,12 @@ static void test_labels(void)
 
   test_result("P1-12: Label() is null outside the table",
               ct.Label(-1) == 0 && ct.Label(4) == 0);
+
+  /* the buffer behind the pointer belongs to the table: a plain char* let a
+     caller write CT_STRLEN or more characters into it and wreck the heap */
+  test_result("Label() hands out a pointer that cannot be written through",
+              (std::is_same<decltype(ct.Label(0)), const char*>::value) &&
+              (std::is_same<decltype(ct.LabelOfLev(1)), const char*>::value));
 }
 
 /* ---- P1-13..P1-20: Export() / Import() ---- */

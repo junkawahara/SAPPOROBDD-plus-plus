@@ -78,7 +78,7 @@ bddcost BDDCT::Cost(const int ix) const
   return (ix >= _n)? bddcost_null: (ix < 0)? 1: _cost[ix];
 }
 
-char* BDDCT::Label(const int ix) const
+const char* BDDCT::Label(const int ix) const
 {
   return (ix >= _n || ix < 0)? 0: _label[ix];
 }

@@ -48,8 +48,13 @@ public:
   bddcost Cost(const int ix) const;
   inline bddcost CostOfLev(const int lev) const 
   { return Cost(_n-lev); }
-  char* Label(const int) const;
-  inline char* LabelOfLev(const int lev) const 
+  /* The label is read through a pointer into the table's own buffer, which
+     holds at most CT_STRLEN characters and is released by the next Alloc(),
+     Import() or AllocRand() and by the destructor: a caller that wants to
+     keep a label past that has to copy it.  The pointer used to be a plain
+     char*, so a caller could also write through it and overrun the buffer. */
+  const char* Label(const int) const;
+  inline const char* LabelOfLev(const int lev) const 
   { return Label(_n-lev); }
 
   int SetCost(const int, const bddcost);
