@@ -73,6 +73,8 @@ public:
   inline const char* LabelOfLev(const int lev) const 
   { return Label(_n-lev); }
 
+  /* 1 for an index outside the table or a cost outside its range, and for
+     nothing else: the invalidation of the caches this does cannot fail */
   int SetCost(const int, const bddcost);
   inline int SetCostOfLev(const int lev, const bddcost cost) 
   { return SetCost(_n-lev, cost); }
@@ -181,6 +183,8 @@ private:
      with the bound and the two cost results of ZDD_CostLE0() handed around
      through three more file-static variables; as members they take their
      context as arguments instead. */
+  int CacheAlloc(void);
+  int Cache0Alloc(void);
   bddcost TopCost(const int, const char *) const;
   ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
   bddcost MinC(const ZDD &);

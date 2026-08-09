@@ -113,9 +113,10 @@ int BDDCT::SetCost(const int ix, const bddcost cost)
   if(ix < 0 || ix >= _n) return 1;
   if(CostChk(cost)) return 1;
   _cost[ix] = cost;
-  /* the costs behind every cached result just changed; both clears raise the
-     out-of-memory error themselves, so the 1 returned above is the index or
-     the cost being wrong and nothing else */
+  /* The costs behind every cached result just changed.  Neither clear
+     allocates, so the 1 returned above is the index or the cost being
+     rejected and nothing else; it used to stand for a failure to allocate a
+     cache table as well, which the caller could not tell apart. */
   if(_caent > 0) CacheClear();
   if(_ca0ent > 0) Cache0Clear();
   return 0;
@@ -185,7 +186,7 @@ int BDDCT::Alloc(const int n, const bddcost cost)
     }
   }
 
-  /* both raise the out-of-memory error themselves if they cannot allocate */
+  /* the caches only hold results of the costs that just went away */
   CacheClear();
   Cache0Clear();
   return 0;
@@ -298,21 +299,28 @@ void BDDCT::Export() const
   }
 }
 
-/* Releases the cache and starts a new empty one.  The return value is kept
-   at 0: a failure to allocate the new table raises the out-of-memory error
-   instead, as the null check on the plain new never fired. */
+/* Releases the cache.  The table behind it is allocated again by the next
+   entry that goes into it, and not here: clearing used to allocate a fresh
+   table at once, which every Alloc() and every SetCost() after a computation
+   paid for, even while a table was being built and there was nothing to
+   cache yet.  Nothing here can fail, so the 0 is the only answer. */
 int BDDCT::CacheClear()
 {
   if(_ca) { delete[] _ca; _ca = 0; }
   _casize = 0;
   _caent = 0;
+  return 0;
+}
+
+/* the table the first entry after a clear goes into; 1 if it cannot be
+   allocated, which costs the caller its entry and nothing else */
+int BDDCT::CacheAlloc()
+{
   CacheEntry* ca = new(std::nothrow) CacheEntry[1 << 4];
-  /* the empty cache left behind is consistent: CacheRef() misses and
-     CacheEnt() declines while _casize is 0 */
-  if(!ca) BDDerr("BDDCT::CacheClear(): memory overflow",
-                 ExceptionType::OutOfMemory);
+  if(!ca) return 1;
   _ca = ca;
   _casize = 1 << 4;
+  _caent = 0;
   return 0;
 }
 
@@ -398,7 +406,7 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
      be stored. */
   if(acc_worst == -bddcost_null || rej_best == -bddcost_null)
     BDDerr("BDDCT::CacheEnt: cost out of range", ExceptionType::OutOfRange);
-  if(!_casize) return 1;
+  if(!_casize && CacheAlloc()) return 1;
   if(_caent >= (_casize >> 1) && CacheEnlarge()) return 1;
   bddword id = f.GetID();
   bddword k = Hash(id) & (_casize - 1);
@@ -439,11 +447,17 @@ int BDDCT::Cache0Clear()
   if(_ca0) { delete[] _ca0; _ca0 = 0; }
   _ca0size = 0;
   _ca0ent = 0;
+  return 0;
+}
+
+/* as CacheAlloc(), for the cost cache */
+int BDDCT::Cache0Alloc()
+{
   Cache0Entry* ca0 = new(std::nothrow) Cache0Entry[1 << 4];
-  if(!ca0) BDDerr("BDDCT::Cache0Clear(): memory overflow",
-                  ExceptionType::OutOfMemory);
+  if(!ca0) return 1;
   _ca0 = ca0;
   _ca0size = 1 << 4;
+  _ca0ent = 0;
   return 0;
 }
 
@@ -499,7 +513,7 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
      one would make Cache0Ref miss this entry, hide the entries behind it on
      the same probe chain, and have Cache0Enlarge drop them all. */
   if(b == bddcost_null) return 1;
-  if(!_ca0size) return 1;
+  if(!_ca0size && Cache0Alloc()) return 1;
   if(_ca0ent >= (_ca0size >> 1) && Cache0Enlarge()) return 1;
   bddword id = f.GetID();
   bddword k = Hash0(op, id) & (_ca0size - 1);
