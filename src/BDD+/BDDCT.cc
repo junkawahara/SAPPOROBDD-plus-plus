@@ -464,9 +464,18 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
   }
   bddcost min = CT->Cache0Ref(4, f.GetID());
   bddcost max = CT->Cache0Ref(5, f.GetID());
-  RetMin = min; RetMax = max;
-  if(min != bddcost_null) if(B < min + spent) return 0;
-  if(max != bddcost_null) if(B >= max + spent) return f;
+  // Pruning returns without recurring, so RetMin and RetMax have to be known
+  // beforehand: the caller reads them as the minimum and the maximum cost of
+  // this very sub-ZDD, and cannot tell a missing cache entry (bddcost_null)
+  // from the same value's other meaning, "this branch holds no set at all".
+  // With one of the two missing we fall through to the recursion below, which
+  // computes and caches it; only the first visit of the node pays for that.
+  if(min != bddcost_null && max != bddcost_null)
+  {
+    RetMin = min; RetMax = max;
+    if(B < min + spent) return 0;
+    if(B >= max + spent) return f;
+  }
   int top = f.Top();
   int tlev = BDD_LevOfVar(top);
   ZDD h = CLE0(f.OffSet(top), spent);
