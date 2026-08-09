@@ -351,15 +351,18 @@ ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
     {
       Zmap* zm = _ca[k]._zmap;
       Zmap::iterator itr = zm->lower_bound(NegCost(bound));
-      if(itr == zm->end())
-      {
-        --itr;
-	if(itr->second != 0) return -1;
-	acc_worst = bddcost_null;
-	--itr;
-	rej_best = -(itr->first);
-	return 0;
-      }
+      /* Every key is a negated cost, so landing past the end means the entry
+         knows of nothing at or below this bound, which is a miss.
+
+         The branch that used to be here walked back from end() looking for
+         the "every set was rejected" mark.  That mark is stored under the key
+         bddcost_null, the largest key there is, so a lower_bound() never runs
+         past it and the walk could not reach it: the mark is served by the
+         ordinary path below.  On an entry whose map is empty -- which the
+         public CacheEnt() leaves behind when both of its bounds are the
+         bddcost_null mark and its result is not the empty family -- the same
+         walk stepped off the front of the map, which is undefined. */
+      if(itr == zm->end()) return -1;
       ZDD h = itr->second;
       if(h == -1) return -1;
       acc_worst = -(itr->first);

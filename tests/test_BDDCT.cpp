@@ -1058,6 +1058,40 @@ static void test_cache_mechanics(void)
               ct2.MinCost(f) == mn1 && ct2.MaxCost(f) == mx1);
 }
 
+/* ---- the edges of a cache entry ----
+   CacheRef() used to answer an entry whose map is empty by stepping off the
+   front of that map, and to look for the "every set was rejected" mark by
+   walking back from the end, where it can never be. */
+
+static void test_cache_entry_edges(void)
+{
+  cout << endl << "--- the edges of a cache entry ---" << endl;
+  BDDCT ct;
+  ct.Alloc(NV);
+  SetVarCost(ct, 0, 10);
+  SetVarCost(ct, 1, 20);
+  ZDD f = Set(0) + Set(1);
+  bddcost aw = 0, rb = 0;
+
+  ct.CacheClear();
+  test_result("CacheEnt() takes an entry with no cost bounds at all",
+              ct.CacheEnt(f, f, bddcost_null, bddcost_null) == 0);
+  test_result("CacheRef() misses on an entry that holds nothing",
+              ct.CacheRef(f, 10, aw, rb) == ZDD(-1));
+
+  /* the entry that says every set was rejected, and the bounds it answers */
+  ct.CacheClear();
+  test_result("CacheEnt() takes the all-rejected entry",
+              ct.CacheEnt(f, ZDD(0), bddcost_null, 30) == 0);
+  aw = 0; rb = 0;
+  ZDD h = ct.CacheRef(f, 10, aw, rb);
+  test_result("CacheRef() serves the all-rejected entry under its bound",
+              h == ZDD(0) && aw == bddcost_null && rb == 30);
+  aw = 0; rb = 0;
+  test_result("CacheRef() misses above the rejected cost",
+              ct.CacheRef(f, 35, aw, rb) == ZDD(-1));
+}
+
 /* ---- P1-32, P1-34..P1-38: acc_worst and rej_best ---- */
 
 static void test_acc_rej_bounds(void)
@@ -1362,6 +1396,7 @@ int main(void)
     test_allocrand();
     test_cache_invalidation();
     test_cache_mechanics();
+    test_cache_entry_edges();
     test_acc_rej_bounds();
     test_compat_api();
     test_stress_fixed_seed();
