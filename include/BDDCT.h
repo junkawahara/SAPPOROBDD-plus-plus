@@ -37,7 +37,7 @@ public:
     }
     ~CacheEntry(void)
     {
-      if(!_zmap) delete _zmap;
+      delete _zmap;
     }
   };
 
