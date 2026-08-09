@@ -662,15 +662,15 @@ static void test_error_zdd_all(void)
 static void test_copy_move_policy(void)
 {
   cout << endl << "--- P0-17, P0-18: copy and move policy ---" << endl;
-  /* BDDCT owns raw arrays and its implicitly generated copy makes two owners
-     of them, so the contract chosen here is P0-17A: no copies (and no
-     implicit move, which would be the same shallow copy).  A runtime copy
-     would double-free, so the contract is checked as a type property. */
-  test_result("P0-17A: BDDCT is not copy constructible [known bug: implicit copy double-frees]",
+  /* BDDCT owns raw arrays and an implicitly generated copy would make two
+     owners of them, so the contract is P0-17A: no copies (and no implicit
+     move, which would be the same shallow copy).  A runtime copy would
+     double-free, so the contract is checked as a type property. */
+  test_result("P0-17A: BDDCT is not copy constructible",
               !std::is_copy_constructible<BDDCT>::value);
-  test_result("P0-17A: BDDCT is not copy assignable [known bug: implicit copy double-frees]",
+  test_result("P0-17A: BDDCT is not copy assignable",
               !std::is_copy_assignable<BDDCT>::value);
-  test_result("P0-18: BDDCT has no implicit shallow move [known bug: implicit move double-frees]",
+  test_result("P0-18: BDDCT has no implicit shallow move",
               !std::is_move_constructible<BDDCT>::value &&
               !std::is_move_assignable<BDDCT>::value);
 }

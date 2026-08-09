@@ -78,6 +78,20 @@ public:
   BDDCT(void);
   ~BDDCT(void);
 
+  /* The table, the labels and both caches are owned through raw pointers,
+     so the implicitly generated copy (and with it the implicit move) would
+     make two owners of them and double-free.  Copies are therefore not
+     part of the contract. */
+#if __cplusplus >= 201103L
+  BDDCT(const BDDCT&) = delete;
+  BDDCT& operator=(const BDDCT&) = delete;
+#else
+private:
+  BDDCT(const BDDCT&);
+  BDDCT& operator=(const BDDCT&);
+public:
+#endif
+
   inline int Size(void) const { return _n; }
 
   bddcost Cost(const int ix) const;
