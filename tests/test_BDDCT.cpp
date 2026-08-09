@@ -874,12 +874,12 @@ static void test_export_import(void)
     BDDCT b;
     b.Alloc(2, 8);
     bool fail_b = ImportFromString(b, "3\n") != 0;
-    test_result("P1-20: the EOF-after-size failure leaves the empty table [known bug: keeps the half-imported size]",
+    test_result("P1-20: the EOF-after-size failure leaves the empty table",
                 fail_b && b.Size() == 0);
     BDDCT c;
     c.Alloc(2, 8);
     bool fail_c = ImportFromString(c, "") != 0;
-    test_result("P1-20: the empty-input failure leaves the empty table [known bug: keeps the old table]",
+    test_result("P1-20: the empty-input failure leaves the empty table",
                 fail_c && c.Size() == 0);
   }
 }

@@ -146,8 +146,11 @@ int BDDCT::Alloc(const int n, const bddcost cost)
 
 int BDDCT::Import(FILE *fp)
 {
+  /* every failure leaves the empty table: the early returns used to keep
+     either the old table or a half-imported one, depending on where the
+     input broke off */
   std::string s;
-  do if(ReadToken(fp, s) == EOF) return 1;
+  do if(ReadToken(fp, s) == EOF) { Alloc(0); return 1; }
   while(s[0] == '#'); // go next word
   int n = strtol(s.c_str(), NULL, 10);
   if(Alloc(n)) return 1;
@@ -155,7 +158,7 @@ int BDDCT::Import(FILE *fp)
      used to be rejected at the EOF here */
   if(_n == 0) return 0;
 
-  do if(ReadToken(fp, s) == EOF) return 1;
+  do if(ReadToken(fp, s) == EOF) { Alloc(0); return 1; }
   while(s[0] == '#'); // go next word
   int e = 0;
   for(int ix=0; ix<_n; ix++)
