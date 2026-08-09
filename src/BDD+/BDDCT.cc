@@ -10,6 +10,37 @@ using namespace std;
 namespace sapporobdd {
 
 
+/* bddcost is a plain int, so the sums taken along a path can leave its range;
+   every one of them used to overflow silently.  The helpers below report the
+   overflow instead.  They also keep the smallest int out of the class, as it
+   is the one value whose negation does not exist and the cache keys are
+   negated costs. */
+static const bddcost CostMin = -bddcost_null;
+
+static bddcost NegCost(const bddcost a)
+{
+  if(a < CostMin)
+    BDDerr("BDDCT: cost out of range", ExceptionType::OutOfRange);
+  return -a;
+}
+
+static bddcost AddCost(const bddcost a, const bddcost b)
+{
+  if(a < CostMin || b < CostMin)
+    BDDerr("BDDCT: cost out of range", ExceptionType::OutOfRange);
+  /* both operands are in [CostMin, bddcost_null] now, so the bounds compared
+     against here cannot overflow themselves */
+  if((b > 0)? (a > bddcost_null - b): (a < CostMin - b))
+    BDDerr("BDDCT: cost overflow", ExceptionType::OutOfRange);
+  return a + b;
+}
+
+static bddcost SubCost(const bddcost a, const bddcost b)
+{
+  return AddCost(a, NegCost(b));
+}
+
+
 BDDCT::BDDCT()
 {
   _n = 0;
@@ -205,7 +236,7 @@ ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
     if(_ca[k]._id == id)
     {
       Zmap* zm = _ca[k]._zmap;
-      Zmap::iterator itr = zm->lower_bound(-bound);
+      Zmap::iterator itr = zm->lower_bound(NegCost(bound));
       if(itr == zm->end())
       {
         --itr;
@@ -235,6 +266,11 @@ ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
 int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
                      const bddcost acc_worst, const bddcost rej_best)
 {
+  /* The entries are keyed by the negated cost and the key bddcost_null is
+     reserved for "every set was rejected", so a cost negating onto it cannot
+     be stored. */
+  if(acc_worst == -bddcost_null || rej_best == -bddcost_null)
+    BDDerr("BDDCT::CacheEnt: cost out of range", ExceptionType::OutOfRange);
   if(!_casize) return 1;
   if(_caent >= (_casize >> 1) && CacheEnlarge()) return 1;
   bddword id = f.GetID();
@@ -253,10 +289,10 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
     k &= _casize - 1;
   }
   Zmap* zm = _ca[k]._zmap;
-  if(acc_worst != bddcost_null) (*zm)[-acc_worst] = h;
+  if(acc_worst != bddcost_null) (*zm)[NegCost(acc_worst)] = h;
   else if(h == 0) (*zm)[bddcost_null] = 0;
   if(rej_best != bddcost_null)
-     if(zm->find(-rej_best) == zm->end()) (*zm)[-rej_best] = -1;
+     if(zm->find(NegCost(rej_best)) == zm->end()) (*zm)[NegCost(rej_best)] = -1;
   return 0;
 }
 
@@ -365,8 +401,16 @@ ZDD CLE(const ZDD& f, const bddcost bound,
   int top = f.Top();
   bddcost cost = CT->CostOfLev(BDD_LevOfVar(top));
   bddcost aw0, aw1, rb0, rb1;
-  h = CLE(f.OnSet0(top), bound - cost, aw1, rb1).Change(top)
-    + CLE(f.OffSet(top), bound, aw0, rb0);
+  ZDD f1 = f.OnSet0(top);
+  ZDD f0 = f.OffSet(top);
+  if(f1 == -1 || f0 == -1)
+    BDDerr("BDDCT::ZDD_CostLE(): memory overflow", ExceptionType::OutOfMemory);
+  h = CLE(f1, SubCost(bound, cost), aw1, rb1).Change(top)
+    + CLE(f0, bound, aw0, rb0);
+  /* the error value must never reach the cache: it is what CacheRef returns
+     for a miss and what CacheEnt stores for a rejected bound */
+  if(h == -1)
+    BDDerr("BDDCT::ZDD_CostLE(): memory overflow", ExceptionType::OutOfMemory);
   /*
   h = CLE(f.OffSet(top), bound, aw0, rb0)
     + CLE(f.OnSet0(top), bound - cost, aw1, rb1).Change(top);
@@ -374,13 +418,13 @@ ZDD CLE(const ZDD& f, const bddcost bound,
   if(aw1 == bddcost_null) acc_worst = aw0;
   else
   {
-    aw1 += cost;
+    aw1 = AddCost(aw1, cost);
     acc_worst = (aw0 == bddcost_null)? aw1: (aw0 > aw1)? aw0: aw1;
   }
   if(rb1 == bddcost_null) rej_best = rb0;
   else
   {
-    rb1 += cost;
+    rb1 = AddCost(rb1, cost);
     rej_best = (rb0 == bddcost_null)? rb1: (rb0 < rb1)? rb0: rb1;
   }
   CT->CacheEnt(f, h, acc_worst, rej_best);
@@ -396,6 +440,8 @@ ZDD CLE(const ZDD& f, const bddcost bound,
 ZDD BDDCT::ZDD_CostLE(const ZDD& f, const bddcost bound,
                          bddcost& acc_worst, bddcost& rej_best)
 {
+  if(f == -1)
+    BDDerr("BDDCT::ZDD_CostLE(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CT = this;
   _call = 0;
   ZDD h = CLE(f, bound, acc_worst, rej_best);
@@ -410,9 +456,14 @@ bddcost MinC(const ZDD& f)
   bddcost min = CT->Cache0Ref(4, f.GetID());
   if(min != bddcost_null) return min;
   int top = f.Top();
-  min = MinC(f.OffSet(top));
-  bddcost min1 = MinC(f.OnSet0(top))
-               + CT->CostOfLev(BDD_LevOfVar(top));
+  ZDD f0 = f.OffSet(top);
+  ZDD f1 = f.OnSet0(top);
+  if(f0 == -1 || f1 == -1)
+    BDDerr("BDDCT::MinCost(): memory overflow", ExceptionType::OutOfMemory);
+  min = MinC(f0);
+  bddcost min1 = MinC(f1);
+  if(min1 != bddcost_null)
+    min1 = AddCost(min1, CT->CostOfLev(BDD_LevOfVar(top)));
   min = (min != bddcost_null && min < min1)? min: min1;
   CT->Cache0Ent(4, f.GetID(), min);
   return min;
@@ -420,6 +471,8 @@ bddcost MinC(const ZDD& f)
 
 bddcost BDDCT::MinCost(const ZDD& f)
 {
+  if(f == -1)
+    BDDerr("BDDCT::MinCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CT = this;
   return MinC(f);
 }
@@ -432,9 +485,14 @@ bddcost MaxC(const ZDD& f)
   bddcost max = CT->Cache0Ref(5, f.GetID());
   if(max != bddcost_null) return max;
   int top = f.Top();
-  max = MaxC(f.OffSet(top));
-  bddcost max1 = MaxC(f.OnSet0(top))
-               + CT->CostOfLev(BDD_LevOfVar(top));
+  ZDD f0 = f.OffSet(top);
+  ZDD f1 = f.OnSet0(top);
+  if(f0 == -1 || f1 == -1)
+    BDDerr("BDDCT::MaxCost(): memory overflow", ExceptionType::OutOfMemory);
+  max = MaxC(f0);
+  bddcost max1 = MaxC(f1);
+  if(max1 != bddcost_null)
+    max1 = AddCost(max1, CT->CostOfLev(BDD_LevOfVar(top)));
   max = (max != bddcost_null && max > max1)? max: max1;
   CT->Cache0Ent(5, f.GetID(), max);
   return max;
@@ -442,6 +500,8 @@ bddcost MaxC(const ZDD& f)
 
 bddcost BDDCT::MaxCost(const ZDD& f)
 {
+  if(f == -1)
+    BDDerr("BDDCT::MaxCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CT = this;
   return MaxC(f);
 }
@@ -473,25 +533,34 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
   if(min != bddcost_null && max != bddcost_null)
   {
     RetMin = min; RetMax = max;
-    if(B < min + spent) return 0;
-    if(B >= max + spent) return f;
+    if(B < AddCost(min, spent)) return 0;
+    if(B >= AddCost(max, spent)) return f;
   }
   int top = f.Top();
   int tlev = BDD_LevOfVar(top);
-  ZDD h = CLE0(f.OffSet(top), spent);
-  int min0 = RetMin;
-  int max0 = RetMax;
+  ZDD f0 = f.OffSet(top);
+  ZDD f1 = f.OnSet0(top);
+  if(f0 == -1 || f1 == -1)
+    BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
+  ZDD h = CLE0(f0, spent);
+  bddcost min0 = RetMin;
+  bddcost max0 = RetMax;
   bddcost cost = CT->CostOfLev(tlev);
-  h += CLE0(f.OnSet0(top), spent + cost).Change(top);
+  ZDD h1 = CLE0(f1, AddCost(spent, cost)).Change(top);
+  if(h1 == -1)
+    BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
+  h += h1;
+  if(h == -1)
+    BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
   if(min == bddcost_null)
   {
-    min = RetMin + cost;
+    min = AddCost(RetMin, cost);
     if(min0 != bddcost_null) min = (min0 <= min)? min0: min;
     CT->Cache0Ent(4, f.GetID(), min);
   }
   if(max == bddcost_null)
   {
-    max = RetMax + cost;
+    max = AddCost(RetMax, cost);
     if(max0 != bddcost_null) max = (max0 >= max)? max0: max;
     CT->Cache0Ent(5, f.GetID(), max);
   }
@@ -501,6 +570,8 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
 
 ZDD BDDCT::ZDD_CostLE0(const ZDD& f, const bddcost bound)
 {
+  if(f == -1)
+    BDDerr("BDDCT::ZDD_CostLE0(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CT = this;
   B = bound;
   ZDD h = CLE0(f, 0);
