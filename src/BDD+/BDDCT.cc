@@ -431,12 +431,20 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
   return 0;
 }
 
-static BDDCT* CT;
-static ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
-ZDD CLE(const ZDD& f, const bddcost bound,
-          bddcost& acc_worst, bddcost& rej_best)
+
+/* The four recursions below are members of the class.  They used to be
+   file-static functions that reached their table through a file-static
+   BDDCT* and handed the bound and the two cost results of ZDD_CostLE0() to
+   each other through three more file-static variables.  That made every one
+   of these operations non-reentrant and unusable from more than one thread
+   even on tables of their own, and it left the pointer to the last table
+   used behind after that table was destroyed.  Passing the context in the
+   ordinary way costs nothing and removes all of it. */
+
+ZDD BDDCT::CLE(const ZDD& f, const bddcost bound,
+               bddcost& acc_worst, bddcost& rej_best)
 {
-  CT->_call++;
+  _call++;
   if(f == 0)
   {
     acc_worst = bddcost_null;
@@ -459,11 +467,11 @@ ZDD CLE(const ZDD& f, const bddcost bound,
     }
   }
   ZDD h;
-  h =  CT->CacheRef(f, bound, acc_worst, rej_best);
+  h =  CacheRef(f, bound, acc_worst, rej_best);
   if(h != -1) return h;
   BDD_RECUR_INC;
   int top = f.Top();
-  bddcost cost = CT->CostOfLev(BDD_LevOfVar(top));
+  bddcost cost = CostOfLev(BDD_LevOfVar(top));
   bddcost aw0, aw1, rb0, rb1;
   ZDD f1 = f.OnSet0(top);
   ZDD f0 = f.OffSet(top);
@@ -475,10 +483,6 @@ ZDD CLE(const ZDD& f, const bddcost bound,
      for a miss and what CacheEnt stores for a rejected bound */
   if(h == -1)
     BDDerr("BDDCT::ZDD_CostLE(): memory overflow", ExceptionType::OutOfMemory);
-  /*
-  h = CLE(f.OffSet(top), bound, aw0, rb0)
-    + CLE(f.OnSet0(top), bound - cost, aw1, rb1).Change(top);
-  */
   if(aw1 == bddcost_null) acc_worst = aw0;
   else
   {
@@ -491,13 +495,7 @@ ZDD CLE(const ZDD& f, const bddcost bound,
     rb1 = AddCost(rb1, cost);
     rej_best = (rb0 == bddcost_null)? rb1: (rb0 < rb1)? rb0: rb1;
   }
-  CT->CacheEnt(f, h, acc_worst, rej_best);
-  /*
-  if(h == 0) CT->CacheEnt(f, h, bddcost_null, bound+1);
-  else if(h == f) CT->CacheEnt(f, h, bound, bddcost_null);
-  else CT->CacheEnt(f, h, bound, bound+1);
-  */
-  //CT->CacheEnt(f, h, bound, bound+1);
+  CacheEnt(f, h, acc_worst, rej_best);
   BDD_RECUR_DEC;
   return h;
 }
@@ -507,18 +505,16 @@ ZDD BDDCT::ZDD_CostLE(const ZDD& f, const bddcost bound,
 {
   if(f == -1)
     BDDerr("BDDCT::ZDD_CostLE(): invalid ZDD", ExceptionType::InvalidBDDValue);
-  CT = this;
   _call = 0;
   ZDD h = CLE(f, bound, acc_worst, rej_best);
   return h;
 }
 
-static bddcost MinC(const ZDD&);
-bddcost MinC(const ZDD& f)
+bddcost BDDCT::MinC(const ZDD& f)
 {
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
-  bddcost min = CT->Cache0Ref(4, f);
+  bddcost min = Cache0Ref(4, f);
   if(min != bddcost_null) return min;
   BDD_RECUR_INC;
   int top = f.Top();
@@ -529,9 +525,9 @@ bddcost MinC(const ZDD& f)
   min = MinC(f0);
   bddcost min1 = MinC(f1);
   if(min1 != bddcost_null)
-    min1 = AddCost(min1, CT->CostOfLev(BDD_LevOfVar(top)));
+    min1 = AddCost(min1, CostOfLev(BDD_LevOfVar(top)));
   min = (min != bddcost_null && min < min1)? min: min1;
-  CT->Cache0Ent(4, f, min);
+  Cache0Ent(4, f, min);
   BDD_RECUR_DEC;
   return min;
 }
@@ -540,16 +536,14 @@ bddcost BDDCT::MinCost(const ZDD& f)
 {
   if(f == -1)
     BDDerr("BDDCT::MinCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
-  CT = this;
   return MinC(f);
 }
 
-static bddcost MaxC(const ZDD&);
-bddcost MaxC(const ZDD& f)
+bddcost BDDCT::MaxC(const ZDD& f)
 {
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
-  bddcost max = CT->Cache0Ref(5, f);
+  bddcost max = Cache0Ref(5, f);
   if(max != bddcost_null) return max;
   BDD_RECUR_INC;
   int top = f.Top();
@@ -560,9 +554,9 @@ bddcost MaxC(const ZDD& f)
   max = MaxC(f0);
   bddcost max1 = MaxC(f1);
   if(max1 != bddcost_null)
-    max1 = AddCost(max1, CT->CostOfLev(BDD_LevOfVar(top)));
+    max1 = AddCost(max1, CostOfLev(BDD_LevOfVar(top)));
   max = (max != bddcost_null && max > max1)? max: max1;
-  CT->Cache0Ent(5, f, max);
+  Cache0Ent(5, f, max);
   BDD_RECUR_DEC;
   return max;
 }
@@ -571,29 +565,28 @@ bddcost BDDCT::MaxCost(const ZDD& f)
 {
   if(f == -1)
     BDDerr("BDDCT::MaxCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
-  CT = this;
   return MaxC(f);
 }
 
-static bddcost B;
-static bddcost RetMin;
-static bddcost RetMax;
-static ZDD CLE0(const ZDD &, const bddcost);
-ZDD CLE0(const ZDD& f, const bddcost spent)
+/* retmin and retmax report the minimum and the maximum cost of f, which the
+   caller needs on top of the filtered family itself; they used to be two
+   file-static variables. */
+ZDD BDDCT::CLE0(const ZDD& f, const bddcost bound, const bddcost spent,
+                bddcost& retmin, bddcost& retmax)
 {
   if(f == 0)
   {
-    RetMin = bddcost_null; RetMax = bddcost_null;
+    retmin = bddcost_null; retmax = bddcost_null;
     return 0;
   }
   if(f == 1)
   {
-    RetMin = 0; RetMax = 0;
-    return (B >= spent)? 1: 0;
+    retmin = 0; retmax = 0;
+    return (bound >= spent)? 1: 0;
   }
-  bddcost min = CT->Cache0Ref(4, f);
-  bddcost max = CT->Cache0Ref(5, f);
-  // Pruning returns without recurring, so RetMin and RetMax have to be known
+  bddcost min = Cache0Ref(4, f);
+  bddcost max = Cache0Ref(5, f);
+  // Pruning returns without recurring, so retmin and retmax have to be known
   // beforehand: the caller reads them as the minimum and the maximum cost of
   // this very sub-ZDD, and cannot tell a missing cache entry (bddcost_null)
   // from the same value's other meaning, "this branch holds no set at all".
@@ -601,9 +594,9 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
   // computes and caches it; only the first visit of the node pays for that.
   if(min != bddcost_null && max != bddcost_null)
   {
-    RetMin = min; RetMax = max;
-    if(B < AddCost(min, spent)) return 0;
-    if(B >= AddCost(max, spent)) return f;
+    retmin = min; retmax = max;
+    if(bound < AddCost(min, spent)) return 0;
+    if(bound >= AddCost(max, spent)) return f;
   }
   BDD_RECUR_INC;
   int top = f.Top();
@@ -612,11 +605,10 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
-  ZDD h = CLE0(f0, spent);
-  bddcost min0 = RetMin;
-  bddcost max0 = RetMax;
-  bddcost cost = CT->CostOfLev(tlev);
-  ZDD h1 = CLE0(f1, AddCost(spent, cost)).Change(top);
+  bddcost min0, max0, min1, max1;
+  ZDD h = CLE0(f0, bound, spent, min0, max0);
+  bddcost cost = CostOfLev(tlev);
+  ZDD h1 = CLE0(f1, bound, AddCost(spent, cost), min1, max1).Change(top);
   if(h1 == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
   h += h1;
@@ -624,17 +616,17 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
   if(min == bddcost_null)
   {
-    min = AddCost(RetMin, cost);
+    min = AddCost(min1, cost);
     if(min0 != bddcost_null) min = (min0 <= min)? min0: min;
-    CT->Cache0Ent(4, f, min);
+    Cache0Ent(4, f, min);
   }
   if(max == bddcost_null)
   {
-    max = AddCost(RetMax, cost);
+    max = AddCost(max1, cost);
     if(max0 != bddcost_null) max = (max0 >= max)? max0: max;
-    CT->Cache0Ent(5, f, max);
+    Cache0Ent(5, f, max);
   }
-  RetMin = min; RetMax = max;
+  retmin = min; retmax = max;
   BDD_RECUR_DEC;
   return h;
 }
@@ -643,11 +635,9 @@ ZDD BDDCT::ZDD_CostLE0(const ZDD& f, const bddcost bound)
 {
   if(f == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): invalid ZDD", ExceptionType::InvalidBDDValue);
-  CT = this;
-  B = bound;
-  ZDD h = CLE0(f, 0);
+  bddcost retmin, retmax;
+  ZDD h = CLE0(f, bound, 0, retmin, retmax);
   return h;
 }
 
 } // namespace sapporobdd
-

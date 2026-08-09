@@ -1220,9 +1220,9 @@ static void test_deep_recursion_guard(void)
 static void test_env_notes(void)
 {
   cout << endl << "--- P2-06, P2-07 ---" << endl;
-  cout << "[INFO] P2-06 not applicable: BDDCT recurses through one static"
-          " context (CT) and the BDD core is single-threaded, so concurrent"
-          " use is outside the contract." << endl;
+  cout << "[INFO] P2-06 not applicable: the BDD core is single-threaded, so"
+          " concurrent use is outside the contract (the recursions themselves"
+          " no longer pass their context through file statics)." << endl;
   cout << "[INFO] P2-07 not applicable: BDDCT allocates with operator new and"
           " this build has no allocation-failure hook for it." << endl;
 }

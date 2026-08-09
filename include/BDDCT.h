@@ -140,6 +140,17 @@ public:
   { return ZDD_CostLE0(f, bound); }
   bddcost MinCost(const ZDD &);
   bddcost MaxCost(const ZDD &);
+
+private:
+  /* The recursions behind the four entry points above.  They used to be
+     file-static functions reaching the table through a file-static BDDCT*,
+     with the bound and the two cost results of ZDD_CostLE0() handed around
+     through three more file-static variables; as members they take their
+     context as arguments instead. */
+  ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
+  bddcost MinC(const ZDD &);
+  bddcost MaxC(const ZDD &);
+  ZDD CLE0(const ZDD &, const bddcost, const bddcost, bddcost &, bddcost &);
 };
 
 } // namespace sapporobdd
