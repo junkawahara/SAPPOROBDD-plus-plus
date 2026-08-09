@@ -1165,6 +1165,56 @@ static void test_stress_fixed_seed(void)
   test_result("P2-05: ZDD_CostLE0() matches the enumeration throughout", bad_le0 == 0);
 }
 
+/* ---- the stack overflow limitter in the cost recursions ----
+   CLE/CLE0/MinC/MaxC recurse once per ZDD level; without BDD_RECUR_INC a
+   diagram deeper than the stack crashed the process instead of raising the
+   usual limit error.  The recursion counter stays raised when the guard
+   throws, so it is reset by hand here, as test_mp_oom.cpp does. */
+
+static void test_deep_recursion_guard(void)
+{
+  cout << endl << "--- deep ZDD: BDDException instead of a stack overflow ---" << endl;
+
+  const int depth = BDD_RecurLimit + 1000;
+  vector<int> deep_var(depth);
+  for(int i=0; i<depth; i++) deep_var[i] = BDD_NewVar();
+  ZDD f = 1;
+  for(int i=0; i<depth; i++) f = f.Change(deep_var[i]);
+
+  BDDCT ct;
+  ct.Alloc(depth);
+
+  bool threw = false;
+  try { ct.MinCost(f); } catch(const BDDException&) { threw = true; }
+  BDD_RecurCount = 0;
+  test_result("MinCost() on a too-deep chain throws BDDException", threw);
+
+  threw = false;
+  try { ct.MaxCost(f); } catch(const BDDException&) { threw = true; }
+  BDD_RecurCount = 0;
+  test_result("MaxCost() on a too-deep chain throws BDDException", threw);
+
+  threw = false;
+  bddcost aw, rb;
+  try { ct.ZDD_CostLE(f, 0, aw, rb); } catch(const BDDException&) { threw = true; }
+  BDD_RecurCount = 0;
+  test_result("ZDD_CostLE() on a too-deep chain throws BDDException", threw);
+
+  threw = false;
+  try { ct.ZDD_CostLE0(f, 0); } catch(const BDDException&) { threw = true; }
+  BDD_RecurCount = 0;
+  test_result("ZDD_CostLE0() on a too-deep chain throws BDDException", threw);
+
+  /* the guard must not get in the way of an ordinary shallow run */
+  BDDCT ct2;
+  ct2.Alloc(NV);
+  SetVarCost(ct2, 0, 10);
+  SetVarCost(ct2, 1, 20);
+  ZDD g = Set(0) + Set(1);
+  test_result("a shallow MinCost() still works after the failures",
+              ct2.MinCost(g) == 10 && BDD_RecurCount == 0);
+}
+
 /* ---- P2-06, P2-07: out of reach in this build ---- */
 
 static void test_env_notes(void)
@@ -1210,6 +1260,7 @@ int main(void)
     test_acc_rej_bounds();
     test_compat_api();
     test_stress_fixed_seed();
+    test_deep_recursion_guard();
     test_env_notes();
   }
   catch(const std::exception& e)

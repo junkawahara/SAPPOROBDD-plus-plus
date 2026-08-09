@@ -461,6 +461,7 @@ ZDD CLE(const ZDD& f, const bddcost bound,
   ZDD h;
   h =  CT->CacheRef(f, bound, acc_worst, rej_best);
   if(h != -1) return h;
+  BDD_RECUR_INC;
   int top = f.Top();
   bddcost cost = CT->CostOfLev(BDD_LevOfVar(top));
   bddcost aw0, aw1, rb0, rb1;
@@ -497,6 +498,7 @@ ZDD CLE(const ZDD& f, const bddcost bound,
   else CT->CacheEnt(f, h, bound, bound+1);
   */
   //CT->CacheEnt(f, h, bound, bound+1);
+  BDD_RECUR_DEC;
   return h;
 }
 
@@ -518,6 +520,7 @@ bddcost MinC(const ZDD& f)
   if(f == 1) return 0;
   bddcost min = CT->Cache0Ref(4, f);
   if(min != bddcost_null) return min;
+  BDD_RECUR_INC;
   int top = f.Top();
   ZDD f0 = f.OffSet(top);
   ZDD f1 = f.OnSet0(top);
@@ -529,6 +532,7 @@ bddcost MinC(const ZDD& f)
     min1 = AddCost(min1, CT->CostOfLev(BDD_LevOfVar(top)));
   min = (min != bddcost_null && min < min1)? min: min1;
   CT->Cache0Ent(4, f, min);
+  BDD_RECUR_DEC;
   return min;
 }
 
@@ -547,6 +551,7 @@ bddcost MaxC(const ZDD& f)
   if(f == 1) return 0;
   bddcost max = CT->Cache0Ref(5, f);
   if(max != bddcost_null) return max;
+  BDD_RECUR_INC;
   int top = f.Top();
   ZDD f0 = f.OffSet(top);
   ZDD f1 = f.OnSet0(top);
@@ -558,6 +563,7 @@ bddcost MaxC(const ZDD& f)
     max1 = AddCost(max1, CT->CostOfLev(BDD_LevOfVar(top)));
   max = (max != bddcost_null && max > max1)? max: max1;
   CT->Cache0Ent(5, f, max);
+  BDD_RECUR_DEC;
   return max;
 }
 
@@ -599,6 +605,7 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
     if(B < AddCost(min, spent)) return 0;
     if(B >= AddCost(max, spent)) return f;
   }
+  BDD_RECUR_INC;
   int top = f.Top();
   int tlev = BDD_LevOfVar(top);
   ZDD f0 = f.OffSet(top);
@@ -628,6 +635,7 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
     CT->Cache0Ent(5, f, max);
   }
   RetMin = min; RetMax = max;
+  BDD_RECUR_DEC;
   return h;
 }
 
