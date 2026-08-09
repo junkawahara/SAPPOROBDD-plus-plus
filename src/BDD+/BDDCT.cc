@@ -121,16 +121,18 @@ int BDDCT::SetCost(const int ix, const bddcost cost)
   return 0;
 }
 
+/* The table holds a label of at most CT_STRLEN characters.  A longer one used
+   to be cut down to that silently, with 0 returned as if the whole label had
+   been stored, so a label lost its tail with nothing to show for it -- in an
+   imported file too.  It is refused now, and the label already in the table is
+   left as it was. */
 int BDDCT::SetLabel(const int ix, const char* label)
 {
   if(ix < 0 || ix >= _n) return 1;
   int j;
-  for(j=0; j<CT_STRLEN; j++)
-  {
-    _label[ix][j] = label[j];
-    if(!label[j]) break;
-  }
-  if(j == CT_STRLEN) _label[ix][j] = 0;
+  for(j=0; j<=CT_STRLEN; j++) if(!label[j]) break;
+  if(j > CT_STRLEN) return 1;
+  for(int i=0; i<=j; i++) _label[ix][i] = label[i];
   return 0;
 }
 

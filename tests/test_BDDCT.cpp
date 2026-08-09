@@ -760,11 +760,11 @@ static void test_labels(void)
   const char* s40 = "1234567890123456789012345678901234567890";
   ok = ct.SetLabel(2, s15) == 0 && strcmp(ct.Label(2), s15) == 0;
   test_result("P1-10: a CT_STRLEN-char label is stored whole", ok);
-  ok = ct.SetLabel(2, s16) == 0 && (int)strlen(ct.Label(2)) == CT_STRLEN &&
-       strncmp(ct.Label(2), s16, CT_STRLEN) == 0;
-  ok = ok && ct.SetLabel(2, s40) == 0 && (int)strlen(ct.Label(2)) == CT_STRLEN &&
-       strncmp(ct.Label(2), s40, CT_STRLEN) == 0;
-  test_result("P1-10: longer labels are cut at CT_STRLEN characters", ok);
+  /* a longer label used to be cut down to CT_STRLEN characters and reported
+     as stored whole */
+  ok = ct.SetLabel(2, s16) != 0 && strcmp(ct.Label(2), s15) == 0;
+  ok = ok && ct.SetLabel(2, s40) != 0 && strcmp(ct.Label(2), s15) == 0;
+  test_result("P1-10: a longer label is refused and changes nothing", ok);
 
   bool lev_ok = true;
   for(int lev=1; lev<=4; lev++)
@@ -848,6 +848,16 @@ static void test_export_import(void)
          dst.Cost(2) == 30 && strcmp(dst.Label(0), "lab0") == 0 &&
          dst.Label(1)[0] == 0 && dst.Label(2)[0] == 0;
     test_result("P1-16: comment tokens are read over", ok);
+  }
+  {
+    BDDCT a;
+    bool ok = ImportFromString(a, "1 5 #123456789012345\n") == 0 &&
+              a.Size() == 1 && strcmp(a.Label(0), "123456789012345") == 0;
+    test_result("P1-16: a CT_STRLEN-char label is imported whole", ok);
+    BDDCT b;
+    test_result("P1-16: a longer label is a format error",
+                ImportFromString(b, "1 5 #1234567890123456\n") != 0 &&
+                b.Size() == 0);
   }
   {
     BDDCT a, b;

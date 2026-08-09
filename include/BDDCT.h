@@ -76,6 +76,7 @@ public:
   int SetCost(const int, const bddcost);
   inline int SetCostOfLev(const int lev, const bddcost cost) 
   { return SetCost(_n-lev, cost); }
+  /* a label longer than CT_STRLEN characters is refused, not shortened */
   int SetLabel(const int, const char *);
   inline int SetLabelOfLev(const int lev, const char* label)
   { return SetLabel(_n-lev, label); }
