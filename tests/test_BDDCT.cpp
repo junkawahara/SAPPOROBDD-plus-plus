@@ -844,14 +844,14 @@ static void test_export_import(void)
   }
   {
     BDDCT a, b;
-    test_result("P1-17: a non-numeric size is refused [known bug: strtol() turns it into 0]",
+    test_result("P1-17: a non-numeric size is refused",
                 ImportFromString(a, "abc 5\n") != 0);
     test_result("P1-17: a non-numeric cost is refused [known bug: strtol() turns it into 0]",
                 ImportFromString(b, "2 xyz 7\n") != 0);
   }
   {
     BDDCT a, b;
-    test_result("P1-18: a size beyond int is refused [known bug: truncated and accepted]",
+    test_result("P1-18: a size beyond int is refused",
                 ImportFromString(a, "4294967299\n1 2 3\n") != 0);
     test_result("P1-18: a cost beyond int is refused [known bug: truncated and accepted]",
                 ImportFromString(b, "1 4294967301\n") != 0);

@@ -152,8 +152,11 @@ int BDDCT::Import(FILE *fp)
   std::string s;
   do if(ReadToken(fp, s) == EOF) { Alloc(0); return 1; }
   while(s[0] == '#'); // go next word
-  int n = strtol(s.c_str(), NULL, 10);
-  if(Alloc(n)) return 1;
+  /* strtol() used to turn junk into a size 0 and quietly truncate numbers
+     past the int range; both are format errors */
+  unsigned long long n;
+  if(ReadDecimal(s, (unsigned long long)INT_MAX, n)) { Alloc(0); return 1; }
+  if(Alloc((int)n)) return 1;
   /* an empty table has nothing after its size, so its own Export() output
      used to be rejected at the EOF here */
   if(_n == 0) return 0;
