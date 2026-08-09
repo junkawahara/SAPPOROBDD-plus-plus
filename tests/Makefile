@@ -50,12 +50,14 @@ OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o bddc.o
 OBJ_OPERATOR = test_operator.o ZDD.o BDD.o bddc.o
 OBJ_ITERATIVE_TEST = test_iterative.o ZDD.o BDD.o bddc.o
 OBJ_MP_OOM = test_mp_oom.o ZDD.o BDD.o bddc.o
+OBJ_BDDCT = test_BDDCT.o BDDCT.o ZDD.o BDD.o bddc.o
 
 # B_EXTEND mode object files
 OBJ_ZDD_EXTEND = test_ZBDD_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
 OBJ_OPERATOR_EXTEND = test_operator_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
 OBJ_ITERATIVE_TEST_EXTEND = test_iterative_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
 OBJ_MP_OOM_EXTEND = test_mp_oom_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
+OBJ_BDDCT_EXTEND = test_BDDCT_extend.o BDDCT_extend.o ZDD_extend.o BDD_extend.o bddc_extend.o
 
 # B_FORCE_ITERATIVE mode object files
 OBJ_ZDD_ITERATIVE = test_ZBDD_iterative.o ZDD_iterative.o BDD_iterative.o bddc_iterative.o
@@ -64,8 +66,8 @@ OBJ_MP_OOM_ITERATIVE = test_mp_oom_iterative.o ZDD_iterative.o BDD_iterative.o b
 
 # Target executables
 #TARGETS = test_ZBDD test_ZBDD_Hash
-TARGETS = test_ZBDD test_bddc_cache test_operator test_iterative_deep test_mp_oom
-TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend test_iterative_deep_extend test_mp_oom_extend
+TARGETS = test_ZBDD test_bddc_cache test_operator test_iterative_deep test_mp_oom test_BDDCT
+TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend test_iterative_deep_extend test_mp_oom_extend test_BDDCT_extend
 TARGETS_ITERATIVE = test_ZBDD_iterative test_operator_iterative test_bddc_cache_iterative test_mp_oom_iterative
 
 # Default target
@@ -102,6 +104,10 @@ test_iterative_deep: $(OBJ_ITERATIVE_TEST)
 test_mp_oom: $(OBJ_MP_OOM)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_MP_OOM) -Wl,--wrap=malloc
 
+# Build test_BDDCT (cost table and its caches)
+test_BDDCT: $(OBJ_BDDCT)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_BDDCT)
+
 # Build B_EXTEND mode test programs
 test_ZBDD_extend: $(OBJ_ZDD_EXTEND)
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_ZDD_EXTEND)
@@ -117,6 +123,9 @@ test_iterative_deep_extend: $(OBJ_ITERATIVE_TEST_EXTEND)
 
 test_mp_oom_extend: $(OBJ_MP_OOM_EXTEND)
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_MP_OOM_EXTEND) -Wl,--wrap=malloc
+
+test_BDDCT_extend: $(OBJ_BDDCT_EXTEND)
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_BDDCT_EXTEND)
 
 # Build B_FORCE_ITERATIVE mode test programs
 test_ZBDD_iterative: $(OBJ_ZDD_ITERATIVE)
@@ -147,6 +156,9 @@ test_iterative.o: test_iterative.cpp $(HEADERS)
 test_mp_oom.o: test_mp_oom.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c test_mp_oom.cpp
 
+test_BDDCT.o: test_BDDCT.cpp $(HEADERS) ../include/BDDCT.h
+	$(CXX) $(CXXFLAGS) -c test_BDDCT.cpp
+
 # B_EXTEND mode compile rules
 test_ZBDD_extend.o: test_ZBDD.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS_EXTEND) -c test_ZBDD.cpp -o test_ZBDD_extend.o
@@ -162,6 +174,9 @@ test_iterative_extend.o: test_iterative.cpp $(HEADERS)
 
 test_mp_oom_extend.o: test_mp_oom.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS_EXTEND) -c test_mp_oom.cpp -o test_mp_oom_extend.o
+
+test_BDDCT_extend.o: test_BDDCT.cpp $(HEADERS) ../include/BDDCT.h
+	$(CXX) $(CXXFLAGS_EXTEND) -c test_BDDCT.cpp -o test_BDDCT_extend.o
 
 # B_FORCE_ITERATIVE mode compile rules
 test_ZBDD_iterative.o: test_ZBDD.cpp $(HEADERS)
@@ -186,6 +201,9 @@ ZDD.o: $(ZDD_SRC) $(HEADERS)
 BDD.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDD.cc -o BDD.o
 
+BDDCT.o: ../src/BDD+/BDDCT.cc ../include/BDDCT.h $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDDCT.cc -o BDDCT.o
+
 bddc.o: ../include/bddc.h ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h $(BDDC_SRCS)
 	@echo "Compiling split bddc source files..."
 	$(CXX) $(CXXFLAGS) -I../src/BDDc -c ../src/BDDc/bddc_init.cc -o bddc_init.o
@@ -209,6 +227,9 @@ ZDD_extend.o: $(ZDD_SRC) $(HEADERS)
 
 BDD_extend.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/BDD.cc -o BDD_extend.o
+
+BDDCT_extend.o: ../src/BDD+/BDDCT.cc ../include/BDDCT.h $(HEADERS)
+	$(CXX) $(CXXFLAGS_EXTEND) -c ../src/BDD+/BDDCT.cc -o BDDCT_extend.o
 
 bddc_extend.o: ../include/bddc.h ../src/BDDc/bddc_internal.h ../src/BDDc/bddc_apply_common.h $(BDDC_SRCS)
 	@echo "Compiling split bddc source files with B_EXTEND..."
@@ -278,6 +299,9 @@ test: $(TARGETS)
 	@echo ""
 	@echo "Running test_mp_oom (multi-precision table OOM)..."
 	@./test_mp_oom
+	@echo ""
+	@echo "Running test_BDDCT (cost table and its caches)..."
+	@./test_BDDCT
 
 # Run B_EXTEND mode tests
 test_extend: $(TARGETS_EXTEND)
@@ -296,6 +320,9 @@ test_extend: $(TARGETS_EXTEND)
 	@echo ""
 	@echo "Running test_mp_oom_extend..."
 	@./test_mp_oom_extend
+	@echo ""
+	@echo "Running test_BDDCT_extend..."
+	@./test_BDDCT_extend
 	@echo ""
 
 # Run B_FORCE_ITERATIVE mode tests
