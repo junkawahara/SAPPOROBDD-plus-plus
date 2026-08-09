@@ -830,7 +830,7 @@ static void test_export_import(void)
     std::string dump;
     { CoutCapture cap; src.Export(); dump = cap.Str(); }
     BDDCT dst;
-    test_result("P1-15: the empty table survives the round trip [known bug: Import() rejects its own empty Export()]",
+    test_result("P1-15: the empty table survives the round trip",
                 ImportFromString(dst, dump) == 0 && dst.Size() == 0);
   }
   {

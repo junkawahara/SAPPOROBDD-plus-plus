@@ -151,6 +151,9 @@ int BDDCT::Import(FILE *fp)
   while(s[0] == '#'); // go next word
   int n = strtol(s.c_str(), NULL, 10);
   if(Alloc(n)) return 1;
+  /* an empty table has nothing after its size, so its own Export() output
+     used to be rejected at the EOF here */
+  if(_n == 0) return 0;
 
   do if(ReadToken(fp, s) == EOF) return 1;
   while(s[0] == '#'); // go next word
