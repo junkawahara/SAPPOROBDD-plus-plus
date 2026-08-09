@@ -217,15 +217,14 @@ int BDDCT::CacheEnlarge()
   {
     if(_ca[i]._zmap)
     {
-      bddword id = _ca[i]._id;
-      bddword k = Hash(id) & (newsize - 1);
+      bddword k = Hash(_ca[i]._key.GetID()) & (newsize - 1);
       while(1)
       {
         if(!newca[k]._zmap) break;
 	k++;
 	k &= newsize - 1;
       }
-      newca[k]._id = id;
+      newca[k]._key = _ca[i]._key;
       newca[k]._zmap = _ca[i]._zmap;
       _ca[i]._zmap = 0;
     }
@@ -245,7 +244,7 @@ ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
   while(1)
   {
     if(!_ca[k]._zmap) return -1; 
-    if(_ca[k]._id == id)
+    if(_ca[k]._key.GetID() == id)
     {
       Zmap* zm = _ca[k]._zmap;
       Zmap::iterator itr = zm->lower_bound(NegCost(bound));
@@ -293,10 +292,10 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
     {
       _caent++;
       if(!(_ca[k]._zmap = new Zmap)) return 1;
-      _ca[k]._id = id;
+      _ca[k]._key = f;
       break;
     }
-    if(_ca[k]._id == id) break;
+    if(_ca[k]._key.GetID() == id) break;
     k++;
     k &= _casize - 1;
   }
@@ -329,9 +328,8 @@ int BDDCT::Cache0Enlarge()
   {
     if(_ca0[i]._b != bddcost_null)
     {
-      bddword id = _ca0[i]._id;
       unsigned char op = _ca0[i]._op;
-      bddword k = Hash0(op, id) & (newsize - 1);
+      bddword k = Hash0(op, _ca0[i]._key.GetID()) & (newsize - 1);
       while(1)
       {
         if(newca0[k]._b == bddcost_null) break;
@@ -339,7 +337,7 @@ int BDDCT::Cache0Enlarge()
 	k &= newsize - 1;
       }
       newca0[k]._op = op;
-      newca0[k]._id = id;
+      newca0[k]._key = _ca0[i]._key;
       newca0[k]._b = _ca0[i]._b;
     }
   }
@@ -349,20 +347,21 @@ int BDDCT::Cache0Enlarge()
   return 0;
 }
 
-bddcost BDDCT::Cache0Ref(const unsigned char op, const bddword id) const
+bddcost BDDCT::Cache0Ref(const unsigned char op, const ZDD& f) const
 {
   if(!_ca0size) return bddcost_null;
+  bddword id = f.GetID();
   bddword k = Hash0(op, id) & (_ca0size - 1);
   while(1)
   {
     if(_ca0[k]._b == bddcost_null) return bddcost_null;
-    if(_ca0[k]._op == op && _ca0[k]._id == id) return _ca0[k]._b;
+    if(_ca0[k]._op == op && _ca0[k]._key.GetID() == id) return _ca0[k]._b;
     k++;
     k &= _ca0size - 1;
   }
 }
 
-int BDDCT::Cache0Ent(const unsigned char op, const bddword id, const bddcost b)
+int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
 {
   /* An entry holding bddcost_null is the mark for an empty slot, so storing
      one would make Cache0Ref miss this entry, hide the entries behind it on
@@ -370,16 +369,17 @@ int BDDCT::Cache0Ent(const unsigned char op, const bddword id, const bddcost b)
   if(b == bddcost_null) return 1;
   if(!_ca0size) return 1;
   if(_ca0ent >= (_ca0size >> 1) && Cache0Enlarge()) return 1;
+  bddword id = f.GetID();
   bddword k = Hash0(op, id) & (_ca0size - 1);
   while(1)
   {
     if(_ca0[k]._b == bddcost_null) { _ca0ent++; break; }
-    if(_ca0[k]._op == op && _ca0[k]._id == id) break;
+    if(_ca0[k]._op == op && _ca0[k]._key.GetID() == id) break;
     k++;
     k &= _ca0size - 1;
   }
   _ca0[k]._op = op;
-  _ca0[k]._id = id;
+  _ca0[k]._key = f;
   _ca0[k]._b = b;
   return 0;
 }
@@ -469,7 +469,7 @@ bddcost MinC(const ZDD& f)
 {
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
-  bddcost min = CT->Cache0Ref(4, f.GetID());
+  bddcost min = CT->Cache0Ref(4, f);
   if(min != bddcost_null) return min;
   int top = f.Top();
   ZDD f0 = f.OffSet(top);
@@ -481,7 +481,7 @@ bddcost MinC(const ZDD& f)
   if(min1 != bddcost_null)
     min1 = AddCost(min1, CT->CostOfLev(BDD_LevOfVar(top)));
   min = (min != bddcost_null && min < min1)? min: min1;
-  CT->Cache0Ent(4, f.GetID(), min);
+  CT->Cache0Ent(4, f, min);
   return min;
 }
 
@@ -498,7 +498,7 @@ bddcost MaxC(const ZDD& f)
 {
   if(f == 0) return bddcost_null;
   if(f == 1) return 0;
-  bddcost max = CT->Cache0Ref(5, f.GetID());
+  bddcost max = CT->Cache0Ref(5, f);
   if(max != bddcost_null) return max;
   int top = f.Top();
   ZDD f0 = f.OffSet(top);
@@ -510,7 +510,7 @@ bddcost MaxC(const ZDD& f)
   if(max1 != bddcost_null)
     max1 = AddCost(max1, CT->CostOfLev(BDD_LevOfVar(top)));
   max = (max != bddcost_null && max > max1)? max: max1;
-  CT->Cache0Ent(5, f.GetID(), max);
+  CT->Cache0Ent(5, f, max);
   return max;
 }
 
@@ -538,8 +538,8 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
     RetMin = 0; RetMax = 0;
     return (B >= spent)? 1: 0;
   }
-  bddcost min = CT->Cache0Ref(4, f.GetID());
-  bddcost max = CT->Cache0Ref(5, f.GetID());
+  bddcost min = CT->Cache0Ref(4, f);
+  bddcost max = CT->Cache0Ref(5, f);
   // Pruning returns without recurring, so RetMin and RetMax have to be known
   // beforehand: the caller reads them as the minimum and the maximum cost of
   // this very sub-ZDD, and cannot tell a missing cache entry (bddcost_null)
@@ -572,13 +572,13 @@ ZDD CLE0(const ZDD& f, const bddcost spent)
   {
     min = AddCost(RetMin, cost);
     if(min0 != bddcost_null) min = (min0 <= min)? min0: min;
-    CT->Cache0Ent(4, f.GetID(), min);
+    CT->Cache0Ent(4, f, min);
   }
   if(max == bddcost_null)
   {
     max = AddCost(RetMax, cost);
     if(max0 != bddcost_null) max = (max0 >= max)? max0: max;
-    CT->Cache0Ent(5, f.GetID(), max);
+    CT->Cache0Ent(5, f, max);
   }
   RetMin = min; RetMax = max;
   return h;

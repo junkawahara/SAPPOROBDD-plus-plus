@@ -26,13 +26,20 @@ class BDDCT;
 class BDDCT
 {
 public:
+  /* Both caches are keyed by the node ID of the argument ZDD.  An ID is only
+     unique while the node it names is alive: once the last reference to the
+     node goes away, the garbage collector may reclaim it and hand the same ID
+     to an unrelated node, and the stale entry would then be returned for that
+     other function.  Each entry therefore holds the key ZDD itself, which
+     keeps the key node alive for as long as the entry lives.  The cost is
+     that a cached node is not collectable until the cache is released by
+     CacheClear() / Cache0Clear(), which SetCost() and Alloc() also do. */
   struct CacheEntry
   {
-    bddword _id;
+    ZDD _key;
     Zmap* _zmap;
     CacheEntry(void)
     {
-      _id = BDD(-1).GetID();
       _zmap = 0;
     }
     ~CacheEntry(void)
@@ -43,12 +50,11 @@ public:
 
   struct Cache0Entry
   {
-    bddword _id;
+    ZDD _key;
     bddcost _b;
     unsigned char _op;
     Cache0Entry(void)
     {
-      _id = BDD(-1).GetID();
       _b = bddcost_null;
       _op = 255;
     }
@@ -100,8 +106,8 @@ public:
 
   int Cache0Clear(void);
   int Cache0Enlarge(void);
-  bddcost Cache0Ref(const unsigned char, const bddword) const;
-  int Cache0Ent(const unsigned char, const bddword, const bddcost);
+  bddcost Cache0Ref(const unsigned char, const ZDD &) const;
+  int Cache0Ent(const unsigned char, const ZDD &, const bddcost);
 
   ZDD ZDD_CostLE(const ZDD& f, const bddcost bound)
   { bddcost aw, rb; return ZDD_CostLE(f, bound, aw, rb); }
