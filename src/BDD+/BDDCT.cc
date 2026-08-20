@@ -60,19 +60,23 @@ BDDCT::BDDCT()
   _ca0ent = 0;
   _ca0 = 0;
 
+  _levsnap = 0;
+  _snapvars = bddvarused();
+
   _call = 0;
 }
 
 BDDCT::~BDDCT()
 {
-  if(_cost) delete[] _cost; 
+  if(_cost) delete[] _cost;
   if(_label)
   {
     for(int i=0; i<_n; i++) if(_label[i]) delete[] _label[i];
     delete[] _label; _label = 0;
   }
-  if(_ca) delete[] _ca; 
-  if(_ca0) delete[] _ca0; 
+  if(_ca) delete[] _ca;
+  if(_ca0) delete[] _ca0;
+  if(_levsnap) delete[] _levsnap;
 }
 
 /* Cost() answers with the bddcost_null mark for every index outside the
@@ -146,6 +150,7 @@ int BDDCT::Alloc(const int n, const bddcost cost)
     for(int i=0; i<_n; i++) if(_label[i]) delete[] _label[i];
     delete[] _label; _label = 0;
   }
+  if(_levsnap) { delete[] _levsnap; _levsnap = 0; }
 
   _n = (n < 0)? 0: n;
 
@@ -184,11 +189,20 @@ int BDDCT::Alloc(const int n, const bddcost cost)
       }
       _label[i][0] = 0;
     }
+    _levsnap = new(std::nothrow) bddvar[_n];
+    if(!_levsnap)
+    {
+      Alloc(0);
+      BDDerr("BDDCT::Alloc(): memory overflow", ExceptionType::OutOfMemory);
+    }
   }
 
   /* the caches only hold results of the costs that just went away */
   CacheClear();
   Cache0Clear();
+  /* the fresh _levsnap holds nothing yet, and an unchanged bddvarused()
+     would certify it: record the present order before anything is cached */
+  Snapshot();
   return 0;
 }
 
@@ -321,6 +335,52 @@ void BDDCT::Export() const
   }
 }
 
+/* Records which variable sits on each level the table covers, as far up as a
+   variable exists.  bddvarused() of the same moment comes along: the count
+   only grows, and it grows on every variable creation including the ones
+   that move levels, so finding it unchanged later certifies the whole
+   snapshot without reading a single level. */
+void BDDCT::Snapshot()
+{
+  const bddvar used = bddvarused();
+  int m = _n;
+  if((bddvar)m > used) m = (int)used;
+  for(int lev=1; lev<=m; lev++) _levsnap[lev-1] = bddvaroflev((bddvar)lev);
+  _snapvars = used;
+}
+
+/* Both caches price a node through the level its variable has at the time of
+   the call, so their entries are only valid for one variable order.
+   BDD_NewVarOfLev() below the top moves the levels of the variables above
+   the insertion point, and an entry from before answered with the costs of
+   the old levels -- all four cost operations returned stale results, without
+   a word, until the caches were cleared by hand.  This compares the present
+   order against the snapshot the entries were filled under and drops both
+   caches when a level the table covers has changed hands; an insertion above
+   the table moves nothing the table prices, so the entries stay.  Every
+   entry only involves variables the table covered when it went in: the
+   recursions refuse a variable outside the table before they recurse.  The
+   comparison walks the table, so it belongs at the entry points and not in
+   the per-node cache lookups, where the unchanged-bddvarused() fast path is
+   the only affordable check. */
+void BDDCT::CacheSync()
+{
+  if(bddvarused() == _snapvars) return;
+  if(_caent > 0 || _ca0ent > 0)
+  {
+    int m = _n;
+    if((bddvar)m > _snapvars) m = (int)_snapvars;
+    for(int lev=1; lev<=m; lev++)
+      if(bddvaroflev((bddvar)lev) != _levsnap[lev-1])
+      {
+        CacheClear();
+        Cache0Clear();
+        break;
+      }
+  }
+  Snapshot();
+}
+
 /* Releases the cache.  The table behind it is allocated again by the next
    entry that goes into it, and not here: clearing used to allocate a fresh
    table at once, which every Alloc() and every SetCost() after a computation
@@ -381,6 +441,7 @@ int BDDCT::CacheEnlarge()
 ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
                       bddcost& acc_worst, bddcost& rej_best)
 {
+  CacheSync();
   if(!_casize) return -1;
   bddword id = f.GetID();
   bddword k = Hash(id) & (_casize - 1);
@@ -428,6 +489,7 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
      be stored. */
   if(acc_worst == -bddcost_null || rej_best == -bddcost_null)
     BDDerr("BDDCT::CacheEnt: cost out of range", ExceptionType::OutOfRange);
+  CacheSync();
   if(!_casize && CacheAlloc()) return 1;
   if(_caent >= (_casize >> 1) && CacheEnlarge()) return 1;
   bddword id = f.GetID();
@@ -517,6 +579,11 @@ int BDDCT::Cache0Enlarge()
 
 bddcost BDDCT::Cache0Ref(const unsigned char op, const ZDD& f) const
 {
+  /* const, so a stale cache cannot be dropped here, and this runs once per
+     visited node, so the level-by-level comparison cannot be afforded here
+     either: any variable created since the snapshot -- harmless or not --
+     is answered as a miss, until a non-const cache call re-snapshots */
+  if(bddvarused() != _snapvars) return bddcost_null;
   if(!_ca0size) return bddcost_null;
   bddword id = f.GetID();
   bddword k = Hash0(op, id) & (_ca0size - 1);
@@ -535,6 +602,7 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
      one would make Cache0Ref miss this entry, hide the entries behind it on
      the same probe chain, and have Cache0Enlarge drop them all. */
   if(b == bddcost_null) return 1;
+  CacheSync();
   if(!_ca0size && Cache0Alloc()) return 1;
   if(_ca0ent >= (_ca0size >> 1) && Cache0Enlarge()) return 1;
   bddword id = f.GetID();
@@ -633,6 +701,7 @@ ZDD BDDCT::ZDD_CostLE(const ZDD& f, const bddcost bound,
 {
   if(f == -1)
     BDDerr("BDDCT::ZDD_CostLE(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  CacheSync();
   _call = 0;
   ZDD h = CLE(f, bound, acc_worst, rej_best);
   return h;
@@ -666,6 +735,7 @@ bddcost BDDCT::MinCost(const ZDD& f)
 {
   if(f == -1)
     BDDerr("BDDCT::MinCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  CacheSync();
   _call = 0;
   return MinC(f);
 }
@@ -698,6 +768,7 @@ bddcost BDDCT::MaxCost(const ZDD& f)
 {
   if(f == -1)
     BDDerr("BDDCT::MaxCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  CacheSync();
   _call = 0;
   return MaxC(f);
 }
@@ -770,6 +841,7 @@ ZDD BDDCT::ZDD_CostLE0(const ZDD& f, const bddcost bound)
 {
   if(f == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  CacheSync();
   _call = 0;
   bddcost retmin, retmax;
   ZDD h = CLE0(f, bound, 0, retmin, retmax);

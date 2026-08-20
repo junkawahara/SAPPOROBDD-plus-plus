@@ -136,7 +136,17 @@ private:
      other function.  Each entry therefore holds the key ZDD itself, which
      keeps the key node alive for as long as the entry lives.  The cost is
      that a cached node is not collectable until the cache is released by
-     CacheClear() / Cache0Clear(), which SetCost() and Alloc() also do. */
+     CacheClear() / Cache0Clear(), which SetCost() and Alloc() also do.
+
+     The entries are also only valid for one variable order: the recursions
+     price a node through the level its variable has at the time of the call,
+     and BDD_NewVarOfLev() below the top moves the levels of the variables
+     above the insertion point.  _levsnap and _snapvars record, per table,
+     which variable sat on each of the table's levels when the entries went
+     in; CacheSync() compares that snapshot against the present order and
+     drops both caches when a level the table covers has changed hands.  An
+     insertion above the table's levels moves nothing the table prices, so
+     the caches survive it. */
   struct CacheEntry
   {
     ZDD _key;
@@ -175,7 +185,14 @@ private:
   bddword _ca0size;
   bddword _ca0ent;
   Cache0Entry* _ca0;
-  
+
+  /* the variable that sat on level lev when the caches were filled is
+     _levsnap[lev-1], for the levels the table covers and that carried a
+     variable at snapshot time; _snapvars is bddvarused() of that moment,
+     so an unchanged bddvarused() certifies the whole snapshot in O(1) */
+  bddvar* _levsnap;
+  bddvar _snapvars;
+
   bddword _call;
 
   /* The recursions behind the four entry points above.  They used to be
@@ -185,6 +202,8 @@ private:
      context as arguments instead. */
   int CacheAlloc(void);
   int Cache0Alloc(void);
+  void Snapshot(void);
+  void CacheSync(void);
   bddcost TopCost(const int, const char *) const;
   ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
   bddcost MinC(const ZDD &);

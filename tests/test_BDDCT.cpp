@@ -1381,6 +1381,102 @@ static void test_call_count(void)
   test_result("a repeated operation counts the one call the cache serves", hit);
 }
 
+/* ---- a variable inserted below the top level ----
+   The recursions price a node through the level its variable has at call
+   time, but the caches are keyed by node IDs alone.  BDD_NewVarOfLev()
+   below the top moves every variable above the insertion point one level
+   up; an entry from before the move then answered with the costs of the
+   old levels, so all four cost operations returned stale results, without
+   a word, until the caches were cleared by hand.  The table now snapshots
+   which variable sat on each of its levels when the caches were filled,
+   and drops both caches when a level it covers has changed hands -- and
+   only then: an insertion at the top or above the table moves nothing the
+   table prices, so those keep the caches.  This test runs last of all:
+   the variables of var[] do not come back to their old levels. */
+
+static void test_variable_order_change(void)
+{
+  cout << endl << "--- a variable inserted below the top level ---" << endl;
+
+  BDDCT ct;
+  ct.Alloc(2);
+  ct.SetCostOfLev(1, 10);         /* var[0], for now */
+  ct.SetCostOfLev(2, 20);         /* var[1], for now */
+
+  ZDD g = Set(0);                 /* the one set {var[0]}: costs 10 now */
+  ZDD f = Set(0) + Set(1);
+
+  bddcost aw, rb;
+  bool primed = ct.MinCost(g) == 10 && ct.MaxCost(g) == 10 &&
+                ct.ZDD_CostLE(g, 15, aw, rb) == g &&
+                ct.ZDD_CostLE0(g, 15) == g &&
+                ct.MinCost(f) == 10 && ct.MaxCost(f) == 20;
+  test_result("the caches are primed under the first variable order", primed);
+
+  /* everything moves one level up: var[0] to level 2, whose cost is 20,
+     and var[1] to level 3, above the two-level table */
+  BDD_NewVarOfLev(1);
+
+  test_result("MinCost() prices the moved variable by its new level",
+              ct.MinCost(g) == 20);
+  test_result("MaxCost() prices the moved variable by its new level",
+              ct.MaxCost(g) == 20);
+  test_result("ZDD_CostLE() prices the moved variable by its new level",
+              ct.ZDD_CostLE(g, 15) == ZDD(0) && ct.ZDD_CostLE(g, 20) == g);
+  test_result("ZDD_CostLE0() prices the moved variable by its new level",
+              ct.ZDD_CostLE0(g, 15) == ZDD(0) && ct.ZDD_CostLE0(g, 20) == g);
+
+  /* var[1] sits above the table now, so the family the caches know must be
+     refused like any other family with a variable outside the table */
+  bddcost c;
+  ZDD z;
+  test_result("a variable pushed above the table is refused, not served",
+              TryMinCost(ct, f, c) == 1 && TryMaxCost(ct, f, c) == 1 &&
+              TryCostLE(ct, f, 15, z) == 1 && TryCostLE2(ct, f, 15, z) == 1 &&
+              TryCostLE0(ct, f, 15, z) == 1);
+
+  /* the caches driven directly: an entry from the old order is a miss */
+  BDDCT ct2;
+  ct2.Alloc(4);
+  bool stored = ct2.CacheEnt(g, g, 10, bddcost_null) == 0 &&
+                ct2.Cache0Ent(4, g, 10) == 0 &&
+                ct2.Cache0Ref(4, g) == 10 &&
+                ct2.CacheRef(g, 10, aw, rb) == g;
+  BDD_NewVarOfLev(1);             /* var[0] to level 3 */
+  test_result("Cache0Ref() misses across the order change",
+              stored && ct2.Cache0Ref(4, g) == bddcost_null);
+  test_result("CacheRef() misses across the order change",
+              ct2.CacheRef(g, 10, aw, rb) == -1);
+
+  /* a variable on top of the order moves nothing that exists, so the
+     caches stay: the repeated operation is the one call the cache serves */
+  BDDCT ct3;
+  ct3.Alloc(4);                   /* levels 1..4; var[0] is on level 3 */
+  ct3.SetCostOfLev(3, 30);
+  bool warm = ct3.MinCost(g) == 30;
+  ct3.MinCost(g);
+  bddword calls_warm = ct3.CallCount();
+  BDD_NewVar();
+  test_result("a new variable on top leaves the caches in place",
+              warm && ct3.MinCost(g) == 30 &&
+              ct3.CallCount() == calls_warm);
+
+  /* an insertion above the table moves only levels the table never
+     prices, so the caches stay as well */
+  BDD_NewVarOfLev(5);
+  test_result("an insertion above the table leaves the caches in place",
+              ct3.MinCost(g) == 30 && ct3.CallCount() == calls_warm);
+
+  /* an insertion at a level the table covers changes hands on level 2:
+     the caches go, and var[0] is priced by its new level 4, whose cost is
+     the Alloc() default 1 */
+  BDD_NewVarOfLev(2);
+  bool recomputed = ct3.MinCost(g) == 1 && ct3.CallCount() > calls_warm;
+  bool recached = ct3.MinCost(g) == 1 && ct3.CallCount() == calls_warm;
+  test_result("an insertion inside the table drops and recomputes",
+              recomputed && recached);
+}
+
 /* ---- P2-06, P2-07: out of reach in this build ---- */
 
 static void test_env_notes(void)
@@ -1433,6 +1529,7 @@ int main(void)
     test_deep_recursion_guard();
     test_variable_outside_table();
     test_call_count();
+    test_variable_order_change();
     test_env_notes();
   }
   catch(const std::exception& e)
