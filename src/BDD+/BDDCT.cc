@@ -513,13 +513,17 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
   }
   Zmap* zm = _ca[k]._zmap;
   /* the map allocates a node per cost; caching is an optimisation, so a
-     failure here costs the entry and not the computation */
+     failure here costs the entry and not the computation.  The rejection
+     marker must go in before the result: each single insertion is all or
+     nothing, so failing between the two leaves a marker without its result,
+     which only ever answers a miss, while a result without its marker is
+     served for bounds beyond the one it was computed under */
   try
   {
-    if(acc_worst != bddcost_null) (*zm)[NegCost(acc_worst)] = h;
-    else if(h == 0) (*zm)[bddcost_null] = 0;
     if(rej_best != bddcost_null)
        if(zm->find(NegCost(rej_best)) == zm->end()) (*zm)[NegCost(rej_best)] = -1;
+    if(acc_worst != bddcost_null) (*zm)[NegCost(acc_worst)] = h;
+    else if(h == 0) (*zm)[bddcost_null] = 0;
   }
   catch(const std::bad_alloc&) { return 1; }
   return 0;
