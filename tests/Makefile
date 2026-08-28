@@ -280,7 +280,7 @@ SBDDH_OPT = -Wall -Wextra -pedantic -Wshadow -Wformat=2 -Wfloat-equal \
 
 testsbddh: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
         SBDD_helper_testc.c ../sbdd_helper/SBDD_helper.h
-	g++ -O3 -I../include $(SBDDH_OPT) SBDD_helper_testcpp.cpp ../lib/BDD64.a -o testsbddh
+	g++ -O3 -I../include -DB_64 $(SBDDH_OPT) SBDD_helper_testcpp.cpp ../lib/BDD64.a -o testsbddh
 
 
 # Run tests
