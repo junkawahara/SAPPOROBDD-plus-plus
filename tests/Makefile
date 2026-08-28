@@ -279,7 +279,7 @@ SBDDH_OPT = -Wall -Wextra -pedantic -Wshadow -Wformat=2 -Wfloat-equal \
 -D_FORTIFY_SOURCE=2 -fstack-protector -Wlogical-op -Wconversion
 
 testsbddh: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
-        SBDD_helper_testc.c ../sbdd_helper/SBDD_helper.h
+        SBDD_helper_testc.c ../sbdd_helper/SBDD_helper.h Makefile
 	g++ -O3 -I../include -DB_64 $(SBDDH_OPT) SBDD_helper_testcpp.cpp ../lib/BDD64.a -o testsbddh
 
 
