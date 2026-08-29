@@ -62,8 +62,11 @@ public:
      the table has no entry for, on both sides of it; the four cost
      operations refuse such a variable rather than pricing it. */
   bddcost Cost(const int ix) const;
+  /* the range is checked before _n - lev is formed: with lev == INT_MIN the
+     subtraction itself overflowed (undefined behaviour) before the old
+     Cost(_n-lev) could reject the index */
   inline bddcost CostOfLev(const int lev) const 
-  { return Cost(_n-lev); }
+  { return (lev <= 0 || lev > _n)? bddcost_null: Cost(_n-lev); }
   /* The label is read through a pointer into the table's own buffer, which
      holds at most CT_STRLEN characters and is released by the next Alloc(),
      Import() or AllocRand() and by the destructor: a caller that wants to
@@ -71,17 +74,18 @@ public:
      char*, so a caller could also write through it and overrun the buffer. */
   const char* Label(const int) const;
   inline const char* LabelOfLev(const int lev) const 
-  { return Label(_n-lev); }
+  { return (lev <= 0 || lev > _n)? 0: Label(_n-lev); }
 
   /* 1 for an index outside the table or a cost outside its range, and for
      nothing else: the invalidation of the caches this does cannot fail */
   int SetCost(const int, const bddcost);
   inline int SetCostOfLev(const int lev, const bddcost cost) 
-  { return SetCost(_n-lev, cost); }
-  /* a label longer than CT_STRLEN characters is refused, not shortened */
+  { return (lev <= 0 || lev > _n)? 1: SetCost(_n-lev, cost); }
+  /* a label longer than CT_STRLEN characters, or one containing whitespace
+     (which the Export() format could not carry), is refused, not adjusted */
   int SetLabel(const int, const char *);
   inline int SetLabelOfLev(const int lev, const char* label)
-  { return SetLabel(_n-lev, label); }
+  { return (lev <= 0 || lev > _n)? 1: SetLabel(_n-lev, label); }
 
   int Alloc(const int n, const bddcost cost = 1);
   int Import(FILE* fp = stdin);

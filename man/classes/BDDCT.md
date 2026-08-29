@@ -157,6 +157,9 @@ int SetLabelOfLev(const int lev, const char* label)
 第 ix 番目の変数、または level lev の変数にラベル文字列 label を代入する。
 正常終了時は 0 を返し、添字（level）が範囲外の場合は 1 を返す。
 **文字列長が CT_STRLEN を超える場合は 1 を返し、既存のラベルは変更しない。**
+**空白文字（スペース・タブ・改行など）を含むラベルも 1 を返して拒否する。**
+Export() の書式はラベルを空白区切りの 1 トークンとして書き出すため、
+空白を含むラベルは Export → Import の往復で復元できない。
 ~~文字列長が CT_STRLEN を超える場合は先頭の CT_STRLEN 文字のみを代入する。~~
 
 ### BDDCT::Alloc
@@ -317,6 +320,11 @@ int Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
 - `CacheEnlarge()` / `Cache0Enlarge()` および `CacheEnt()` / `Cache0Ent()` は、
   記憶領域を確保できない場合に 1 を返す（キャッシュは最適化にすぎないので
   例外は投げず、計算はそのまま続行できる）。
+- 空のキャッシュ（初期状態または Clear 直後）に対する `CacheEnlarge()` /
+  `Cache0Enlarge()` は、初期容量の表を新規に確保する。
+- `CacheEnt()` は、acc_worst または rej_best の符号反転がキャッシュの番兵値
+  bddcost_null と衝突する場合（コスト -2147483647）、登録を行わず 1 を返す。
+  計算結果自体は正常に返される。
 - ~~Cache0Ref() / Cache0Ent() のキーは bddword の ID である。~~
   キーは ZDD である。
 

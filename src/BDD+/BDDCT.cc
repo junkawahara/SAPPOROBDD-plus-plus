@@ -137,6 +137,12 @@ int BDDCT::SetLabel(const int ix, const char* label)
   int j;
   for(j=0; j<=CT_STRLEN; j++) if(!label[j]) break;
   if(j > CT_STRLEN) return 1;
+  /* Export() writes a label as one whitespace-delimited token with no
+     escaping, so a label containing whitespace was accepted here but came
+     back cut at its first blank -- or derailed the rest of the table --
+     when the exported file was imported again. */
+  for(int i=0; i<j; i++)
+    if(isspace((unsigned char)label[i])) return 1;
   for(int i=0; i<=j; i++) _label[ix][i] = label[i];
   return 0;
 }
@@ -295,6 +301,27 @@ int BDDCT::Import(FILE *fp)
   return 0;
 }
 
+/* Draws a value uniformly from [0, m); m is at most 2^32 - 3, the width of
+   the widest valid cost range.  One rand() call scaled by a double, as this
+   used to be, reaches at most RAND_MAX + 1 distinct values -- with the
+   common RAND_MAX of 2^31 - 1 less than half of a wide range could ever be
+   generated, and even a small range was biased where RAND_MAX + 1 did not
+   divide evenly.  Assemble enough 15-bit pieces (the least a conforming
+   rand() provides) and reject the overshoot instead. */
+static unsigned long long RandBelow(const unsigned long long m)
+{
+  int bits = 0;
+  while((1ULL << bits) < m) bits++;
+  for(;;)
+  {
+    unsigned long long r = 0;
+    for(int have=0; have<bits; have+=15)
+      r = (r << 15) | (unsigned long long)(rand() & 0x7FFF);
+    r &= (1ULL << bits) - 1ULL;
+    if(r < m) return r;
+  }
+}
+
 /* Fills a fresh table of n variables with costs drawn uniformly from the
    closed range [min, max].  The numbers come from the C library's rand(), so
    a program that never calls srand() gets the same table on every run. */
@@ -313,7 +340,7 @@ int BDDCT::AllocRand(const int n, const bddcost min, const bddcost max)
     (unsigned long long)((long long)max - (long long)min) + 1ULL;
   for(int ix=0; ix<_n; ix++)
   {
-    long long r = (long long)(((double)rand()/((double)RAND_MAX+1)) * (double)m);
+    long long r = (long long)RandBelow(m);
     if(SetCost(ix, (bddcost)(r + (long long)min)))
     {
       Alloc(0);
@@ -325,6 +352,14 @@ int BDDCT::AllocRand(const int n, const bddcost min, const bddcost max)
 
 void BDDCT::Export() const
 {
+  /* The Import() format is plain decimal.  cout keeps whatever basefield /
+     showpos / showbase state the caller set, and exporting under std::hex
+     used to write a file Import() refused -- or, worse, one it read back as
+     different decimal numbers.  Pin the format and restore the caller's
+     flags afterwards. */
+  const std::ios_base::fmtflags saved = cout.flags();
+  cout << std::dec;
+  cout.unsetf(std::ios_base::showpos | std::ios_base::showbase);
   cout << "#n " << _n << "\n";
   for(int i=0; i<_n; i++)
   {
@@ -333,6 +368,7 @@ void BDDCT::Export() const
       cout << " #" << _label[i];
     cout << "\n";
   }
+  cout.flags(saved);
 }
 
 /* Records which variable sits on each level the table covers, as far up as a
@@ -410,6 +446,10 @@ int BDDCT::CacheAlloc()
 
 int BDDCT::CacheEnlarge()
 {
+  /* on the empty cache "enlarging" means creating it: _casize << 2 was 0,
+     and the zero-length array this left behind was overwritten (and leaked)
+     when the first entry called CacheAlloc() over it */
+  if(_casize == 0) return CacheAlloc();
   bddword newsize = _casize << 2;
   //cout << "enlarge: " << newsize << "\n";
   /* growing the cache is optional: the failure is reported to the caller,
@@ -486,9 +526,12 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
 {
   /* The entries are keyed by the negated cost and the key bddcost_null is
      reserved for "every set was rejected", so a cost negating onto it cannot
-     be stored. */
-  if(acc_worst == -bddcost_null || rej_best == -bddcost_null)
-    BDDerr("BDDCT::CacheEnt: cost out of range", ExceptionType::OutOfRange);
+     be stored.  It is a legal composite cost, though (-2147483646 + -1
+     reaches it), and this used to throw: ZDD_CostLE() then failed after its
+     result had been computed, on an input MinCost() and ZDD_CostLE0()
+     answered without complaint.  Caching is an optimisation, so only the
+     entry is given up. */
+  if(acc_worst == -bddcost_null || rej_best == -bddcost_null) return 1;
   CacheSync();
   if(!_casize && CacheAlloc()) return 1;
   if(_caent >= (_casize >> 1) && CacheEnlarge()) return 1;
@@ -553,6 +596,8 @@ int BDDCT::Cache0Alloc()
 
 int BDDCT::Cache0Enlarge()
 {
+  /* as CacheEnlarge(): on the empty cache, create it */
+  if(_ca0size == 0) return Cache0Alloc();
   bddword newsize = _ca0size << 2;
   //cout << "enlarge: " << newsize << "\n";
   /* as CacheEnlarge(): the caller goes on with the cache it has */
