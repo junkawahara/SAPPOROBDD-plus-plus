@@ -153,6 +153,9 @@ extern bddp   bddlit(bddp f);
 extern bddp   bddlen(bddp f);
 extern int    bddimportz(FILE* strm, bddp* p, int lim);
 extern char  *bddcardmp16(bddp f, char *s);
+       /* s must hold 16 * sizeof(bddp) * 2 hex digits and the terminating
+          null (257 bytes in a 64bit build, 129 with B_32), or be 0 to have
+          a buffer of the needed size allocated. */
 extern int    bddisbdd(bddp f);
 extern int    bddiszdd(bddp f);
 extern int    bddiszbdd(bddp f); // for compatibility

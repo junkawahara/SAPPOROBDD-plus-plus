@@ -132,6 +132,42 @@ int main()
   test_result("repeated CardMP16() keeps returning the cardinality",
               !again_threw && again == "400000000000000000");
 
+  /* 5. The buffer size the manual asks the caller to provide has to be the
+        one the widest possible result really needs: 16 words written as hex
+        digits plus the terminating null.  CardMP16() takes no length, so a
+        number that is too small in the manual is an overrun in the caller. */
+  const size_t max_digits = 16 * sizeof(bddp) * 2; /* B_MP_LMAX words */
+  const size_t doc_size = max_digits + 1;          /* 257 in a 64bit build */
+
+  /* The largest representable cardinality is 2^(16 * 64) - 1, i.e. the power
+     set of that many variables with the empty set removed. */
+  ZDD full(1);
+  for(size_t i = 0; i < max_digits * 4; i++) full += full.Change(BDD_NewVar());
+  ZDD widest = full - ZDD(1);
+
+  char wide_buf[doc_size + 1];
+  memset(wide_buf, 'x', sizeof(wide_buf));
+  string widest_str;
+  bool widest_threw = false;
+  try { widest_str = widest.CardMP16(wide_buf); }
+  catch(const BDDException&) { widest_threw = true; }
+
+  test_result("the widest cardinality fits in the documented buffer size",
+              !widest_threw && widest_str.size() == max_digits);
+  test_result("the widest cardinality is the all-ones value",
+              widest_str.find_first_not_of('F') == string::npos);
+  test_result("nothing is written past the documented buffer size",
+              wide_buf[doc_size] == 'x');
+
+  /* One more than that must be refused rather than written out. */
+  bool over_threw = false;
+  memset(wide_buf, 'x', sizeof(wide_buf));
+  try { full.CardMP16(wide_buf); }
+  catch(const BDDOutOfRangeException&) { over_threw = true; }
+  catch(const BDDException&)           { }
+  test_result("a cardinality one larger throws BDDOutOfRangeException",
+              over_threw);
+
   cout << endl;
   cout << "=======================================" << endl;
   cout << "Total Tests: " << test_count << endl;

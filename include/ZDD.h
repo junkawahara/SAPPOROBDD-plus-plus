@@ -74,6 +74,11 @@ public:
   bddword Card(void) const { return bddcard(_zdd); }
   bddword Lit(void) const { return bddlit(_zdd); }
   bddword Len(void) const { return bddlen(_zdd); }
+  /* The count is at most 16 words, so s must hold 16 * sizeof(bddp) * 2 hex
+     digits plus the terminating null: 257 bytes in a 64bit build (the
+     default and B_EXTEND), 129 bytes with B_32.  There is no length
+     argument, so a shorter buffer is overrun without being detected.
+     s == 0 asks bddcardmp16() to allocate a buffer of the size it needs. */
   char* CardMP16(char* s) const { return bddcardmp16(_zdd, s); }
 
   void Export(FILE *strm = stdout) const;
