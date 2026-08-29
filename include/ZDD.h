@@ -3,8 +3,10 @@
  * (C) Shin-ichi MINATO  (May 14, 2021)      *
  *********************************************/
 
-#ifndef _ZDD_
-#define _ZDD_
+/* The include guard used to be _ZDD_, and an identifier that starts with an
+   underscore followed by a capital is reserved to the implementation. */
+#ifndef SAPPOROBDD_ZDD_H
+#define SAPPOROBDD_ZDD_H
 
 #include "BDD.h"
 
@@ -23,10 +25,23 @@ public:
   ZDD(int v) { _zdd = (v==0)? bddempty:(v>0)? bddsingle:bddnull; }
   ZDD(const ZDD& f) { _zdd = bddcopy(f._zdd); }
 
-  ~ZDD(void) { bddfree(_zdd); }
+  /* bddfree() throws for an invalid bddp, which this can hold when
+     BDD_Init() was called again while the object was alive:
+     re-initialization invalidates every earlier bddp.  A destructor is
+     noexcept, so letting that exception out would terminate the process for
+     an object that merely goes out of scope; there is nothing left to
+     release then, so swallow it. */
+  ~ZDD(void) { try { bddfree(_zdd); } catch(...) { } }
 
   ZDD& operator=(const ZDD& f) { 
-    if(_zdd != f._zdd) { bddfree(_zdd); _zdd = bddcopy(f._zdd); } 
+    if(_zdd != f._zdd) {
+      /* copy before free: bddcopy() throws when f holds an invalid bddp,
+         and freeing first would leave _zdd already released for the
+         destructor to release again */
+      bddword t = bddcopy(f._zdd);
+      bddfree(_zdd);
+      _zdd = t;
+    }
     return *this;
   }
 
@@ -130,18 +145,22 @@ extern ZDD ZDD_Meet(const ZDD&, const ZDD&);
 extern ZDD ZDD_Random(int, int density = 50);
 extern ZDD ZDD_Import(FILE *strm = stdin);
 
-extern ZDD ZDD_LCM_A(char *, int);
-extern ZDD ZDD_LCM_C(char *, int);
-extern ZDD ZDD_LCM_M(char *, int);
+/* The ZDD_LCM_A/C/M interface (src/BDD+/ZDDLCM.cc) is not part of the build:
+   it needs the separate LCM module (bddlcm1/bddlcm2), which this repository
+   does not contain.  Its declarations lived here and made every caller fail
+   at link time; they are gone until the module is. */
 
 // Aliases for backward compatibility
 inline ZDD ZBDD_Meet(const ZDD& f, const ZDD& g) { return ZDD_Meet(f, g); }
 inline ZDD ZBDD_Random(int n, int density = 50) { return ZDD_Random(n, density); }
 inline ZDD ZBDD_Import(FILE *strm = stdin) { return ZDD_Import(strm); }
-inline ZDD ZBDD_LCM_A(char *fname, int th) { return ZDD_LCM_A(fname, th); }
-inline ZDD ZBDD_LCM_C(char *fname, int th) { return ZDD_LCM_C(fname, th); }
-inline ZDD ZBDD_LCM_M(char *fname, int th) { return ZDD_LCM_M(fname, th); }
 
+/* Wraps a raw ID handed over by the C core WITHOUT taking a new reference:
+   the returned ZDD assumes ownership of the reference the caller holds.
+   Passing an ID that another owner keeps - e.g. ZDD_ID(f.GetID()) - makes
+   two owners of one reference and corrupts the reference count when both
+   are destroyed.  To share a ZDD, copy the object; use ZDD_ID() only for
+   IDs returned by C-layer functions that hand over their reference. */
 inline ZDD ZDD_ID(bddword zdd)
   { ZDD h; h._zdd = zdd; return h; }
 
@@ -163,6 +182,9 @@ inline ZDD operator-(const ZDD& f, const ZDD& g)
 inline ZDD operator%(const ZDD& f, const ZDD& p)
   { return f - (f/p) * p; }
 
+/* ID comparison.  Note that two error values compare equal: when both
+   operands hold the -1 of two failed operations, f == g answers 1, so
+   check the operands against -1 before comparing computed results. */
 inline int operator==(const ZDD& f, const ZDD& g)
   { return f.GetID() == g.GetID(); }
 
@@ -312,4 +334,4 @@ namespace std {
 }
 #endif
 
-#endif // _ZDD_
+#endif // SAPPOROBDD_ZDD_H

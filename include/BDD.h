@@ -3,8 +3,10 @@
  * (C) Shin-ichi MINATO  (Dec. 6, 2021)     *
  ********************************************/
 
-#ifndef _BDD_
-#define _BDD_
+/* The include guard used to be _BDD_, and an identifier that starts with an
+   underscore followed by a capital is reserved to the implementation. */
+#ifndef SAPPOROBDD_BDD_H
+#define SAPPOROBDD_BDD_H
 
 #include <cstdlib>
 #include <cstdio>
@@ -56,10 +58,23 @@ public:
   BDD(int a) { _bdd = (a==0)? bddfalse:(a>0)? bddtrue:bddnull; }
   BDD(const BDD& f) { _bdd = bddcopy(f._bdd); }
 
-  ~BDD(void) { bddfree(_bdd); }
+  /* bddfree() throws for an invalid bddp, which this can hold when
+     BDD_Init() was called again while the object was alive:
+     re-initialization invalidates every earlier bddp.  A destructor is
+     noexcept, so letting that exception out would terminate the process for
+     an object that merely goes out of scope; there is nothing left to
+     release then, so swallow it. */
+  ~BDD(void) { try { bddfree(_bdd); } catch(...) { } }
 
   BDD& operator=(const BDD& f) { 
-    if(_bdd != f._bdd) { bddfree(_bdd); _bdd = bddcopy(f._bdd); }
+    if(_bdd != f._bdd) {
+      /* copy before free: bddcopy() throws when f holds an invalid bddp,
+         and freeing first would leave _bdd already released for the
+         destructor to release again */
+      bddword t = bddcopy(f._bdd);
+      bddfree(_bdd);
+      _bdd = t;
+    }
     return *this; 
   }
 
@@ -157,6 +172,12 @@ inline int BDD_NewVar(void)
 inline int BDD_LevOfVar(int v) { return bddlevofvar(v); }
 inline int BDD_VarOfLev(int lev) { return bddvaroflev(lev); }
 
+/* Wraps a raw ID handed over by the C core WITHOUT taking a new reference:
+   the returned BDD assumes ownership of the reference the caller holds.
+   Passing an ID that another owner keeps - e.g. BDD_ID(f.GetID()) - makes
+   two owners of one reference and corrupts the reference count when both
+   are destroyed.  To share a BDD, copy the object; use BDD_ID() only for
+   IDs returned by C-layer functions that hand over their reference. */
 inline BDD BDD_ID(bddword bdd)
   { BDD h; h._bdd = bdd; return h; }
 
@@ -180,6 +201,9 @@ inline BDD operator|(const BDD& f, const BDD& g)
 inline BDD operator^(const BDD& f, const BDD& g) 
   { return BDD_ID(bddxor(f.GetID(), g.GetID())); }
 
+/* ID comparison.  Note that two error values compare equal: when both
+   operands hold the -1 of two failed operations, f == g answers 1, so
+   check the operands against -1 before comparing computed results. */
 inline int operator==(const BDD& f, const BDD& g) 
   { return f.GetID() == g.GetID(); }
 
@@ -187,7 +211,13 @@ inline int operator!=(const BDD& f, const BDD& g)
   { return f.GetID() != g.GetID(); }
 
 inline int BDD_Imply(const BDD& f, const BDD& g) 
-  { return bddimply(f.GetID(), g.GetID()); }
+{
+  /* bddimply() answers 0 for a null operand, so the -1 of a failed
+     operation would silently decay into "does not imply" */
+  if(f.GetID() == bddnull || g.GetID() == bddnull)
+    BDDerr("BDD_Imply: null operand.", ExceptionType::InvalidBDDValue);
+  return bddimply(f.GetID(), g.GetID());
+}
 
 class BDDV
 {
@@ -264,6 +294,10 @@ public:
   void Export(FILE *strm = stdout) const;
 
   BDDV Former(void) const {
+    /* keep the error mark: the _len <= 1 path below would turn the error
+       vector (whose length is 1) into an empty vector and lose the failure,
+       while Latter() keeps it -- BDDV::Part() guards the same way */
+    if(_bdd == -1) return *this;
     BDDV hv;
     if(_len <= 1) return hv;
     if((hv._bdd = _bdd.At0(_lev)) == -1) return BDDV(-1);
@@ -302,7 +336,6 @@ public:
 
 //----- External functions for BDDV ---------
 extern int     BDDV_Init(bddword init=256, bddword limit=BDD_MaxNode);
-extern int     BDDV_NewVarOfLev(int);
 extern BDDV operator||(const BDDV&, const BDDV&);
 extern BDDV BDDV_Mask1(int, int);
 extern BDDV BDDV_Mask2(int, int);
@@ -341,8 +374,6 @@ inline BDDV operator^(const BDDV& fv, const BDDV& gv) {
   return hv;
 }
 
-extern BDDV operator|(const BDDV&, const BDDV&);
-extern BDDV operator^(const BDDV&, const BDDV&);
 inline int operator==(const BDDV& fv, const BDDV& gv)
 
   { return fv.GetMetaBDD() == gv.GetMetaBDD() && fv.Len() == gv.Len(); }
@@ -412,4 +443,4 @@ public:
 
 } // namespace sapporobdd
 
-#endif // _BDD_ 
+#endif // SAPPOROBDD_BDD_H 

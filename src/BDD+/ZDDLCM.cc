@@ -27,9 +27,10 @@ ZDD ZDD_LCM_A(char *fname, int th)
   bddlcm1(fname, th, 0);
   while(LCM_Eend > BDDV_UserTopLev()) BDD_NewVar();
   bddword z = bddlcm2();
-  ZDD h = ZDD_ID(z);
-  bddfree(z);
-  return h;
+  /* ZDD_ID() assumes ownership of the reference bddlcm2() handed over; the
+     bddfree(z) that used to follow released that same reference a second
+     time and corrupted the count. */
+  return ZDD_ID(z);
 }
 
 ZDD ZDD_LCM_C(char *fname, int th)
@@ -37,9 +38,10 @@ ZDD ZDD_LCM_C(char *fname, int th)
   bddlcm1(fname, th, 1);
   while(LCM_Eend > BDDV_UserTopLev()) BDD_NewVar();
   bddword z = bddlcm2();
-  ZDD h = ZDD_ID(z);
-  bddfree(z);
-  return h;
+  /* ZDD_ID() assumes ownership of the reference bddlcm2() handed over; the
+     bddfree(z) that used to follow released that same reference a second
+     time and corrupted the count. */
+  return ZDD_ID(z);
 }
 
 ZDD ZDD_LCM_M(char *fname, int th)
@@ -47,9 +49,10 @@ ZDD ZDD_LCM_M(char *fname, int th)
   bddlcm1(fname, th, 2);
   while(LCM_Eend > BDDV_UserTopLev()) BDD_NewVar();
   bddword z = bddlcm2();
-  ZDD h = ZDD_ID(z);
-  bddfree(z);
-  return h;
+  /* ZDD_ID() assumes ownership of the reference bddlcm2() handed over; the
+     bddfree(z) that used to follow released that same reference a second
+     time and corrupted the count. */
+  return ZDD_ID(z);
 }
 
 } // namespace sapporobdd
