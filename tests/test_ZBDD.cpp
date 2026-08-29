@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
@@ -35,6 +36,12 @@ using namespace sapporobdd;
 #define ZDD_Random ZBDD_Random
 #define ZDD_Export ZBDD_Export
 #define ZDD_Import ZBDD_Import
+#endif
+
+// fmemopen() is POSIX; it is the only portable way to make a stream accept a
+// few bytes and then fail, which is what the aborted Export() test needs.
+#if defined(__unix__) || defined(__APPLE__)
+#define ZDD_TEST_HAS_FMEMOPEN 1
 #endif
 
 // Test counter
@@ -1038,6 +1045,103 @@ void test_io_operations() {
     std::cout << endl;
 }
 
+// count() and export_static() borrow the nx field -- the node hash chain
+// pointer -- as a visit flag and rely on reset() to put it back.  If an
+// exception escapes while the flags are still set, Size() silently answers 0,
+// Export() writes a node count of 0 into an otherwise complete file, and a
+// newly created node follows the flagged value as a chain pointer.
+#ifdef ZDD_TEST_HAS_FMEMOPEN
+// A write error in the middle of Export()
+static void test_export_write_error() {
+    ZDD f = buildZDDFromSets({{1, 2}, {3, 4}, {1}, {1, 4, 5}});
+    bddword size = f.Size();
+
+    // 18 bytes hold the header but not the first node line
+    char small_buf[18];
+    FILE* fp = fmemopen(small_buf, sizeof(small_buf), "w");
+    if (fp == NULL) {
+        test_result("a memory stream for the aborted Export() test", false);
+        return;
+    }
+    setvbuf(fp, NULL, _IONBF, 0); // report the error on the write itself
+    bool threw = false;
+    try { f.Export(fp); } catch (const BDDException&) { threw = true; }
+    fclose(fp);
+    test_result("Export() to a stream that is too small throws", threw);
+    test_result("Size() is unchanged after the failed Export()",
+                f.Size() == size);
+
+    char buf[4096];
+    memset(buf, 0, sizeof(buf));
+    fp = fmemopen(buf, sizeof(buf), "w");
+    bool exported = true;
+    try { f.Export(fp); } catch (const BDDException&) { exported = false; }
+    fclose(fp);
+    char header[64];
+    snprintf(header, sizeof(header), "_n %llu", (unsigned long long)size);
+    test_result("the next Export() writes the real node count",
+                exported && strstr(buf, header) != NULL);
+
+    fp = fmemopen(buf, strlen(buf), "r");
+    ZDD g = ZDD_Import(fp);
+    fclose(fp);
+    test_result("the file written after the failure imports back", g == f);
+
+    // A leftover flag would send getnode() down a bogus hash chain
+    ZDD h(1);
+    for (int i = 1; i <= 10; ++i) h = h + h.Change(i);
+    test_result("new nodes are still built correctly after the failure",
+                h.Card() == 1024 && h.Size() == 10);
+}
+#endif
+
+// Test that a traversal aborted by an exception leaves the node table intact
+// (see the comment on test_export_write_error() above).
+void test_aborted_traversal() {
+    std::cout << "=== Testing Aborted Traversal Recovery ===" << endl;
+
+#ifdef ZDD_TEST_HAS_FMEMOPEN
+    test_export_write_error();
+#endif
+
+    // The recursion limit reached in the middle of Size()
+    {
+        const int DEPTH = 40;
+        vector<int> vars;
+        for (int i = 0; i < DEPTH; ++i) vars.push_back(BDD_NewVar());
+
+        ZDD deep(1);
+        ZDD mid(0);
+        for (int i = 0; i < DEPTH; ++i) {
+            deep = deep.Change(vars[i]);
+            if (i == DEPTH - 6) mid = deep; // a subgraph 6 levels below the top
+        }
+        bddword mid_size = mid.Size();
+        bddword deep_size = deep.Size();
+        test_result("the chain and its subgraph are built",
+                    deep_size == (bddword)DEPTH && mid_size == (bddword)(DEPTH - 5));
+
+        // Push the recursion counter close to its limit so that the traversal
+        // of deep is aborted below the level where mid's nodes have already
+        // been marked with the visit flag.
+        int saved = BDD_RecurCount;
+        BDD_RecurCount = BDD_RecurLimit - 10;
+        bool threw = false;
+        try { deep.Size(); } catch (const BDDException&) { threw = true; }
+        test_result("Size() throws when it reaches the recursion limit", threw);
+        test_result("the recursion counter is restored after the failure",
+                    BDD_RecurCount == BDD_RecurLimit - 10);
+        BDD_RecurCount = saved;
+
+        test_result("a shared subgraph still reports its own size",
+                    mid.Size() == mid_size);
+        test_result("the whole chain reports its size once the counter is back",
+                    deep.Size() == deep_size);
+    }
+
+    std::cout << endl;
+}
+
 // Test external functions
 void test_external_functions() {
     std::cout << "=== Testing External Functions ===" << endl;
@@ -1306,6 +1410,7 @@ int main() {
     test_symmetry_operations();
     test_implication_operations();
     test_io_operations();
+    test_aborted_traversal();
     test_external_functions();
     test_edge_cases();
 

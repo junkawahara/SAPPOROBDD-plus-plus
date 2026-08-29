@@ -69,7 +69,7 @@ void export_static(FILE *strm, bddp f)
 void bddexport(FILE *strm, bddp *p, int lim)
 {
   struct B_NodeTable *fp;
-  int n, i, lev, lev0;
+  int n, i, lev, lev0, recur_count;
 
   /* Check operands */
   n = lim;
@@ -92,8 +92,12 @@ void bddexport(FILE *strm, bddp *p, int lim)
   fprintf_check(strm, B_BDDP_FD, bddvsize(p, n));
   fprintf_check(strm, "\n");
 
-  /* Put internal nodes */
-  for(i=0; i<n; i++) export_static(strm, p[i]);
+  /* Put internal nodes.  A write error (or the recursion limit) makes
+     export_static() throw in the middle of the traversal, so the visit flags
+     it left in the nx fields have to be cleared before leaving. */
+  recur_count = BDD_RecurCount;
+  try { for(i=0; i<n; i++) export_static(strm, p[i]); }
+  catch(...) { reset_aborted(p, n, recur_count); throw; }
   for(i=0; i<n; i++) reset(p[i]);
 
   /* Put external node */
@@ -109,6 +113,7 @@ void bddexport(FILE *strm, bddp *p, int lim)
 void bdddump(bddp f)
 {
   struct B_NodeTable *fp;
+  int recur_count;
 
   /* Check indexes */
   if(f == bddnull) { printf("RT = NULL\n\n"); return; }
@@ -117,7 +122,9 @@ void bdddump(bddp f)
       err("bdddump: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   /* Dump nodes */
-  dump(f);
+  recur_count = BDD_RecurCount;
+  try { dump(f); }
+  catch(...) { reset_aborted(&f, 1, recur_count); throw; }
   reset(f);
 
   /* Dump top node */
@@ -131,7 +138,7 @@ void bdddump(bddp f)
 void bddvdump(bddp *p, int n)
 {
   struct B_NodeTable *fp;
-  int i;
+  int i, recur_count;
 
   /* Check operands.  A bddnull entry is skipped rather than abandoning the
      whole array: the loops below already handle it element by element and
@@ -145,7 +152,9 @@ void bddvdump(bddp *p, int n)
   }
 
   /* Dump nodes */
-  for(i=0; i<n; i++) if(p[i] != bddnull) dump(p[i]);
+  recur_count = BDD_RecurCount;
+  try { for(i=0; i<n; i++) if(p[i] != bddnull) dump(p[i]); }
+  catch(...) { reset_aborted(p, n, recur_count); throw; }
   for(i=0; i<n; i++) if(p[i] != bddnull) reset(p[i]);
 
   /* Dump top node */

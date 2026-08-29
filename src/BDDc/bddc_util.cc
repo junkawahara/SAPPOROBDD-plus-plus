@@ -424,13 +424,16 @@ bddp bddsize(bddp f)
 {
   bddp num;
   struct B_NodeTable *fp;
+  int recur_count;
 
   if(f == bddnull) return 0;
   if(B_CST(f)) return 0; /* Constant */
   if((fp=B_NP(f))>=Node+NodeSpc || fp->varrfc == 0)
     err("bddsize: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
-  num = count(f);
+  recur_count = BDD_RecurCount;
+  try { num = count(f); }
+  catch(...) { reset_aborted(&f, 1, recur_count); throw; }
   reset(f);
   return num;
 }
@@ -440,7 +443,7 @@ bddp bddvsize(bddp *p, int lim)
 {
   bddp num;
   struct B_NodeTable *fp;
-  int n, i;
+  int n, i, recur_count;
 
   /* Check operand */
   n = lim;
@@ -456,7 +459,9 @@ bddp bddvsize(bddp *p, int lim)
       err("bddvsize: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
   }
   num = 0;
-  for(i=0; i<n; i++) num += count(p[i]);
+  recur_count = BDD_RecurCount;
+  try { for(i=0; i<n; i++) num += count(p[i]); }
+  catch(...) { reset_aborted(p, n, recur_count); throw; }
   for(i=0; i<n; i++) reset(p[i]);
   return num;
 }
@@ -475,12 +480,16 @@ static bddp count_recursive(bddp f)
   nx = B_GET_BDDP(fp->nx);
   if(nx & B_CST_MASK) return 0;
 
+  /* Set visit flag before descending, as export_static() and the iterative
+     version do.  The graph is acyclic, so the subgraphs cannot reach this
+     node again and the count is unchanged; marking first keeps the flagged
+     region connected to the root, so that reset() starting at the root can
+     still clear every flag when the traversal below is aborted. */
+  B_SET_BDDP(fp->nx, nx | B_CST_MASK);
+
   BDD_RECUR_INC;
   c = count_recursive(B_GET_BDDP(fp->f0)) + count_recursive(B_GET_BDDP(fp->f1)) + 1U ;
   BDD_RECUR_DEC;
-
-  /* Set visit flag */
-  B_SET_BDDP(fp->nx, nx | B_CST_MASK);
 
   return c;
 }
@@ -576,6 +585,28 @@ void reset(bddp f)
     return;
   }
   reset_recursive(f);
+}
+
+void reset_aborted(bddp *p, int n, int recur_count)
+/* Clears the visit flags of p[0..n-1] after a traversal (count(), dump() or
+   export_static()) was aborted by an exception.  Those traversals borrow the
+   nx field, which is the node hash chain pointer, as a visit flag and rely on
+   reset() to restore it; leaving a flag behind corrupts the node table, so
+   every caller has to run this on the way out. */
+{
+  int i;
+
+  /* The unwound traversal frames never reached their BDD_RECUR_DEC, so the
+     recursion counter is still as deep as the traversal got.  Put it back to
+     the value the aborted call started from. */
+  BDD_RecurCount = recur_count;
+
+  /* The iterative version is used here whatever the variable count is.  It
+     keeps its stack on the heap and never throws, so it can undo a traversal
+     that stopped at the recursion limit -- reset_recursive() would hit that
+     same limit before reaching the deepest flag, and an exception of its own
+     would replace the one that aborted the traversal. */
+  for(i=0; i<n; i++) if(p[i] != bddnull) reset_iterative(p[i]);
 }
 
 int mp_add(struct B_MP *p, bddp ix)

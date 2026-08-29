@@ -375,6 +375,7 @@ void gc1(struct B_NodeTable *np);
 bddp count(bddp f);
 void dump(bddp f);
 void reset(bddp f);
+void reset_aborted(bddp *p, int n, int recur_count);
 
 /* Import/Export helpers */
 void export_static(FILE *strm, bddp f);
