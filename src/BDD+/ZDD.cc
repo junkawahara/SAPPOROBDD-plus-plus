@@ -37,12 +37,24 @@ static const unsigned char BC_ZDD_INTERSEC = 66;
 
 void ZDD::Export(FILE *strm) const
 {
+  /* an error ZDD used to be written out as an empty file, which re-imported
+     as the constant 0: the error became a normal value for good */
+  if(_zdd == bddnull)
+    BDDerr("ZDD::Export: Cannot export the error ZDD.", ExceptionType::InvalidBDDValue);
   bddword p = _zdd;
   bddexport(strm, &p, 1);
 }
 
 void ZDD::Print() const
 {
+  /* the error value used to be printed as a huge ID with all counts 0,
+     indistinguishable from a real (empty) ZDD without knowing the number */
+  if(_zdd == bddnull)
+  {
+    cout << "[ null (error ZDD) ]\n";
+    cout.flush();
+    return;
+  }
   cout << "[ " << GetID();
   cout << " Var:" << Top() << "(" << BDD_LevOfVar(Top()) << ")";
   cout << " Size:" << Size() << " Card:";
@@ -50,7 +62,10 @@ void ZDD::Print() const
   cout.flush();
 }
 
-void ZDD::PrintPla() const { ZDDV(*this).PrintPla(); }
+/* returns 1 when nothing could be printed (the error ZDD, or a failure in a
+   component); the void version silently printed nothing for the error ZDD,
+   leaving the caller no way to tell it from a legitimate empty output */
+int ZDD::PrintPla() const { return ZDDV(*this).PrintPla(); }
 
 #define ZDD_CACHE_CHK_RETURN(op, fx, gx) \
   { ZDD h = BDD_CacheZDD(op, fx, gx); \
@@ -64,6 +79,12 @@ void ZDD::PrintPla() const { ZDDV(*this).PrintPla(); }
 
 ZDD ZDD::Swap(int v1, int v2) const
 {
+  /* validate before the early return, so that v1 == v2 (or a constant
+     operand inside OffSet/OnSet) does not silently skip the check */
+  if(v1 <= 0 || v1 > BDD_VarUsed())
+    BDDerr("ZDD::Swap: Invalid VarID.", (bddword)v1, ExceptionType::OutOfRange);
+  if(v2 <= 0 || v2 > BDD_VarUsed())
+    BDDerr("ZDD::Swap: Invalid VarID.", (bddword)v2, ExceptionType::OutOfRange);
   if(v1 == v2) return *this;
   ZDD f00 = this->OffSet(v1).OffSet(v2);
   ZDD f11 = this->OnSet(v1).OnSet(v2);
@@ -163,13 +184,17 @@ ZDD ZDD::Always() const
 int ZDD::SymChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::SymChk(): invalid v1.", v1, ExceptionType::OutOfRange);
-  if(v2 <= 0) BDDerr("ZDD::SymChk(): invalid v2.", v2, ExceptionType::OutOfRange);
+  if(v1 <= 0 || v1 > BDD_VarUsed()) BDDerr("ZDD::SymChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0 || v2 > BDD_VarUsed()) BDDerr("ZDD::SymChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(*this == 0 || *this == 1) return 1;
   if(v1 == v2) return 1;
   if(BDD_LevOfVar(v1) < BDD_LevOfVar(v2)) { int tmp = v1; v1 = v2; v2 = tmp; }
 
   ZDD S = ZDD(1).Change(v1) + ZDD(1).Change(v2);
+  /* an OOM here would leave gx = bddnull below, a cache key shared by every
+     variable pair whose S failed, and a later pair could hit this pair's
+     cached answer */
+  if(S == -1) return -1;
   bddword fx = GetID();
   bddword gx = S.GetID();
   /* The miss value of BDD_CacheInt() is bddnull, which has to be compared as
@@ -195,7 +220,13 @@ int ZDD::SymChk(int v1, int v2) const
     int t1 = f1.Top();
     int t2 = (BDD_LevOfVar(t0) > BDD_LevOfVar(t1))? t0: t1;
     if(BDD_LevOfVar(t2) <= BDD_LevOfVar(v2))
-      Y = (f0.OnSet0(v2) == f1.OffSet(v2));
+    {
+      /* compare only after checking both sides: two failed (-1) results
+         would compare equal, be taken for "symmetric", and be cached */
+      ZDD c0 = f0.OnSet0(v2);
+      ZDD c1 = f1.OffSet(v2);
+      Y = (c0 == -1 || c1 == -1)? -1: (c0 == c1);
+    }
     else
     {
       ZDD g0 = f0.OffSet(t2) + f1.OffSet(t2).Change(t2);
@@ -330,8 +361,8 @@ ZDD ZDD::SymSet(int v) const
 int ZDD::ImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::ImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
-  if(v2 <= 0) BDDerr("ZDD::ImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
+  if(v1 <= 0 || v1 > BDD_VarUsed()) BDDerr("ZDD::ImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0 || v2 > BDD_VarUsed()) BDDerr("ZDD::ImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
@@ -352,8 +383,8 @@ ZDD ZDD::ImplySet(int v) const
 int ZDD::CoImplyChk(int v1, int v2) const
 {
   if(*this == -1) return -1;
-  if(v1 <= 0) BDDerr("ZDD::CoImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
-  if(v2 <= 0) BDDerr("ZDD::CoImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
+  if(v1 <= 0 || v1 > BDD_VarUsed()) BDDerr("ZDD::CoImplyChk(): invalid v1.", v1, ExceptionType::OutOfRange);
+  if(v2 <= 0 || v2 > BDD_VarUsed()) BDDerr("ZDD::CoImplyChk(): invalid v2.", v2, ExceptionType::OutOfRange);
   if(v1 == v2) return 1;
   if(*this == 0 || *this == 1) return 1;
 
@@ -412,6 +443,9 @@ ZDD ZDD::CoImplySet(int v) const
 
 int ZDD::IsPoly() const
 {
+  /* the error value used to be answered as 0 ("a single term"), unlike the
+     other predicates of this file, which all propagate -1 */
+  if(*this == -1) return -1;
   int top = Top();
   if(top == 0) return 0;
   ZDD f1 = OnSet0(top);
@@ -498,8 +532,10 @@ ZDD operator/(const ZDD& f, const ZDD& p)
   if(f == -1) return -1;
   if(p == -1) return -1;
   if(p == 1) return f;
-  if(f == p) return 1;
+  /* the divisor check must come before the f == p shortcut: 0/0 used to
+     take the shortcut and answer 1 instead of the divide-by-zero error */
   if(p == 0) BDDerr("operator /(): Divided by zero.", ExceptionType::InvalidBDDValue);
+  if(f == p) return 1;
   int top = p.Top();
   if(BDD_LevOfVar(f.Top()) < BDD_LevOfVar(top)) return 0;
 
@@ -567,6 +603,13 @@ ZDD ZDD_Meet(const ZDD& fc, const ZDD& gc)
 ZDD ZDD_Random(int lev, int density)
 {
   if(lev < 0) BDDerr("ZDD_Random(): lev < 0.", lev, ExceptionType::OutOfRange);
+  /* in a BDDV environment the levels above BDD_TopLev() belong to the
+     partitioning system variables; a lev up there used to slip past
+     bddvaroflev's check and return a random family over system variables */
+  if(lev > BDD_TopLev())
+    BDDerr("ZDD_Random(): lev > BDD_TopLev().", lev, ExceptionType::OutOfRange);
+  if(density < 0 || density > 100)
+    BDDerr("ZDD_Random(): Invalid density.", density, ExceptionType::OutOfRange);
   if(lev == 0) return ((std::rand()%100) < density)? 1: 0;
   return ZDD_Random(lev-1, density) +
          ZDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
@@ -579,6 +622,12 @@ ZDD ZDD_Import(FILE *strm)
   if (bddimportz(strm, &zdd, 1)) {
     BDDerr("ZDD_Import(): Import failed.", ExceptionType::FileFormat);
   }
+  /* a file declaring "_o 0" makes the import succeed without writing an
+     output; the bddnull it leaves would escape as an error ZDD returned
+     without an exception, unlike every other failure of this function */
+  if (zdd == bddnull) {
+    BDDerr("ZDD_Import(): No output in file.", ExceptionType::FileFormat);
+  }
   return ZDD_ID(zdd);
 }
 
@@ -590,6 +639,12 @@ ZDDV::ZDDV(const ZDD& f, int location)
   if(location < 0) BDDerr("ZDDV::ZDDV(): location < 0.", location, ExceptionType::OutOfRange);
   if(location >= BDDV_MaxLen)
     BDDerr("ZDDV::ZDDV(): Too large location.", location, ExceptionType::OutOfRange);
+  /* a location above 0 is encoded on the partitioning system variables that
+     only BDDV_Init() creates; without them the Change(var) loop below would
+     consume the user's variables 1, 2, ... as partition bits and silently
+     fold the component into them */
+  if(location > 0 && !BDDV_Active)
+    BDDerr("ZDDV::ZDDV(): BDDV_Init() has not been run.", location, ExceptionType::InternalError);
   if(BDD_LevOfVar(f.Top()) > BDD_TopLev())
     BDDerr("ZDDV::ZDDV(): Invalid top var.", f.Top(), ExceptionType::InvalidBDDValue);
   _zdd = f;
@@ -669,7 +724,10 @@ ZDDV ZDDV::Swap(int v1, int v2) const
 {
   if(BDD_LevOfVar(v1) > BDD_TopLev())
     BDDerr("ZDDV::Swap(): Invalid VarID.", v1, ExceptionType::InvalidBDDValue);
-  if(BDD_LevOfVar(v1) > BDD_TopLev())
+  /* this used to re-test v1 (a copy-paste slip), so a system variable passed
+     as v2 was never rejected and the swap silently destroyed the vector's
+     partition structure */
+  if(BDD_LevOfVar(v2) > BDD_TopLev())
     BDDerr("ZDDV::Swap(): Invalid VarID.", v2, ExceptionType::InvalidBDDValue);
   ZDDV tmp;
   tmp._zdd = _zdd.Swap(v1, v2);
@@ -683,6 +741,10 @@ int ZDDV::Top() const
   int top = 0;
   while(fv1 != ZDDV())
   {
+    /* an OOM turns fv1 into the error vector, which never becomes the empty
+       vector again: without this check (which operator<< and operator>>
+       carry in the same loop) the loop never terminated */
+    if(fv1 == ZDDV(-1)) return 0;
     int last = fv1.Last();
     int t = fv1.GetZDD(last).Top();
     if(BDD_LevOfVar(t) > BDD_LevOfVar(top)) top = t;
@@ -700,6 +762,10 @@ int ZDDV::Last() const
     int t = f.Top();
     last += 1 << (t - 1);
     f = f.OnSet0(t);
+    /* an OOM used to end the loop through Top() == 0 and hand back the
+       partial sum as if it were the true index */
+    if(f == -1)
+      BDDerr("ZDDV::Last(): Operation failed.", ExceptionType::OutOfMemory);
   }
   return last;
 }
@@ -708,7 +774,10 @@ ZDDV ZDDV::Mask(int start, int len) const
 {
   if(start < 0 || start >= BDDV_MaxLen)
     BDDerr("ZDDV::Mask(): Illegal start index.", start, ExceptionType::OutOfRange);
-  if(len <= 0 || start+len > BDDV_MaxLen)
+  /* written as a subtraction so that a len near INT_MAX cannot overflow
+     start+len (undefined behaviour that used to skip this check and return
+     an empty vector instead of the error) */
+  if(len <= 0 || len > BDDV_MaxLen - start)
     BDDerr("ZDDV::Mask(): Illegal len.", len, ExceptionType::OutOfRange);
   ZDDV tmp;
   for(int i=start; i<start+len; i++)
@@ -738,16 +807,35 @@ ZDD ZDDV::GetZDD(int index) const
 
 bddword ZDDV::Size() const
 {
+  /* bddvsize() stops at the first bddnull in the array, so a component that
+     failed with -1 used to truncate the count silently; and a plain new
+     would throw std::bad_alloc past every BDDException handler. */
+  if(_zdd == -1)
+    BDDerr("ZDDV::Size(): Error vector.", ExceptionType::InvalidBDDValue);
   int len = this -> Last() + 1;
-  bddword* bddv = new bddword[len];
-  for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
-  bddword s = bddvsize(bddv, len);
-  delete[] bddv;
-  return s;
+  std::unique_ptr<bddword[]> bddv(new(std::nothrow) bddword[len]);
+  if(!bddv)
+    BDDerr("ZDDV::Size(): Memory allocation failed.", ExceptionType::OutOfMemory);
+  for(int i=0; i<len; i++)
+  {
+    ZDD f = GetZDD(i);
+    if(f == -1)
+      BDDerr("ZDDV::Size(): Operation failed.", ExceptionType::OutOfMemory);
+    bddv[i] = f.GetID();
+  }
+  return bddvsize(bddv.get(), len);
 }
 
 void ZDDV::Print() const
 {
+  /* the error vector used to be printed as its raw meta ID with all counts
+     0, indistinguishable from a real vector without knowing the number */
+  if(_zdd == -1)
+  {
+    cout << "[ null (error ZDDV) ]\n";
+    cout.flush();
+    return;
+  }
   int len = this -> Last() + 1;
   for(int i=0; i<len; i++)
   {
@@ -760,11 +848,22 @@ void ZDDV::Print() const
 
 void ZDDV::Export(FILE *strm) const
 {
+  /* as Size(): a -1 component used to make bddexport() write a file with
+     silently missing components */
+  if(_zdd == -1)
+    BDDerr("ZDDV::Export(): Error vector.", ExceptionType::InvalidBDDValue);
   int len = this -> Last() + 1;
-  bddword* bddv = new bddword[len];
-  for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
-  bddexport(strm, bddv, len);
-  delete[] bddv;
+  std::unique_ptr<bddword[]> bddv(new(std::nothrow) bddword[len]);
+  if(!bddv)
+    BDDerr("ZDDV::Export(): Memory allocation failed.", ExceptionType::OutOfMemory);
+  for(int i=0; i<len; i++)
+  {
+    ZDD f = GetZDD(i);
+    if(f == -1)
+      BDDerr("ZDDV::Export(): Operation failed.", ExceptionType::OutOfMemory);
+    bddv[i] = f.GetID();
+  }
+  bddexport(strm, bddv.get(), len);
 }
 
 /* The cube being printed and the number of outputs used to live in file scope
@@ -779,8 +878,14 @@ static int ZDDV_PLA(const ZDDV& fv, int tlev, int len, char* cube)
   {
     cout << cube << " ";
     for(int i=0; i<len; i++)
-      if(fv.GetZDD(i) == 0) cout << "~";
+    {
+      /* a component that failed with -1 used to fall into the else branch
+         and be printed as "1", turning the error into PLA content */
+      ZDD z = fv.GetZDD(i);
+      if(z == -1) return 1;
+      if(z == 0) cout << "~";
       else cout << "1";
+    }
     cout << "\n";
     cout.flush();
     return 0;
@@ -898,8 +1003,13 @@ ZDDV ZDDV_Import(FILE *strm)
   e = 0;
   for(bddword ix=0; ix<n_nd; ix++)
   {
+    /* The node IDs are read with the same validation as the header counts:
+       B_STRTOI turned a corrupt token into 0, and node ID 0 is a real node
+       (the table starts at index 0), so a damaged file could resolve the
+       junk into a silent reference to that node instead of being refused. */
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
-    bddword nd = B_STRTOI(s.c_str(), NULL, 10);
+    if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+    bddword nd = (bddword)uval;
     
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
     /* A level the file made up would make bddvaroflev() throw an out-of-range
@@ -913,7 +1023,8 @@ ZDDV ZDDV_Import(FILE *strm)
     else if(s == "T") f0 = 1;
     else
     {
-      bddword nd0 = B_STRTOI(s.c_str(), NULL, 10);
+      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+      bddword nd0 = (bddword)uval;
 
       bddword ixx = IMPORTHASH(nd0);
       while(hash1[ixx] != nd0)
@@ -931,7 +1042,8 @@ ZDDV ZDDV_Import(FILE *strm)
     else if(s == "T") f1 = 1;
     else
     {
-      bddword nd1 = B_STRTOI(s.c_str(), NULL, 10);
+      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+      bddword nd1 = (bddword)uval;
       if(nd1 & 1) { inv = 1; nd1 ^= 1; }
       else inv = 0;
   
@@ -947,7 +1059,9 @@ ZDDV ZDDV_Import(FILE *strm)
     }
 
     f = f1.Change(var) + f0;
-    if(f == -1) BDDerr("ZDDV_Import(): Invalid ZDD result from operation", ExceptionType::InternalError);
+    /* a -1 here is a memory overflow, not a defect of the library or of the
+       file; reporting it as InternalError misled the caller's recovery */
+    if(f == -1) BDDerr("ZDDV_Import(): Memory overflow", ExceptionType::OutOfMemory);
 
     bddword ixx = IMPORTHASH(nd);
     while(hash1[ixx] != B_VAL_MASK)
@@ -969,11 +1083,13 @@ ZDDV ZDDV_Import(FILE *strm)
   {
     if(ReadToken(strm, s) == EOF)
       BDDerr("ZDDV_Import(): Unexpected end of file reading output values", ExceptionType::FileFormat);
-    bddword nd = B_STRTOI(s.c_str(), NULL, 10);
     if(s == "F") v += ZDDV(0, i);
     else if(s == "T") v += ZDDV(1, i);
     else
     {
+      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval))
+        BDDerr("ZDDV_Import(): Invalid node ID", ExceptionType::FileFormat);
+      bddword nd = (bddword)uval;
       if(nd & 1) { inv = 1; nd ^= 1; }
       else inv = 0;
   
@@ -989,6 +1105,11 @@ ZDDV ZDDV_Import(FILE *strm)
     }
   }
 
+  /* the vector concatenations above return the error vector on an OOM
+     without an exception; every other failure of this function throws, so
+     this one must not slip out as a normal return value */
+  if(v == ZDDV(-1))
+    BDDerr("ZDDV_Import(): Memory overflow", ExceptionType::OutOfMemory);
   return v;
 }
 
@@ -1046,6 +1167,11 @@ ZDD ZDD::ZLev(int lev, int last) const
     ftop = f.Top();
     flev = BDD_LevOfVar(ftop);
   }
+  /* an OOM inside the loop leaves f == -1 (whose level 0 ends the loop);
+     with last != 0 the old return handed back u, the pre-failure
+     intermediate, as if it were the answer -- and SetZSkip() would then
+     store that wrong node in the ZSkip cache */
+  if(f == -1) return -1;
   return (last == 0 || lev == flev)? f: u;
 }
 
@@ -1070,6 +1196,9 @@ void ZDD::SetZSkip() const
 
 ZDD ZDD::Intersec(const ZDD& g) const
 {
+  /* check the error values first: ZDD(-1).Intersec(ZDD(0)) used to take the
+     g == 0 shortcut and turn the failure into a normal empty answer */
+  if(*this == -1 || g == -1) return -1;
   if(g == 0) return 0;
   if(g == 1) return *this & 1;
   int ftop = Top();

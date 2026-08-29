@@ -4,6 +4,9 @@
  * (C) Shin-ichi MINATO (Dec. 11, 2012) *
  ****************************************/
 
+#include <memory>
+#include <new>
+
 #include "ZDD.h"
 
 namespace sapporobdd {
@@ -15,11 +18,23 @@ void ZDD::XPrint() const
 
 void ZDDV::XPrint() const
 {
+	/* as ZDDV::Size()/Export(): refuse the error vector and -1 components
+	   instead of drawing a silently truncated graph, and allocate with
+	   nothrow so the failure stays a BDDException */
+	if(GetMetaZDD() == -1)
+		BDDerr("ZDDV::XPrint(): Error vector.", ExceptionType::InvalidBDDValue);
 	int len = Last() + 1;
-	bddword* bddv = new bddword[len];
-	for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
-	bddvgraph(bddv, len);
-	delete[] bddv;
+	std::unique_ptr<bddword[]> bddv(new(std::nothrow) bddword[len]);
+	if(!bddv)
+		BDDerr("ZDDV::XPrint(): Memory allocation failed.", ExceptionType::OutOfMemory);
+	for(int i=0; i<len; i++)
+	{
+		ZDD f = GetZDD(i);
+		if(f == -1)
+			BDDerr("ZDDV::XPrint(): Operation failed.", ExceptionType::OutOfMemory);
+		bddv[i] = f.GetID();
+	}
+	bddvgraph(bddv.get(), len);
 }
 
 /*

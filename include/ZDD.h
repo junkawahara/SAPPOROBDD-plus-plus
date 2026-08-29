@@ -99,7 +99,9 @@ public:
   void Export(FILE *strm = stdout) const;
   void XPrint(void) const;
   void Print(void) const;
-  void PrintPla(void) const;
+  /* 1 when nothing could be printed (the error ZDD, or a component that
+     failed with -1), 0 on success */
+  int PrintPla(void) const;
 
   ZDD Swap(int, int) const;
   ZDD Restrict(const ZDD&) const;
