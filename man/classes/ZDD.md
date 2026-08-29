@@ -355,7 +355,11 @@ ZDD ZDD_Import(FILE *strm = stdin)
 
 strmで指定するファイルからZDDの構造を読み込み、ZDDオブジェクトを生成して、それを返す。ただし、ファイルに書かれているデータが多出力であった場合は、最初の出力の構造のみ読み込む。~~ファイルに文法誤りが合った場合等、異常終了時はnullを返す。~~
 ファイルに文法誤りがあった場合等は BDDFileFormatException 例外を投げる。
+出力数（_o）が 0 のファイルも BDDFileFormatException 例外を投げる。
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
+なお、ファイルのヘッダ（_i）に応じて不足分の変数を作成した後に
+読み込みが失敗した場合、作成済みの変数はそのまま残る
+（BDD_VarUsed() が増えたままになる）。
 
 ### ZDD_Random
 
@@ -367,7 +371,10 @@ ZDD ZDD_Random(int lev, int density = 50)
 変数順位(level)が1からlevまでの値を持つアイテム変数を使用する。
 アイテム変数はあらかじめ宣言されていなければならない。density によって、
 濃度（要素数／全体集合％）を指定することができる。
-lev が 0 未満の場合は BDDOutOfRangeException 例外を投げる。
+lev が 0 未満の場合、または lev がユーザー変数の数（BDD_TopLev()）を
+超える場合は BDDOutOfRangeException 例外を投げる。
+density が 0 未満または 100 を超える場合も BDDOutOfRangeException
+例外を投げる。
 ~~記憶あふれの場合は
 nullを返す。~~
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
@@ -650,8 +657,10 @@ int ZDD::SymChk(int v1, int v2) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 変数番号 v1 と v2 のアイテムが対称性を持つかどうかをチェックする。
-v1 または v2 が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
-記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
+v1 または v2 が 0 以下、または使用中の変数番号を超える場合は
+BDDOutOfRangeException 例外を投げる。
+~~記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。~~
+記憶あふれの場合は -1 を返す（例外は投げない）。
 正常に終了した場合は、対称性がある場合は 1、ない場合は 0 を返す。自分自身が null の場合は -1 を返す。
 
 ### SymGrp
@@ -663,7 +672,10 @@ ZDD ZDD::SymGrp(void) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 自分自身における対称なアイテムのグループを抽出する。
-記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
+どの変数とも対称でない変数（要素数 1 のグループ）は結果に**含めない**
+（SymGrpNaive() は含めるので、両者の結果は一般に一致しない）。
+~~記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。~~
+記憶あふれの場合は null を表すオブジェクトを返す（例外は投げない）。
 
 ### SymGrpNaive
 
@@ -674,7 +686,10 @@ ZDD ZDD::SymGrpNaive(void) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 自分自身における対称なアイテムのグループを抽出する（ナイーブ版）。
-記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
+どの変数とも対称でない変数（要素数 1 のグループ）も結果に**含める**
+（SymGrp() は含めないので、両者の結果は一般に一致しない）。
+~~記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。~~
+記憶あふれの場合は null を表すオブジェクトを返す（例外は投げない）。
 
 ### SymSet
 
@@ -686,7 +701,8 @@ ZDD ZDD::SymSet(int v) const
 
 変数番号 v のアイテムと対称なアイテムの集合を返す。
 v が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
-記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
+~~記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。~~
+記憶あふれの場合は null を表すオブジェクトを返す（例外は投げない）。
 
 ### ImplyChk
 
@@ -800,8 +816,9 @@ char* ZDD::CardMP16(char* s) const
 多倍長整数でカウントする。結果は16進数文字列としてsから始まる
 記憶領域に格納する。sに0(NULL)を与えて実行した場合は、必要なサイズの
 文字列領域を確保(malloc)してから結果を格納し、その開始アドレスを
-関数値として返す。文字列領域確保に失敗した場合は0(NULL)を返し
-終了する。0以外のsを与えた場合は、sをそのまま関数値として返す。
+関数値として返す。~~文字列領域確保に失敗した場合は0(NULL)を返し
+終了する。~~ 文字列領域確保に失敗した場合は BDDOutOfMemoryException
+例外を投げる。0以外のsを与えた場合は、sをそのまま関数値として返す。
 0以外のsを与える場合には、あらかじめ十分な記憶領域（~~64ビット
 PCの場合、最大129文字~~ 64ビットビルド（既定および B_EXTEND）の場合は
 16ワード×16桁＝最大256文字、終端のヌル文字を含めて最大257バイト。
@@ -811,8 +828,10 @@ PCの場合、最大129文字~~ 64ビットビルド（既定および B_EXTEND�
 検出できない。結果の格納場所が確保されていても計算途中に
 メモリが不足し計算結果が不明となる場合は、 ~~空文字列を格納して
 終了する。~~ BDDOutOfMemoryException 例外を投げる。
-メモリは足りているが計算結果が表現可能な最大値を
-超える場合は、表現可能な最大値をカウント結果として格納して終了する。
+~~メモリは足りているが計算結果が表現可能な最大値を
+超える場合は、表現可能な最大値をカウント結果として格納して終了する。~~
+メモリは足りているが計算結果が表現可能な最大値（16ワード）を
+超える場合は BDDOutOfRangeException 例外を投げる。
 引数fに bddnullを与えた場合は0をカウント結果とする。不当な引数
 （ZBDDを正しく指していない等）を与えた場合は ~~異常終了する。~~
 BDDInvalidBDDValueException 例外を投げる。
