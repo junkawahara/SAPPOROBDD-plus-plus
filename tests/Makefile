@@ -46,7 +46,7 @@ endif
 
 # Object files
 OBJ_ZDD = test_ZBDD.o ZDD.o BDD.o bddc.o
-OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o bddc.o
+OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o BDDHASH.o ZDDHASH.o bddc.o
 OBJ_OPERATOR = test_operator.o ZDD.o BDD.o bddc.o
 OBJ_ITERATIVE_TEST = test_iterative.o ZDD.o BDD.o bddc.o
 OBJ_MP_OOM = test_mp_oom.o ZDD.o BDD.o bddc.o
@@ -65,8 +65,7 @@ OBJ_OPERATOR_ITERATIVE = test_operator_iterative.o ZDD_iterative.o BDD_iterative
 OBJ_MP_OOM_ITERATIVE = test_mp_oom_iterative.o ZDD_iterative.o BDD_iterative.o bddc_iterative.o
 
 # Target executables
-#TARGETS = test_ZBDD test_ZBDD_Hash
-TARGETS = test_ZBDD test_bddc_cache test_operator test_iterative_deep test_mp_oom test_BDDCT
+TARGETS = test_ZBDD test_ZBDD_Hash test_bddc_cache test_operator test_iterative_deep test_mp_oom test_BDDCT
 TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend test_iterative_deep_extend test_mp_oom_extend test_BDDCT_extend
 TARGETS_ITERATIVE = test_ZBDD_iterative test_operator_iterative test_bddc_cache_iterative test_mp_oom_iterative
 
@@ -201,6 +200,12 @@ ZDD.o: $(ZDD_SRC) $(HEADERS)
 BDD.o: ../src/BDD+/BDD.cc ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDD.cc -o BDD.o
 
+BDDHASH.o: ../src/BDD+/BDDHASH.cc ../include/BDD.h ../include/bddc.h
+	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDDHASH.cc -o BDDHASH.o
+
+ZDDHASH.o: ../src/BDD+/ZDDHASH.cc ../include/ZDD.h ../include/BDD.h ../include/bddc.h
+	$(CXX) $(CXXFLAGS) -c ../src/BDD+/ZDDHASH.cc -o ZDDHASH.o
+
 BDDCT.o: ../src/BDD+/BDDCT.cc ../include/BDDCT.h $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c ../src/BDD+/BDDCT.cc -o BDDCT.o
 
@@ -287,6 +292,9 @@ testsbddh: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
 test: $(TARGETS)
 	@echo "Running test_ZBDD..."
 	@./test_ZBDD
+	@echo ""
+	@echo "Running test_ZBDD_Hash..."
+	@./test_ZBDD_Hash
 	@echo ""
 	@echo "Running test_bddc_cache..."
 	@./test_bddc_cache

@@ -362,28 +362,52 @@ inline BDDV& BDDV::operator<<=(int s) { return *this = *this << s; }
 inline BDDV& BDDV::operator>>=(int s) { return *this = *this >> s; }
 
 
+/* A hash table mapping BDD keys to void* values, used as a scratch table by
+   applications.  Enter(key, p) inserts or updates; Enter(key, 0) deletes the
+   key (a null value cannot be stored, since Refer() answers 0 for "not
+   found").  Refer(key) returns the stored pointer or 0; Amount() the number
+   of live entries.  Clear() releases every entry at once.  An entry keeps a
+   reference to its key BDD for as long as it is in the table, so bddgc()
+   cannot collect the key's nodes until the entry is deleted or cleared. */
 class BDD_Hash
 {
   struct BDD_Entry
   {
+    enum State { Empty = 0, Occupied = 1, Deleted = 2 };
     BDD _key;
     void* _ptr;
-    BDD_Entry(void){ _key = -1; }
+    char _state;
+    BDD_Entry(void){ _ptr = 0; _state = Empty; }
   };
 
   bddword _amount;
+  bddword _tombstone;
   bddword _hashSize;
   BDD_Entry* _wheel;
 
-  BDD_Entry* GetEntry(BDD);
-  void Enlarge(void);
+  BDD_Entry* GetEntry(const BDD&) const;
+  void Rehash(bddword newSize);
 public:
   BDD_Hash(void);
   ~BDD_Hash(void);
+
+  /* _wheel is owned through a raw pointer, so the implicitly generated copy
+     would make two owners of it and double-free.  Copies are therefore not
+     part of the contract. */
+#if __cplusplus >= 201103L
+  BDD_Hash(const BDD_Hash&) = delete;
+  BDD_Hash& operator=(const BDD_Hash&) = delete;
+#else
+private:
+  BDD_Hash(const BDD_Hash&);
+  BDD_Hash& operator=(const BDD_Hash&);
+public:
+#endif
+
   void Clear(void);
-  void Enter(BDD, void *);
-  void* Refer(BDD);
-  bddword Amount(void);
+  void Enter(const BDD&, void *);
+  void* Refer(const BDD&) const;
+  bddword Amount(void) const;
 };
 
 } // namespace sapporobdd

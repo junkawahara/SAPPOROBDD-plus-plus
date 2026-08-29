@@ -247,29 +247,52 @@ inline ZDDV& ZDDV::operator<<=(int s)
 inline ZDDV& ZDDV::operator>>=(int s)
   { return *this = *this >> s; }
 
-class ZDD_Hash;
+/* A hash table mapping ZDD keys to void* values, used as a scratch table by
+   applications.  Enter(key, p) inserts or updates; Enter(key, 0) deletes the
+   key (a null value cannot be stored, since Refer() answers 0 for "not
+   found").  Refer(key) returns the stored pointer or 0; Amount() the number
+   of live entries.  Clear() releases every entry at once.  An entry keeps a
+   reference to its key ZDD for as long as it is in the table, so bddgc()
+   cannot collect the key's nodes until the entry is deleted or cleared. */
 class ZDD_Hash
 {
   struct ZDD_Entry
   {
+    enum State { Empty = 0, Occupied = 1, Deleted = 2 };
     ZDD _key;
     void* _ptr;
-    ZDD_Entry(void){ _key = -1; }
+    char _state;
+    ZDD_Entry(void){ _ptr = 0; _state = Empty; }
   };
 
   bddword _amount;
+  bddword _tombstone;
   bddword _hashSize;
   ZDD_Entry* _wheel;
-  
-  ZDD_Entry* GetEntry(ZDD);
-  void Enlarge(void);
+
+  ZDD_Entry* GetEntry(const ZDD&) const;
+  void Rehash(bddword newSize);
 public:
   ZDD_Hash(void);
   ~ZDD_Hash(void);
+
+  /* _wheel is owned through a raw pointer, so the implicitly generated copy
+     would make two owners of it and double-free.  Copies are therefore not
+     part of the contract. */
+#if __cplusplus >= 201103L
+  ZDD_Hash(const ZDD_Hash&) = delete;
+  ZDD_Hash& operator=(const ZDD_Hash&) = delete;
+#else
+private:
+  ZDD_Hash(const ZDD_Hash&);
+  ZDD_Hash& operator=(const ZDD_Hash&);
+public:
+#endif
+
   void Clear(void);
-  void Enter(ZDD, void *);
-  void* Refer(ZDD);
-  bddword Amount(void);
+  void Enter(const ZDD&, void *);
+  void* Refer(const ZDD&) const;
+  bddword Amount(void) const;
 };
 
 typedef ZDD_Hash ZBDD_Hash; // for backward compatibility
