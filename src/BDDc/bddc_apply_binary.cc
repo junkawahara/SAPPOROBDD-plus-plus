@@ -132,18 +132,33 @@ bddp apply_binary(bddp f, bddp g, unsigned char op, unsigned char skip)
   /* Stack overflow limitter */
   BDD_RECUR_INC;
 
-  /* Get result node */
-  h0 = apply(f0, g0, op, 0);
-  if(h0 == bddnull) { h = h0; }
-  else
+  /* Get result node.  The recursions and get{b,z}ddp() report memory
+     exhaustion by exception (getnode() throws rather than returning
+     bddnull), which would skip the bddfree() calls below; the references
+     held in h0/h1 would then leak and pin their nodes against bddgc()
+     forever, so they are released on the way out. */
+  h0 = bddnull;
+  h1 = bddnull;
+  try
   {
-    h1 = apply(f1, g1, op, 0);
-    if(h1 == bddnull) { bddfree(h0); h = h1; }
+    h0 = apply(f0, g0, op, 0);
+    if(h0 == bddnull) { h = h0; }
     else
     {
-      h = z? getzddp(v, h0, h1): getbddp(v, h0, h1);
-      if(h == bddnull) { bddfree(h0); bddfree(h1); }
+      h1 = apply(f1, g1, op, 0);
+      if(h1 == bddnull) { bddfree(h0); h = h1; }
+      else
+      {
+        h = z? getzddp(v, h0, h1): getbddp(v, h0, h1);
+        if(h == bddnull) { bddfree(h0); bddfree(h1); }
+      }
     }
+  }
+  catch(...)
+  {
+    bddfree(h1);
+    bddfree(h0);
+    throw;
   }
 
   /* Stack overflow limitter */

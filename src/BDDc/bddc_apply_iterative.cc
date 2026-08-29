@@ -271,6 +271,7 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
     frame->h1 = bddnull;
     frame->result = bddnull;
 
+    try {
     while (stack.top >= 0) {
         frame = stack_current(&stack);
 
@@ -436,6 +437,20 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
             final_result = frame->result;
         }
         stack_pop(&stack);
+    }
+
+    }
+    catch (...) {
+        /* getnode() and the nested apply() calls report memory exhaustion by
+           exception.  The frames of the abandoned traversal own the node
+           references in their h0/h1 fields; release them so the nodes do not
+           stay pinned against bddgc() forever, then release the stack. */
+        for (int i = 0; i <= stack.top; i++) {
+            bddfree(stack.frames[i].h1);
+            bddfree(stack.frames[i].h0);
+        }
+        stack_free(&stack);
+        throw;
     }
 
     stack_free(&stack);
@@ -671,6 +686,7 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     frame->h1 = bddnull;
     frame->result = bddnull;
 
+    try {
     while (stack.top >= 0) {
         frame = stack_current(&stack);
 
@@ -845,6 +861,20 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
         stack_pop(&stack);
     }
 
+    }
+    catch (...) {
+        /* getnode() and the nested apply() calls report memory exhaustion by
+           exception.  The frames of the abandoned traversal own the node
+           references in their h0/h1 fields; release them so the nodes do not
+           stay pinned against bddgc() forever, then release the stack. */
+        for (int i = 0; i <= stack.top; i++) {
+            bddfree(stack.frames[i].h1);
+            bddfree(stack.frames[i].h0);
+        }
+        stack_free(&stack);
+        throw;
+    }
+
     stack_free(&stack);
     return final_result;
 }
@@ -1000,6 +1030,7 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     frame->h1 = bddnull;
     frame->result = bddnull;
 
+    try {
     while (stack.top >= 0) {
         frame = stack_current(&stack);
 
@@ -1142,6 +1173,8 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                     }
                     bddfree(frame->h0);
                     bddfree(frame->h1);
+                    frame->h0 = bddnull;
+                    frame->h1 = bddnull;
                     if (h == bddnull) {
                         frame->result = bddnull;
                         goto pop_frame;
@@ -1303,6 +1336,21 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
         stack_pop(&stack);
     }
 
+    }
+    catch (...) {
+        /* As in the other iterative applies, but only the BC_SUPPORT frames
+           hold node references in h0/h1; the other count operations keep
+           plain numbers there, which must never reach bddfree(). */
+        for (int i = 0; i <= stack.top; i++) {
+            if (stack.frames[i].op == BC_SUPPORT) {
+                bddfree(stack.frames[i].h1);
+                bddfree(stack.frames[i].h0);
+            }
+        }
+        stack_free(&stack);
+        throw;
+    }
+
     stack_free(&stack);
     return final_result;
 }
@@ -1368,6 +1416,7 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
     frame->h1 = bddnull;
     frame->result = bddnull;
 
+    try {
     while (stack.top >= 0) {
         frame = stack_current(&stack);
 
@@ -1592,6 +1641,20 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
             final_result = frame->result;
         }
         stack_pop(&stack);
+    }
+
+    }
+    catch (...) {
+        /* getnode() and the nested apply() calls report memory exhaustion by
+           exception.  The frames of the abandoned traversal own the node
+           references in their h0/h1 fields; release them so the nodes do not
+           stay pinned against bddgc() forever, then release the stack. */
+        for (int i = 0; i <= stack.top; i++) {
+            bddfree(stack.frames[i].h1);
+            bddfree(stack.frames[i].h0);
+        }
+        stack_free(&stack);
+        throw;
     }
 
     stack_free(&stack);

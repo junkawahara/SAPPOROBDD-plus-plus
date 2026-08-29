@@ -50,6 +50,10 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
   bddvar i;
   bool cacheallocated = false;
 
+  /* No recursion survives a re-initialization, so the depth counter starts
+     over with everything else. */
+  BDD_RecurCount = 0;
+
   /* Set cache ratio if specified */
   if(cacheRatio > 0.0) {
     /* throw an exeption if cacheRatio is illegal */

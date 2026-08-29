@@ -47,6 +47,7 @@ endif
 # Object files
 OBJ_ZDD = test_ZBDD.o ZDD.o BDD.o bddc.o
 OBJ_HASH = test_ZBDD_Hash.o ZDD.o BDD.o BDDHASH.o ZDDHASH.o bddc.o
+OBJ_RECOVERY = test_recovery.o ZDD.o BDD.o bddc.o
 OBJ_OPERATOR = test_operator.o ZDD.o BDD.o bddc.o
 OBJ_ITERATIVE_TEST = test_iterative.o ZDD.o BDD.o bddc.o
 OBJ_MP_OOM = test_mp_oom.o ZDD.o BDD.o bddc.o
@@ -65,7 +66,7 @@ OBJ_OPERATOR_ITERATIVE = test_operator_iterative.o ZDD_iterative.o BDD_iterative
 OBJ_MP_OOM_ITERATIVE = test_mp_oom_iterative.o ZDD_iterative.o BDD_iterative.o bddc_iterative.o
 
 # Target executables
-TARGETS = test_ZBDD test_ZBDD_Hash test_bddc_cache test_operator test_iterative_deep test_mp_oom test_BDDCT
+TARGETS = test_ZBDD test_ZBDD_Hash test_recovery test_bddc_cache test_operator test_iterative_deep test_mp_oom test_BDDCT
 TARGETS_EXTEND = test_ZBDD_extend test_operator_extend test_bddc_cache_extend test_iterative_deep_extend test_mp_oom_extend test_BDDCT_extend
 TARGETS_ITERATIVE = test_ZBDD_iterative test_operator_iterative test_bddc_cache_iterative test_mp_oom_iterative
 
@@ -85,6 +86,10 @@ test_ZBDD: $(OBJ_ZDD)
 # Build test_ZBDD_Hash
 test_ZBDD_Hash: $(OBJ_HASH)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_HASH)
+
+# Build test_recovery (usability after caught exceptions)
+test_recovery: $(OBJ_RECOVERY)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_RECOVERY)
 
 # Build test_bddc_cache
 test_bddc_cache: test_bddc_cache.o bddc.o
@@ -193,6 +198,9 @@ test_mp_oom_iterative.o: test_mp_oom.cpp $(HEADERS)
 test_ZBDD_Hash.o: test_ZBDD_Hash.cpp ../include/ZDD.h ../include/BDD.h ../include/bddc.h
 	$(CXX) $(CXXFLAGS) -c test_ZBDD_Hash.cpp
 
+test_recovery.o: test_recovery.cpp ../include/ZDD.h ../include/BDD.h ../include/bddc.h
+	$(CXX) $(CXXFLAGS) -c test_recovery.cpp
+
 ZDD.o: $(ZDD_SRC) $(HEADERS)
 	@echo "Using $(ZDD_SRC)"
 	$(CXX) $(CXXFLAGS) -c $(ZDD_SRC) -o ZDD.o
@@ -295,6 +303,9 @@ test: $(TARGETS)
 	@echo ""
 	@echo "Running test_ZBDD_Hash..."
 	@./test_ZBDD_Hash
+	@echo ""
+	@echo "Running test_recovery..."
+	@./test_recovery
 	@echo ""
 	@echo "Running test_bddc_cache..."
 	@./test_bddc_cache

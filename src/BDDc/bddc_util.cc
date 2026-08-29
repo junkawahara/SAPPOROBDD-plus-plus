@@ -645,6 +645,17 @@ int mp_add(struct B_MP *p, bddp ix)
 
 [[noreturn]] int err(const char *msg, bddp num, ExceptionType exType)
 {
+  /* The exception thrown below unwinds every library recursion frame between
+     here and the caller, and none of those frames reaches its BDD_RECUR_DEC.
+     Nothing inside the library resumes such a recursion (handlers like the
+     one in bddsize() restore the counter they saved themselves before
+     rethrowing), so once the exception reaches the user no library frame is
+     left and the correct depth is 0.  Without this reset the counter stayed
+     at the depth the aborted recursion had reached, and after a caught
+     stack-overflow exception every later operation ran out of its recursion
+     budget immediately -- permanently, since not even BDD_Init() reset it. */
+  BDD_RecurCount = 0;
+
   const int msg_buf_size = 1024;
   char msg_buf[msg_buf_size];
   /* The whole message has to be built by a single snprintf: every snprintf

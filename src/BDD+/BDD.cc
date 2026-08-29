@@ -166,6 +166,10 @@ BDD BDD_Random(int level, int density)
 
 void BDDerr(const char* msg, ExceptionType exType)
 {
+  /* As in the C core's err(): the exception unwinds every BDD+ recursion
+     frame without passing their BDD_RECUR_DEC, and by the time it reaches
+     the user no library frame is left, so the correct depth is 0. */
+  BDD_RecurCount = 0;
   switch (exType) {
     case ExceptionType::InvalidBDDValue:
       throw BDDInvalidBDDValueException(msg, 0);
@@ -183,6 +187,7 @@ void BDDerr(const char* msg, ExceptionType exType)
 
 void BDDerr(const char* msg, bddword key, ExceptionType exType)
 {
+  BDD_RecurCount = 0;
   switch (exType) {
     case ExceptionType::InvalidBDDValue:
       throw BDDInvalidBDDValueException(msg, key);

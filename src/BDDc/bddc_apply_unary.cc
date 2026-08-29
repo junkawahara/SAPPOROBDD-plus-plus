@@ -82,7 +82,10 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
     if(flev < glev)
     {
       B_RFC_INC_NP(fp);
-      h = getzddp((bddvar)g, bddfalse, f);
+      /* getnode() reports memory exhaustion by exception; release the
+         reference taken above instead of leaking it */
+      try { h = getzddp((bddvar)g, bddfalse, f); }
+      catch(...) { bddfree(f); throw; }
       if(h == bddnull) bddfree(f);
       return h;
     }
@@ -93,7 +96,8 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
       if(B_NEG(f)^B_NEG(h1)) h1 = B_NOT(h1);
       if(!B_CST(h0)) { fp = B_NP(h0); B_RFC_INC_NP(fp); }
       if(!B_CST(h1)) { fp = B_NP(h1); B_RFC_INC_NP(fp); }
-      h = getzddp((bddvar)g, h0, h1);
+      try { h = getzddp((bddvar)g, h0, h1); }
+      catch(...) { bddfree(h1); bddfree(h0); throw; }
       if(h == bddnull) { bddfree(h0); bddfree(h1); }
       return h;
     }
@@ -143,7 +147,14 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
   /* Stack overflow limitter */
   BDD_RECUR_INC;
 
-  /* Get result node */
+  /* Get result node.  The recursions and get{b,z}ddp() report memory
+     exhaustion by exception, which would skip the bddfree() calls below;
+     the references held in h0/h1 are released on the way out instead of
+     leaking and pinning their nodes against bddgc() forever. */
+  h0 = bddnull;
+  h1 = bddnull;
+  try
+  {
   switch(op)
   {
   case BC_AT0:
@@ -192,6 +203,13 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
     err("apply_unary: unknown opcode", op, ExceptionType::InternalError);
     h = bddnull;
     break;
+  }
+  }
+  catch(...)
+  {
+    bddfree(h1);
+    bddfree(h0);
+    throw;
   }
 
   /* Stack overflow limitter */

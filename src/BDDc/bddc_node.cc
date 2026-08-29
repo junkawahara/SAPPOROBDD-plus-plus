@@ -175,7 +175,7 @@ int hash_enlarge(bddvar v)
   }
   else {
     bddp memsize = sizeof(bddp_64) * newSpc;
-    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
+    err("hash_enlarge: not enough memory for hash table", memsize, ExceptionType::OutOfMemory);
   }
 #elif defined(B_32)
   newhash_32 = 0;
@@ -188,7 +188,7 @@ int hash_enlarge(bddvar v)
   }
   else {
     bddp memsize = sizeof(bddp_32) * newSpc;
-    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
+    err("hash_enlarge: not enough memory for hash table", memsize, ExceptionType::OutOfMemory);
   }
 #else
   newhash_32 = 0;
@@ -220,7 +220,7 @@ int hash_enlarge(bddvar v)
     } else {
       memsize += sizeof(bddp_h8) * newSpc;
     }
-    throw BDDOutOfMemoryException("hash_enlarge: not enough memory for hash table", memsize);
+    err("hash_enlarge: not enough memory for hash table", memsize, ExceptionType::OutOfMemory);
   }
 #endif
   varp->hashSpc = newSpc;
@@ -283,21 +283,21 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
 #ifdef B_EXTEND
     varp->hash_64 = 0;
     varp->hash_64 = B_MALLOC(bddp_64, B_HASH_SPC0);
-    if(!varp->hash_64) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_64) * B_HASH_SPC0);
+    if(!varp->hash_64) err("getnode: not enough memory for hash table", sizeof(bddp_64) * B_HASH_SPC0, ExceptionType::OutOfMemory);
 #elif defined(B_32)
     varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
-    if(!varp->hash_32) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0);
+    if(!varp->hash_32) err("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0, ExceptionType::OutOfMemory);
 #else
     varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
-    if(!varp->hash_32) throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0);
+    if(!varp->hash_32) err("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0, ExceptionType::OutOfMemory);
     varp->hash_h8 = 0;
     varp->hash_h8 = B_MALLOC(bddp_h8, B_HASH_SPC0);
     if(!varp->hash_h8)
     {
       free(varp->hash_32);
-      throw BDDOutOfMemoryException("getnode: not enough memory for hash table", sizeof(bddp_h8) * B_HASH_SPC0);
+      err("getnode: not enough memory for hash table", sizeof(bddp_h8) * B_HASH_SPC0, ExceptionType::OutOfMemory);
     }
 #endif
     for(ix=0; ix<B_HASH_SPC0; ix++)
@@ -336,8 +336,9 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
      otherwise leave the counter permanently too high. */
   if(varp->hashUsed + 1U >= varp->hashSpc)
   {
-    if(hash_enlarge(v)) throw BDDOutOfMemoryException("getnode: "
-      "not enough memory for hash table", sizeof(bddp_32) * varp->hashSpc); /* Hash-table overflow */
+    if(hash_enlarge(v)) err("getnode: "
+      "not enough memory for hash table", sizeof(bddp_32) * varp->hashSpc,
+      ExceptionType::OutOfMemory); /* Hash-table overflow */
     key = B_HASHKEY(f0, f1, varp->hashSpc); /* Enlarge success */
   }
 
@@ -346,8 +347,9 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
   {
     if(node_enlarge())
     {
-      if(bddgc()) throw BDDOutOfMemoryException("getnode: "
-        "not enough memory for node table", 0); /* Node-table overflow */
+      if(bddgc()) err("getnode: "
+        "not enough memory for node table", 0,
+        ExceptionType::OutOfMemory); /* Node-table overflow */
       key = B_HASHKEY(f0, f1, varp->hashSpc);
     }
     /* Node-table enlarged or GC succeeded */

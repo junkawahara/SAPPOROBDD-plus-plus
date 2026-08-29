@@ -12,19 +12,23 @@ namespace sapporobdd {
 
 void fprintf_check(FILE *strm, const char *format, ...)
 {
+  /* err() rather than a direct throw: a write error surfaces in the middle
+     of the export_static() recursion, and err() resets the recursion depth
+     counter that the unwound frames never decrement. */
   if (strm == NULL) {
-    throw BDDFileFormatException("Output stream is null", 0);
+    err("fprintf_check: Output stream is null", 0, ExceptionType::FileFormat);
   }
   if (format == NULL) {
-    throw BDDFileFormatException("Format string is null", 0);
+    err("fprintf_check: Format string is null", 0, ExceptionType::FileFormat);
   }
 
   va_list args;
   va_start(args, format);
-  if (vfprintf(strm, format, args) < 0) {
-    throw BDDFileFormatException("Error writing to file", 0);
-  }
+  int r = vfprintf(strm, format, args);
   va_end(args);
+  if (r < 0) {
+    err("fprintf_check: Error writing to file", 0, ExceptionType::FileFormat);
+  }
 }
 
 void export_static(FILE *strm, bddp f)

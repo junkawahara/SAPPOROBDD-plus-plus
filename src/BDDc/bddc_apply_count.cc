@@ -138,18 +138,35 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
   switch(op)
   {
   case BC_SUPPORT:
-    h0 = apply(f0, bddfalse, op, 0);
-    if(h0 == bddnull) { h = h0; break; }
-    h1 = apply(f1, bddfalse, op, 0);
-    if(h1 == bddnull) { bddfree(h0); h = h1; break; }
-    h = z? apply(h0, h1, BC_UNION, 0):
-           apply(B_NOT(h0), B_NOT(h1), BC_AND, 0);
-    bddfree(h0); bddfree(h1);
-    if(h == bddnull) break;
-    h0 = h;
-    h = z? getzddp(v, h0, bddtrue):
-           getbddp(v, B_NOT(h0), bddtrue);
-    if(h == bddnull) bddfree(h0);
+    /* Unlike the other count results, these intermediates are node
+       references.  The recursions and get{b,z}ddp() report memory exhaustion
+       by exception, which would skip the bddfree() calls; release whatever
+       is held on the way out instead of leaking it.  (The other cases hold
+       plain numbers in h0/h1, which must never reach bddfree().) */
+    h0 = bddnull;
+    h1 = bddnull;
+    try
+    {
+      h0 = apply(f0, bddfalse, op, 0);
+      if(h0 == bddnull) { h = h0; break; }
+      h1 = apply(f1, bddfalse, op, 0);
+      if(h1 == bddnull) { bddfree(h0); h = h1; break; }
+      h = z? apply(h0, h1, BC_UNION, 0):
+             apply(B_NOT(h0), B_NOT(h1), BC_AND, 0);
+      bddfree(h0); bddfree(h1);
+      h0 = bddnull; h1 = bddnull;
+      if(h == bddnull) break;
+      h0 = h;
+      h = z? getzddp(v, h0, bddtrue):
+             getbddp(v, B_NOT(h0), bddtrue);
+      if(h == bddnull) bddfree(h0);
+    }
+    catch(...)
+    {
+      bddfree(h1);
+      bddfree(h0);
+      throw;
+    }
     break;
 
   case BC_CARD:

@@ -67,7 +67,14 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
   /* Stack overflow limitter */
   BDD_RECUR_INC;
 
-  /* Get result node */
+  /* Get result node.  The recursions and getbddp() report memory exhaustion
+     by exception, which would skip the bddfree() calls below; the references
+     held in h0/h1 are released on the way out instead of leaking and pinning
+     their nodes against bddgc() forever. */
+  h0 = bddnull;
+  h1 = bddnull;
+  try
+  {
   switch(op)
   {
   case BC_COFACTOR:
@@ -107,6 +114,7 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
       if(h1 == bddnull) { bddfree(h0); h = h1; break; }
       h = apply(h0, h1, BC_AND, 0);
       bddfree(h0); bddfree(h1);
+      h0 = bddnull; h1 = bddnull;
     }
     else
     {
@@ -123,6 +131,13 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
     err("apply_special: unknown opcode", op, ExceptionType::InternalError);
     h = bddnull;
     break;
+  }
+  }
+  catch(...)
+  {
+    bddfree(h1);
+    bddfree(h0);
+    throw;
   }
 
   /* Stack overflow limitter */
