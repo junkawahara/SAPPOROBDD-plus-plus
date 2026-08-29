@@ -25,7 +25,7 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     return apply_binary_iterative(f, g, op, skip);
 #else
     /* Use iterative version when variable count exceeds threshold */
-    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+    if (VarUsed >= APPLY_RECURSION_THRESHOLD) {
       return apply_binary_iterative(f, g, op, skip);
     }
     return apply_binary(f, g, op, skip);
@@ -44,7 +44,7 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     return apply_unary_iterative(f, g, op, skip);
 #else
     /* Use iterative version when variable count exceeds threshold */
-    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+    if (VarUsed >= APPLY_RECURSION_THRESHOLD) {
       return apply_unary_iterative(f, g, op, skip);
     }
     return apply_unary(f, g, op, skip);
@@ -61,7 +61,7 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     return apply_count_iterative(f, g, op, skip);
 #else
     /* Use iterative version when variable count exceeds threshold */
-    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+    if (VarUsed >= APPLY_RECURSION_THRESHOLD) {
       return apply_count_iterative(f, g, op, skip);
     }
     return apply_count(f, g, op, skip);
@@ -75,7 +75,7 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip)
     return apply_special_iterative(f, g, op, skip);
 #else
     /* Use iterative version when variable count exceeds threshold */
-    if (VarUsed > APPLY_RECURSION_THRESHOLD) {
+    if (VarUsed >= APPLY_RECURSION_THRESHOLD) {
       return apply_special_iterative(f, g, op, skip);
     }
     return apply_special(f, g, op, skip);

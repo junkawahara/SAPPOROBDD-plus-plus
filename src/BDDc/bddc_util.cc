@@ -12,6 +12,11 @@ namespace sapporobdd {
 /* ============================================================
  * Threshold for switching to iterative versions
  * Same as APPLY_RECURSION_THRESHOLD in bddc_apply_common.h
+ *
+ * The switch tests VarUsed >= threshold: the recursion limiter throws when
+ * the depth counter reaches BDD_RecurLimit (8192), and a graph over exactly
+ * 8192 variables legitimately reaches depth 8192, so "VarUsed > 8192" left
+ * that one variable count failing on inputs both neighbours handled.
  * ============================================================ */
 #define UTIL_RECURSION_THRESHOLD 8192
 
@@ -32,11 +37,14 @@ struct UtilStack {
     int capacity;
 };
 
-static void util_stack_init(struct UtilStack *stack) {
+static int util_stack_init(struct UtilStack *stack) {
+    /* the malloc used to go unchecked, and the first frame write after a
+       failure dereferenced the null pointer */
     stack->frames = (struct UtilStackFrame *)malloc(
         sizeof(struct UtilStackFrame) * UTIL_STACK_INIT_SIZE);
     stack->top = -1;
     stack->capacity = UTIL_STACK_INIT_SIZE;
+    return stack->frames != 0;
 }
 
 static void util_stack_free(struct UtilStack *stack) {
@@ -89,13 +97,14 @@ static bddp count_iterative(bddp f)
 
     if (B_CST(f)) return 0;
 
-    util_stack_init(&stack);
-
-    /* Push initial frame */
-    if (!util_stack_push(&stack)) {
-        util_stack_free(&stack);
-        return 0;
-    }
+    /* A failure used to make this return 0, which bddsize() answered as a
+       normal node count of 0.  Nothing is marked yet at this point, so
+       throwing here is clean; the push failures further down throw as well,
+       and the callers' handlers clear the visit flags via reset_aborted(). */
+    if (!util_stack_init(&stack))
+        err("count_iterative: memory allocation failed", 0,
+            ExceptionType::OutOfMemory);
+    util_stack_push(&stack); /* capacity is fresh; cannot fail */
     frame = util_stack_current(&stack);
     frame->f = f;
     frame->state = 0;
@@ -129,7 +138,8 @@ static bddp count_iterative(bddp f)
                 frame->state = 1;
                 if (!util_stack_push(&stack)) {
                     util_stack_free(&stack);
-                    return 0;
+                    err("count_iterative: memory allocation failed", 0,
+                        ExceptionType::OutOfMemory);
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -153,7 +163,8 @@ static bddp count_iterative(bddp f)
                 frame->state = 2;
                 if (!util_stack_push(&stack)) {
                     util_stack_free(&stack);
-                    return 0;
+                    err("count_iterative: memory allocation failed", 0,
+                        ExceptionType::OutOfMemory);
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -214,6 +225,27 @@ static bddp count_iterative(bddp f)
 /* ============================================================
  * Iterative version of reset()
  * ============================================================ */
+
+/* Last-resort recursive clear of the visit flags, used only when the heap
+   stack of reset_iterative() cannot be (re)allocated.  Clearing the flags
+   must not fail -- a flag left behind corrupts the node hash chains -- and
+   it cannot allocate either, since it runs exactly when allocation fails;
+   the machine stack is all that is left.  There is no recursion limiter
+   here for the same reason: throwing would abandon the remaining flags. */
+static void reset_fallback(bddp f)
+{
+    bddp nx;
+    struct B_NodeTable *fp;
+
+    if (B_CST(f)) return;
+    fp = B_NP(f);
+    nx = B_GET_BDDP(fp->nx);
+    if (!(nx & B_CST_MASK)) return;
+    B_SET_BDDP(fp->nx, nx & ~B_CST_MASK);
+    reset_fallback(B_GET_BDDP(fp->f0));
+    reset_fallback(B_GET_BDDP(fp->f1));
+}
+
 static void reset_iterative(bddp f)
 {
     struct UtilStack stack;
@@ -223,13 +255,13 @@ static void reset_iterative(bddp f)
 
     if (B_CST(f)) return;
 
-    util_stack_init(&stack);
-
-    /* Push initial frame */
-    if (!util_stack_push(&stack)) {
-        util_stack_free(&stack);
+    /* the failure used to be ignored (the malloc was not even checked), and
+       the traversal silently stopped with flags still set */
+    if (!util_stack_init(&stack)) {
+        reset_fallback(f);
         return;
     }
+    util_stack_push(&stack); /* capacity is fresh; cannot fail */
     frame = util_stack_current(&stack);
     frame->f = f;
     frame->state = 0;
@@ -259,8 +291,11 @@ static void reset_iterative(bddp f)
                 /* Push frame for f0 */
                 frame->state = 1;
                 if (!util_stack_push(&stack)) {
-                    util_stack_free(&stack);
-                    return;
+                    /* the stack cannot grow: clear the child's subtree with
+                       the last-resort recursion and go on with this frame
+                       (its state is already advanced) */
+                    reset_fallback(f0);
+                    break;
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -280,8 +315,8 @@ static void reset_iterative(bddp f)
                 /* Push frame for f1 */
                 frame->state = 2;
                 if (!util_stack_push(&stack)) {
-                    util_stack_free(&stack);
-                    return;
+                    reset_fallback(f1);
+                    break;
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -316,13 +351,12 @@ static void dump_iterative(bddp f)
 
     if (B_CST(f)) return;
 
-    util_stack_init(&stack);
-
-    /* Push initial frame */
-    if (!util_stack_push(&stack)) {
-        util_stack_free(&stack);
-        return;
-    }
+    /* as count_iterative(): a failure used to be silent, leaving a partial
+       dump and, for the pushes below, visit flags still set */
+    if (!util_stack_init(&stack))
+        err("dump_iterative: memory allocation failed", 0,
+            ExceptionType::OutOfMemory);
+    util_stack_push(&stack); /* capacity is fresh; cannot fail */
     frame = util_stack_current(&stack);
     frame->f = f;
     frame->state = 0;
@@ -354,7 +388,8 @@ static void dump_iterative(bddp f)
                 frame->state = 1;
                 if (!util_stack_push(&stack)) {
                     util_stack_free(&stack);
-                    return;
+                    err("dump_iterative: memory allocation failed", 0,
+                        ExceptionType::OutOfMemory);
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -376,7 +411,8 @@ static void dump_iterative(bddp f)
                 frame->state = 2;
                 if (!util_stack_push(&stack)) {
                     util_stack_free(&stack);
-                    return;
+                    err("dump_iterative: memory allocation failed", 0,
+                        ExceptionType::OutOfMemory);
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -497,7 +533,7 @@ static bddp count_recursive(bddp f)
 bddp count(bddp f)
 {
   /* Use iterative version when variable count exceeds threshold */
-  if (VarUsed > UTIL_RECURSION_THRESHOLD) {
+  if (VarUsed >= UTIL_RECURSION_THRESHOLD) {
     return count_iterative(f);
   }
   return count_recursive(f);
@@ -548,7 +584,7 @@ static void dump_recursive(bddp f)
 void dump(bddp f)
 {
   /* Use iterative version when variable count exceeds threshold */
-  if (VarUsed > UTIL_RECURSION_THRESHOLD) {
+  if (VarUsed >= UTIL_RECURSION_THRESHOLD) {
     dump_iterative(f);
     return;
   }
@@ -580,7 +616,7 @@ static void reset_recursive(bddp f)
 void reset(bddp f)
 {
   /* Use iterative version when variable count exceeds threshold */
-  if (VarUsed > UTIL_RECURSION_THRESHOLD) {
+  if (VarUsed >= UTIL_RECURSION_THRESHOLD) {
     reset_iterative(f);
     return;
   }

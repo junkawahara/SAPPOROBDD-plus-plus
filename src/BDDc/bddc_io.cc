@@ -5,6 +5,7 @@
 ******************************************/
 
 #include "bddc_internal.h"
+#include <limits.h>
 
 namespace sapporobdd {
 
@@ -212,6 +213,44 @@ int bddimportz(FILE *strm, bddp *p, int lim)
   return import(strm, p, lim, 1);
 }
 
+/* Parses one decimal token: returns 0 and stores the value when the whole
+   token is a decimal number in [0, limit], and 1 otherwise (empty token, a
+   sign, junk characters, or too large).  Mirrors ReadDecimal of the BDD+
+   layer.  import() used to hand every count and node ID of the file straight
+   to strtol/strtoull: a huge "_n" wrapped the "hashsize < n_nd<<1" loop
+   below into an endless one, a huge "_i" created variables up to the
+   manager's limit one by one before failing, and a corrupt node ID token
+   quietly became 0, which is a real node the reference could resolve to. */
+static int read_decimal_token(const char *s, unsigned long long limit,
+                              unsigned long long *val)
+{
+  unsigned long long v = 0;
+  int i;
+
+  if(s[0] == 0) return 1;
+  for(i=0; s[i]; i++)
+  {
+    unsigned long long d;
+    if(s[i] < '0' || s[i] > '9') return 1;
+    d = (unsigned long long)(s[i] - '0');
+    if(v > (~0ULL - d) / 10ULL) return 1;
+    v = v * 10ULL + d;
+    if(v > limit) return 1;
+  }
+  *val = v;
+  return 0;
+}
+
+/* Bounds for the header counts: no more levels than the manager can hold
+   variables, no more outputs than an int can index, and no more nodes than
+   the node table can address.  Anything above them describes a corrupt file
+   rather than a huge one. */
+#define IMPORT_MAX_LEV \
+  (((unsigned long long)bddvarmax < (unsigned long long)INT_MAX)? \
+    (unsigned long long)bddvarmax: (unsigned long long)INT_MAX)
+#define IMPORT_MAX_OUT ((unsigned long long)INT_MAX)
+#define IMPORT_MAX_NODE ((unsigned long long)B_NODE_MAX)
+
 int import(FILE *strm, bddp *p, int lim, int z)
 {
   int n, m, v, lev, var, inv, e;
@@ -227,7 +266,12 @@ int import(FILE *strm, bddp *p, int lim, int z)
   if(strcmp(s, "_i") != 0) throw BDDFileFormatException("Import error: Expected '_i' marker", 0);
   v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
-  n = strtol(s, 0, 10);
+  {
+    unsigned long long uval;
+    if(read_decimal_token(s, IMPORT_MAX_LEV, &uval))
+      throw BDDFileFormatException("Import error: Invalid number of levels", 0);
+    n = (int)uval;
+  }
   while(n > (int)bddvarused()) bddnewvar();
 
   v = fscanf(strm, "%255s", s);
@@ -235,14 +279,24 @@ int import(FILE *strm, bddp *p, int lim, int z)
   if(strcmp(s, "_o") != 0) throw BDDFileFormatException("Import error: Expected '_o' marker", 0);
   v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
-  m = strtol(s, 0, 10);
+  {
+    unsigned long long uval;
+    if(read_decimal_token(s, IMPORT_MAX_OUT, &uval))
+      throw BDDFileFormatException("Import error: Invalid number of outputs", 0);
+    m = (int)uval;
+  }
 
   v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
   if(strcmp(s, "_n") != 0) throw BDDFileFormatException("Import error: Expected '_n' marker", 0);
   v = fscanf(strm, "%255s", s);
   if(v == EOF) throw BDDFileFormatException("Import error: Unexpected end of file", 0);
-  n_nd = B_STRTOI(s, 0, 10);
+  {
+    unsigned long long uval;
+    if(read_decimal_token(s, IMPORT_MAX_NODE, &uval))
+      throw BDDFileFormatException("Import error: Invalid number of nodes", 0);
+    n_nd = (bddp)uval;
+  }
 
   for(hashsize = 1; hashsize < (n_nd<<1); hashsize <<= 1)
     ; /* empty */
@@ -273,13 +327,22 @@ int import(FILE *strm, bddp *p, int lim, int z)
   e = 0;
   for(ix=0; ix<n_nd; ix++)
   {
-    v = fscanf(strm, "%255s", s);
-    if(v == EOF) { e = 1; break; }
-    nd = B_STRTOI(s, 0, 10);
+    unsigned long long uval;
 
     v = fscanf(strm, "%255s", s);
     if(v == EOF) { e = 1; break; }
-    lev = strtol(s, 0, 10);
+    if(read_decimal_token(s, (unsigned long long)B_VAL_MASK, &uval))
+      { e = 1; break; }
+    nd = (bddp)uval;
+
+    v = fscanf(strm, "%255s", s);
+    if(v == EOF) { e = 1; break; }
+    /* a level the file made up would make bddvaroflev() throw an
+       out-of-range error of its own; report it as the format error it is */
+    if(read_decimal_token(s, (unsigned long long)bddvarused(), &uval)
+       || uval == 0)
+      { e = 1; break; }
+    lev = (int)uval;
     var = bddvaroflev(lev);
 
     v = fscanf(strm, "%255s", s);
@@ -288,7 +351,9 @@ int import(FILE *strm, bddp *p, int lim, int z)
     else if(strcmp(s, "T") == 0) f0 = bddtrue;
     else
     {
-      nd0 = B_STRTOI(s, 0, 10);
+      if(read_decimal_token(s, (unsigned long long)B_VAL_MASK, &uval))
+        { e = 1; break; }
+      nd0 = (bddp)uval;
 
       ixx = IMPORTHASH(nd0);
       while(hash1[ixx] != nd0)
@@ -307,7 +372,9 @@ int import(FILE *strm, bddp *p, int lim, int z)
     else if(strcmp(s, "T") == 0) f1 = bddtrue;
     else
     {
-      nd1 = B_STRTOI(s, 0, 10);
+      if(read_decimal_token(s, (unsigned long long)B_VAL_MASK, &uval))
+        { e = 1; break; }
+      nd1 = (bddp)uval;
       if(nd1 & 1) { inv = 1; nd1 ^= 1; }
       else inv = 0;
 
@@ -356,7 +423,10 @@ int import(FILE *strm, bddp *p, int lim, int z)
     else if(strcmp(s, "T") == 0) p[i] = bddtrue;
     else
     {
-      nd = B_STRTOI(s, 0, 10);
+      unsigned long long uval;
+      if(read_decimal_token(s, (unsigned long long)B_VAL_MASK, &uval))
+        throw BDDFileFormatException("Import error: Invalid node ID", 0);
+      nd = (bddp)uval;
       if(nd & 1) { inv = 1; nd ^= 1; }
       else inv = 0;
 
