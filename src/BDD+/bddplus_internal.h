@@ -66,6 +66,17 @@ inline int ReadDecimal(const std::string& s, unsigned long long limit,
   return 0;
 }
 
+/* Discards the rest of the current line, up to and including the newline.
+   The PLA reader uses it for comments and for directives that take an
+   arbitrary number of arguments: both end at the end of their line, not
+   after one token. */
+inline void SkipLine(FILE *strm)
+{
+  int c;
+  while((c = fgetc(strm)) != EOF && c != '\n')
+    ; /* empty */
+}
+
 } // namespace sapporobdd
 
 #endif /* BDDPLUS_INTERNAL_H */

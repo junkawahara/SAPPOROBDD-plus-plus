@@ -68,8 +68,11 @@ bddvar bddnewvaroflev(bddvar lev)
 {
   bddvar i;
 
-  if(lev == 0 || lev > ++VarUsed)
+  /* the ++VarUsed used to live inside this condition, so the error path for
+     an invalid level had already created a ghost variable when it threw */
+  if(lev == 0 || lev > VarUsed + 1U)
     err("bddnewvaroflev: Invalid level", lev, ExceptionType::OutOfRange);
+  ++VarUsed;
   if(VarUsed == VarSpc) var_enlarge();
   for(i=VarUsed; i>lev; i--) Var[ VarID[i] = VarID[i-1U] ].lev = i;
   Var[ VarID[lev] = VarUsed ].lev = lev;
@@ -346,12 +349,14 @@ bddp bddlshift(bddp f, bddvar shift)
 {
   struct B_NodeTable *fp;
 
-  /* Check operands */
+  /* Check operands.  A shift of 0 is the identity whatever the variable
+     count; testing it after the range check used to make "f << 0" fail
+     when no variable existed yet (shift >= VarUsed with VarUsed == 0). */
+  if(f == bddnull) return bddnull;
+  if(shift == 0) return bddcopy(f);
   if(shift >= VarUsed)
     err("bddlshift: Invalid shift", shift, ExceptionType::OutOfRange);
-  if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
-  if(shift == 0) return bddcopy(f);
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
     err("bddlshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
@@ -363,12 +368,14 @@ bddp bddrshift(bddp f, bddvar shift)
 {
   struct B_NodeTable *fp;
 
-  /* Check operands */
+  /* Check operands.  A shift of 0 is the identity whatever the variable
+     count; testing it after the range check used to make "f << 0" fail
+     when no variable existed yet (shift >= VarUsed with VarUsed == 0). */
+  if(f == bddnull) return bddnull;
+  if(shift == 0) return bddcopy(f);
   if(shift >= VarUsed)
     err("bddrshift: Invalid shift", shift, ExceptionType::OutOfRange);
-  if(f == bddnull) return bddnull;
   if(B_CST(f)) return f;
-  if(shift == 0) return bddcopy(f);
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
     err("bddrshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
