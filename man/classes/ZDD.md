@@ -37,6 +37,11 @@ extern const bddword BDD_MaxNode
 extern const int BDD_MaxVar
 ```
 
+BDD_MaxVar は C++ インタフェースが扱える変数番号の最大値である。変数番号は
+このインタフェースでは int で受け渡しされるため、B_EXTEND ビルドのように
+C コア側の上限（bddvarmax）が INT_MAX を超える場合は INT_MAX に丸められる
+（以前は範囲外変換によって負の値になっていた）。
+
 ## BDD.h で定義された関数
 
 以下の関数は BDD.h で定義されているが、ZDD クラスでも用いる。
@@ -306,7 +311,9 @@ ZDD operator%(const ZDD& f, const ZDD& g);
 
 f を g で割った剰余の集合を表すZDDオブジェクトを生成し、それを返す。
 ~~記憶あふれの場合は、null を表すオブジェクトを返す。~~ 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。引数にnullを与えた
-場合にはnullを返す。
+場合にはnullを返す。`f - (f / g) * g` として実装されているため、
+operator/ と同じく g が 0 の場合は BDDInvalidBDDValueException 例外を投げる
+（operator%= も同様）。
 
 ### operator==
 
@@ -338,7 +345,7 @@ f と g の不等号 < による比較結果を返す。
 ### BDD_CacheZDD
 
 ```cpp
-ZDD BDD_CacheZDD(char op, bddword f, bddword g);
+ZDD BDD_CacheZDD(unsigned char op, bddword fx, bddword gx)
 ```
 
 f と g の演算結果が ZDD 型のとき、演算結果を演算キャッシュから参照する。op 
@@ -375,6 +382,9 @@ lev が 0 未満の場合、または lev がユーザー変数の数（BDD_TopL
 超える場合は BDDOutOfRangeException 例外を投げる。
 density が 0 未満または 100 を超える場合も BDDOutOfRangeException
 例外を投げる。
+本関数は 1 レベルにつき 2 回再帰するので、実行時間は lev に対して指数的で
+あり、再帰の深さも lev に等しい。深さが再帰の上限（BDD_RecurLimit）に
+達した場合は BDDInternalErrorException 例外を投げる。
 ~~記憶あふれの場合は
 nullを返す。~~
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
@@ -382,7 +392,7 @@ nullを返す。~~
 ### ZDD_Meet
 
 ```cpp
-ZDD_Meet(const ZDD& f, const ZDD& g)
+ZDD ZDD_Meet(const ZDD& f, const ZDD& g)
 ```
 
 f と g のMeet演算（Knuth本4巻1分冊141頁: 演習問題203参照）により得られる
@@ -397,7 +407,6 @@ f と g のMeet演算（Knuth本4巻1分冊141頁: 演習問題203参照）に�
 ZDD::ZDD(void)
 ZDD::ZDD(int v)
 ZDD::ZDD(const ZDD& f)
-ZDD::ZDD(const BDD& bdd, int offset)
 ```
 
 基本constructer。引数を与えない場合は、初期値として空集合を表すZDDオブジェクトを生成する。
@@ -406,12 +415,9 @@ v < 0 ならば null を表すZDDオブジェクトを生成する。
 
 引数として `const ZDD& f` を与えた場合は、引数 f を複製する。
 
-引数として `const BDD& bdd, int offset` を与えた場合は、BDDオブジェクトから変換する。
-各変数をoffset だけシフトして
-ZDD変数に割り当てる。offsetに0を指定すると、0シフト（元の変数番号のまま）
-となる。~~記憶あふれの場合は null オブジェクトを生成する。~~
-記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
-例外として、変数の値が0のBDDの場合は空集合のZDDとなる。
+（BDDオブジェクトから変換する `ZDD::ZDD(const BDD& bdd, int offset)` は
+かつてここに記載されていたが、そのようなコンストラクタは実装されていない。
+BDD から ZDD への変換が必要な場合は、変換を自分で書く必要がある。）
 
 ### ~ZDD
 
@@ -432,7 +438,7 @@ ZDD& ZDD::operator=(const ZDD& f)
 ### operator&=
 
 ```cpp
-ZDD ZDD::operator&=(const ZDD& f)
+ZDD& ZDD::operator&=(const ZDD& f)
 ```
 
 自分自身と f との交わり(intersection)を求め、自分自身に代入し、
@@ -442,7 +448,7 @@ ZDD ZDD::operator&=(const ZDD& f)
 ### operator+=
 
 ```cpp
-ZDD ZDD::operator+=(const ZDD& f)
+ZDD& ZDD::operator+=(const ZDD& f)
 ```
 
 自分自身と f との結び(union)を求め、自分自身に代入し、そのコピーを
@@ -452,7 +458,7 @@ ZDD ZDD::operator+=(const ZDD& f)
 ### operator-=
 
 ```cpp
-ZDD ZDD::operator-=(const ZDD& f)
+ZDD& ZDD::operator-=(const ZDD& f)
 ```
 
 自分自身から f を引いた差分集合を求め、自分自身に代入し、そのコピーを
@@ -462,7 +468,7 @@ ZDD ZDD::operator-=(const ZDD& f)
 ### operator*=
 
 ```cpp
-ZDD ZDD::operator*=(const ZDD& f)
+ZDD& ZDD::operator*=(const ZDD& f)
 ```
 
 自分自身と f との直積集合を求め、自分自身に代入し、そのコピーを返す。
@@ -472,7 +478,7 @@ ZDD ZDD::operator*=(const ZDD& f)
 ### operator/=
 
 ```cpp
-ZDD ZDD::operator/=(const ZDD& f)
+ZDD& ZDD::operator/=(const ZDD& f)
 ```
 
 自分自身を f で割った集合(Weak division)を求め、自分自身に代入し、
@@ -482,7 +488,7 @@ ZDD ZDD::operator/=(const ZDD& f)
 ### operator%=
 
 ```cpp
-ZDD ZDD::operator%=(const ZDD& f)
+ZDD& ZDD::operator%=(const ZDD& f)
 ```
 
 自分自身を f で割った余りの集合を求め、自分自身に代入し、そのコピーを返す。
@@ -492,7 +498,7 @@ ZDD ZDD::operator%=(const ZDD& f)
 ### operator<<=
 
 ```cpp
-ZDD ZDD::operator<<=(int s)
+ZDD& ZDD::operator<<=(int s)
 ```
 
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
@@ -503,10 +509,16 @@ ZDD ZDD::operator<<=(int s)
 オブジェクトを返す。~~ 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。自分自身が null のときは何もしない。sに負の値を指定する
 ことはできない。負の値を指定した場合は BDDOutOfRangeException 例外を投げる。
 
+シフト量 s は現在使用中の変数の個数（BDD_VarUsed()）より小さくなければ
+ならず、s がそれ以上の場合は BDDOutOfRangeException 例外を投げる。
+この検査は自分自身が定数（空集合や単位元集合）であっても行われるので、
+変数を一つも宣言していない状態での `ZDD(0) << 1` も例外となる。
+s == 0 は常に恒等変換であり、変数が一つもなくても例外にならない。
+
 ### operator>>=
 
 ```cpp
-ZDD ZDD::operator>>=(int s)
+ZDD& ZDD::operator>>=(int s)
 ```
 
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
@@ -517,10 +529,16 @@ ZDD ZDD::operator>>=(int s)
 オブジェクトを返す。~~ 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。自分自身が null のときは何もしない。sに負の値を指定する
 ことはできない。負の値を指定した場合は BDDOutOfRangeException 例外を投げる。
 
+シフト量 s は現在使用中の変数の個数（BDD_VarUsed()）より小さくなければ
+ならず、s がそれ以上の場合は BDDOutOfRangeException 例外を投げる。
+この検査は自分自身が定数（空集合や単位元集合）であっても行われるので、
+変数を一つも宣言していない状態での `ZDD(0) << 1` も例外となる。
+s == 0 は常に恒等変換であり、変数が一つもなくても例外にならない。
+
 ### operator<<
 
 ```cpp
-ZDD ZDD::operator<<(int) const
+ZDD ZDD::operator<<(int s) const
 ```
 
 自分自身のグラフに対して、関係する全てのアイテム変数を、展開順位(level)がsずつ
@@ -529,6 +547,12 @@ ZDD ZDD::operator<<(int) const
 なるようなsを与えてはならない。必要な入力変数はあらかじめ宣言しておくこと。
 ~~記憶あふれの場合は、null を表すオブジェクトを返す。~~ 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。自分自身が null のときは
 何もしない。sに負の値を指定することはできない。負の値を指定した場合は BDDOutOfRangeException 例外を投げる。
+
+シフト量 s は現在使用中の変数の個数（BDD_VarUsed()）より小さくなければ
+ならず、s がそれ以上の場合は BDDOutOfRangeException 例外を投げる。
+この検査は自分自身が定数（空集合や単位元集合）であっても行われるので、
+変数を一つも宣言していない状態での `ZDD(0) << 1` も例外となる。
+s == 0 は常に恒等変換であり、変数が一つもなくても例外にならない。
 
 ### operator>>
 
@@ -542,6 +566,12 @@ ZDD ZDD::operator>>(int s) const
 なるようなsを与えてはならない。必要な入力変数はあらかじめ宣言しておくこと。
 ~~記憶あふれの場合は、null を表すオブジェクトを返す。~~ 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。自分自身が null のときは
 何もしない。sに負の値を指定することはできない。負の値を指定した場合は BDDOutOfRangeException 例外を投げる。
+
+シフト量 s は現在使用中の変数の個数（BDD_VarUsed()）より小さくなければ
+ならず、s がそれ以上の場合は BDDOutOfRangeException 例外を投げる。
+この検査は自分自身が定数（空集合や単位元集合）であっても行われるので、
+変数を一つも宣言していない状態での `ZDD(0) << 1` も例外となる。
+s == 0 は常に恒等変換であり、変数が一つもなくても例外にならない。
 
 ### OffSet
 
@@ -578,7 +608,7 @@ varがグラフの最上位の変数番号の場合は、1-エッジ が指し�
 ### Change
 
 ```cpp
-ZDD ZDD::Change(int) const
+ZDD ZDD::Change(int v) const
 ```
 
 自分自身のグラフに対して、変数番号varのアイテムの有無を反転させた集合
@@ -588,7 +618,7 @@ ZDD ZDD::Change(int) const
 ### Swap
 
 ```cpp
-ZDD Swap(int var1, int var2) const
+ZDD ZDD::Swap(int v1, int v2) const
 ```
 
 自分自身のグラフに対して、変数番号var1とvar2のアイテム変数を
@@ -599,7 +629,7 @@ levelではなく、変数番号で与えることに注意。~~記憶あふれ�
 ### Restrict
 
 ```cpp
-ZDD ZDD::Restrict(ZDD f) const
+ZDD ZDD::Restrict(const ZDD& f) const
 ```
 
 自分自身の組合せ集合の要素となっている組合せの中で、fの中の少なくとも
@@ -610,7 +640,7 @@ ZDDオブジェクトを生成してそれを返す。~~記憶あふれの場合
 ### Permit
 
 ```cpp
-ZDD ZDD::Permit(ZDD f) const
+ZDD ZDD::Permit(const ZDD& f) const
 ```
 
 自分自身の組合せ集合の要素となっている組合せの中で、fの中の少なくとも
@@ -626,6 +656,9 @@ ZDD ZDD::PermitSym(int n) const
 
 自分自身の組合せ集合の要素となっている組合せの中で、アイテム個数がn個以下の
 組合せだけを抽出した組合せ集合を表すZDDオブジェクトを生成してそれを返す。
+n == 0 のときは空の組合せ（要素数0）だけが残る。n が負の場合は該当する
+組合せが存在しないので空集合を返す（以前は負の n を n == 0 と同一視し、
+空の組合せを残していた）。
 ~~記憶あふれの場合は、nullを返す。~~ 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。自分自身または引数がnullの場合もnullを返す
 
 ### Support
@@ -700,7 +733,7 @@ ZDD ZDD::SymSet(int v) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 変数番号 v のアイテムと対称なアイテムの集合を返す。
-v が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
+v が 0 以下の場合、または v が BDD_VarUsed() を超える場合は BDDOutOfRangeException 例外を投げる。
 ~~記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。~~
 記憶あふれの場合は null を表すオブジェクトを返す（例外は投げない）。
 
@@ -713,7 +746,8 @@ int ZDD::ImplyChk(int v1, int v2) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 変数番号 v1 のアイテムが v2 のアイテムを含意するかどうかをチェックする。
-v1 または v2 が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
+v1 または v2 が 0 以下、または BDD_VarUsed() を超える場合は
+BDDOutOfRangeException 例外を投げる。
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
 正常に終了した場合は、含意関係がある場合は 1、ない場合は 0 を返す。自分自身が null の場合は -1 を返す。
 
@@ -725,10 +759,18 @@ int ZDD::CoImplyChk(int v1, int v2) const
 
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
-変数番号 v1 と v2 のアイテムが相互に含意するかどうかをチェックする。
-v1 または v2 が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
+v1 のアイテムを v2 のアイテムに置き換えても族に属したままかどうかを
+チェックする。すなわち、v1 を含み v2 を含まない組合せ全体（v1 を除いたもの）が、
+v2 を含み v1 を含まない組合せ全体（v2 を除いたもの）に包含されるかどうかを判定する。
+これは片方向の関係であり、v1 と v2 を入れ替えると結果は一般に異なる
+（「相互含意」と記載されていたが、実装は一方向の包含関係だけを検査する。
+両方向を知りたい場合は CoImplyChk(v1, v2) と CoImplyChk(v2, v1) の両方を呼ぶか、
+SymChk() を用いること）。
+v1 または v2 が 0 以下、または BDD_VarUsed() を超える場合は
+BDDOutOfRangeException 例外を投げる。
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
-正常に終了した場合は、相互含意関係がある場合は 1、ない場合は 0 を返す。自分自身が null の場合は -1 を返す。
+正常に終了した場合は、関係がある場合は 1、ない場合は 0 を返す。自分自身が null の場合、
+および途中の演算が失敗した場合は -1 を返す。
 
 ### ImplySet
 
@@ -739,7 +781,7 @@ ZDD ZDD::ImplySet(int v) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 変数番号 v のアイテムが含意するアイテムの集合を返す。
-v が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
+v が 0 以下の場合、または v が BDD_VarUsed() を超える場合は BDDOutOfRangeException 例外を投げる。
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
 
 ### CoImplySet
@@ -751,7 +793,7 @@ ZDD ZDD::CoImplySet(int v) const
 【本関数の記述は SAPPOROBDD マニュアルに存在しないため、以下の説明は未確認】
 
 変数番号 v のアイテムと相互に含意するアイテムの集合を返す。
-v が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
+v が 0 以下の場合、または v が BDD_VarUsed() を超える場合は BDDOutOfRangeException 例外を投げる。
 記憶あふれの場合は BDDOutOfMemoryException 例外を投げる。
 
 ### IsPoly
@@ -760,7 +802,11 @@ v が 0 以下の場合は BDDOutOfRangeException 例外を投げる。
 int ZDD::IsPoly(void) const
 ```
 
-自分自身の集合に組合せが複数個含まれるかどうかの真偽を返す。
+自分自身の集合に組合せが複数個含まれるかどうかを返す。複数個含まれる場合は 1、
+そうでない場合は 0 を返す。ただし自分自身が null の場合、および途中の演算が
+失敗した場合は -1 を返す三値の関数である。C++ の条件式では -1 も真になるため、
+`if(f.IsPoly())` と書くとエラーを「複数個含まれる」と誤って扱うことになる。
+戻り値は int として受け取り、-1 を明示的に検査すること。
 
 ### Divisor
 
@@ -868,11 +914,13 @@ strm書き込み中にエラーが生じた場合、BDDFileFormatException 例�
 ### PrintPla
 
 ```cpp
-void ZDD::PrintPla(void) const
+int ZDD::PrintPla(void) const
 ```
 
 自分自身が表す集合を表形式（pla format）で標準出力に出力する。
 標準出力への書き込み時のエラーチェックは行わない。
+戻り値は、出力できた場合は 0、出力できなかった場合（自分自身が null、
+または内部の演算が失敗した場合）は 1 である。
 
 ### XPrint
 
@@ -881,6 +929,9 @@ void ZDD::XPrint(void) const
 ```
 
 自分自身のグラフを、X-Window に描画する。
+本メソッドの実体は src/BDDXc のグラフィックモジュールにある。X11 が
+見つからない環境では src/INSTALL がそのモジュールの構築を省略するため、
+呼び出すとリンクエラーになる（ヘッダの宣言は常に存在する）。
 
 ### XPrint0
 
@@ -889,6 +940,7 @@ void ZDD::XPrint0(void) const
 ```
 
 自分自身のグラフを、X-Window に描画する。（否定エッジなし）
+XPrint() と同じく src/BDDXc のグラフィックモジュールを必要とする。
 
 ### Print
 
@@ -902,7 +954,7 @@ void Print(void) const
 ### ZLev
 
 ```cpp
-bddword ZDD::ZLev(int lev, int last = 0) const
+ZDD ZDD::ZLev(int lev, int last = 0) const
 ```
 
 自分自身のZDDについて、最上位節点から0-枝を順にたどって行って、アイテム変数のレベルがちょうどlev となっている節点があれば、それを最上位節点とするZDDオブジェクトをコピーして返す。変数レベルがちょうどlevとなっている節点がなければ、lastがゼロのときは、lev以下となる最初の節点を最上位節点とするZDDオブジェクトをコピーして返す。lastが非ゼロのときは、lev以上である最後の節点を最上位節点とするZDDオブジェクトをコピーして返す。nullに対してはnullを返す。なお、ZDDオブジェクトに対してあらかじめSetZSkip()を1回実行しておくと、補助リンクのおかげでZLevメソッドが高速に行える。
@@ -920,7 +972,7 @@ void ZDD::SetZSkip(void) const
 ### Intersec
 
 ```cpp
-bddword ZDD::Intersec(ZDD g) const
+ZDD ZDD::Intersec(const ZDD& g) const
 ```
 
 自分自身とgとの共通集合を表すZDDオブジェクトを生成し、それを返す。どちらかがnullならばnullを返す。あらかじめSetZSkip()を1回実行しておくと、補助リンクのおかげで高速に実行できる。特に、自分自身のZDDオブジェクトが含むアイテム変数の個数が非常に多く、gに出現するアイテム変数の個数が非常に少ないときに有効である。
