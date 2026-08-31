@@ -23,7 +23,15 @@ static const unsigned char BC_Spread = 61;
 //----- External constant data for BDD -------
 
 const bddword BDD_MaxNode = B_VAL_MASK >> 1U;
-const int BDD_MaxVar = bddvarmax;
+/* The C++ interface passes variable IDs as int - BDD_NewVar(), BDDvar(),
+   ZDD::Change() and the rest - so INT_MAX is the largest ID this layer can
+   name.  In B_EXTEND the C core's bddvarmax is close to 2^32, and the plain
+   "= bddvarmax" was an out-of-range conversion that made the advertised
+   maximum come out as -2: every "v <= BDD_MaxVar" check then rejected all
+   real variables. */
+const int BDD_MaxVar =
+  ((unsigned long long)bddvarmax > (unsigned long long)INT_MAX)?
+    INT_MAX: (int)bddvarmax;
 
 //--- Automatic initialization of the manager ----
 
@@ -195,10 +203,17 @@ BDD BDD_Random(int level, int density)
   if(density < 0 || density > 100)
     BDDerr("BDD_Random: Invalid density.", density, ExceptionType::OutOfRange);
   if(level == 0) return ((std::rand()%100) < density)? 1: 0;
-  return (BDDvar(BDD_VarOfLev(level))
-        & BDD_Random(level-1, density)) |
-         (~BDDvar(BDD_VarOfLev(level))
-        & BDD_Random(level-1, density));
+  /* As ZDD_Random(): the recursion reaches level 0 before it produces
+     anything, so the machine stack goes "level" frames deep whatever the
+     density is, and only the limitter keeps a large level from crashing the
+     process instead of reporting the limit. */
+  BDD_RECUR_INC;
+  BDD h = (BDDvar(BDD_VarOfLev(level))
+         & BDD_Random(level-1, density)) |
+          (~BDDvar(BDD_VarOfLev(level))
+         & BDD_Random(level-1, density));
+  BDD_RECUR_DEC;
+  return h;
 }
 
 void BDDerr(const char* msg, ExceptionType exType)

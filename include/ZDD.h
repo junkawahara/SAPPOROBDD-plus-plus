@@ -97,7 +97,10 @@ public:
   char* CardMP16(char* s) const { return bddcardmp16(_zdd, s); }
 
   void Export(FILE *strm = stdout) const;
+  /* Both need the X11 viewer (src/BDDXc); a build made without it links only
+     as long as they are not called. */
   void XPrint(void) const;
+  void XPrint0(void) const;
   void Print(void) const;
   /* 1 when nothing could be printed (the error ZDD, or a component that
      failed with -1), 0 on success */
@@ -243,7 +246,8 @@ public:
   void Export(FILE *strm = stdout) const;
   int PrintPla(void) const;
   void XPrint(void) const;
-	
+  void XPrint0(void) const;
+
   friend ZDDV operator&(const ZDDV&, const ZDDV&);
   friend ZDDV operator+(const ZDDV&, const ZDDV&);
   friend ZDDV operator-(const ZDDV&, const ZDDV&);

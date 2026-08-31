@@ -1197,6 +1197,112 @@ void test_map() {
     test_result("Unordered map with ZDD key works", zddUnorderedMap[ZDD(1).Change(2)] == 200);
 }
 
+// The shift operations are the only cached operations whose result depends on
+// the variable ORDER, so inserting a variable below the top has to drop their
+// cache entries.  Everything here needs a second reference to the operand:
+// the apply cache is bypassed for a diagram that only one owner holds.
+void test_variable_order_change() {
+    std::cout << "=== Testing operations across a variable order change ===" << endl;
+
+    BDD_Init(256, 1024 * 1024);
+    int v1 = BDD_NewVar();
+    int v2 = BDD_NewVar();
+    BDD_NewVar();               // v3, level 3
+
+    ZDD f = ZDD(1).Change(v1);  // { {v1} }, at level 1
+    ZDD keepf = f;
+    ZDD lbefore = f << 1;
+    test_result("(f << 1) is the variable of level 2", lbefore.Top() == v2);
+
+    int v4 = BDD_NewVarOfLev(2); // v4 takes level 2; v2 and v3 move up
+    ZDD lafter = f << 1;
+    test_result("(f << 1) follows the new variable order",
+                lafter.Top() == v4 && BDD_LevOfVar(lafter.Top()) == 2);
+
+    ZDD g = ZDD(1).Change(BDD_VarOfLev(3));
+    ZDD keepg = g;
+    ZDD rbefore = g >> 1;
+    test_result("(g >> 1) is a variable of level 2",
+                BDD_LevOfVar(rbefore.Top()) == 2);
+
+    BDD_NewVarOfLev(1);          // everything moves up one level
+    ZDD rafter = g >> 1;
+    test_result("(g >> 1) follows the new variable order",
+                BDD_LevOfVar(rafter.Top()) == 3);
+
+    // A variable appended on top moves no level, so the cached results stay
+    // valid; the answer must not change either.
+    ZDD h = ZDD(1).Change(BDD_VarOfLev(2));
+    ZDD keeph = h;
+    ZDD hbefore = h >> 1;
+    BDD_NewVar();
+    ZDD hafter = h >> 1;
+    test_result("a variable added on top leaves the shift result unchanged",
+                hafter == hbefore);
+
+    std::cout << endl;
+}
+
+void test_argument_validation() {
+    std::cout << "=== Testing argument validation ===" << endl;
+
+    BDD_Init(256, 1024 * 1024);
+    int v1 = BDD_NewVar();
+    int v2 = BDD_NewVar();
+    ZDD f = ZDD(1).Change(v1) + ZDD(1).Change(v2) + ZDD(1);
+
+    // "at most n items" holds for no combination at all when n < 0, not even
+    // for the empty one, whose size is 0.
+    test_result("PermitSym(0) keeps the empty combination",
+                f.PermitSym(0) == ZDD(1));
+    test_result("PermitSym(-1) is the empty family", f.PermitSym(-1) == ZDD(0));
+    test_result("PermitSym(-1) of the unit family is empty",
+                ZDD(1).PermitSym(-1) == ZDD(0));
+
+    // The upper end of the VarID range is checked by the method itself now,
+    // and not by the C layer under the name of another function.
+    int over = BDD_VarUsed() + 1;
+    bool threw = false;
+    try { f.SymSet(over); } catch (const BDDOutOfRangeException&) { threw = true; }
+    test_result("SymSet() rejects a VarID above BDD_VarUsed()", threw);
+    threw = false;
+    try { f.ImplySet(over); } catch (const BDDOutOfRangeException&) { threw = true; }
+    test_result("ImplySet() rejects a VarID above BDD_VarUsed()", threw);
+    threw = false;
+    try { f.CoImplySet(over); } catch (const BDDOutOfRangeException&) { threw = true; }
+    test_result("CoImplySet() rejects a VarID above BDD_VarUsed()", threw);
+
+    test_result("BDD_MaxVar is a usable positive VarID bound",
+                BDD_MaxVar > 0 && BDD_VarUsed() <= BDD_MaxVar);
+
+    std::cout << endl;
+}
+
+// ZDD_Random() descends to level 0 before it produces anything, so its
+// recursion is as deep as its first argument; without the recursion limitter
+// a large lev overflowed the machine stack instead of throwing.
+void test_random_recursion_depth() {
+    std::cout << "=== Testing ZDD_Random() recursion depth ===" << endl;
+
+    BDD_Init(256, 1024 * 1024);
+    const int lev = 9000;   // above BDD_RecurLimit (8192)
+    for (int i = 0; i < lev; i++) BDD_NewVar();
+
+    bool threw = false;
+    try { ZDD_Random(lev, 50); }
+    catch (const BDDException&) { threw = true; }
+    test_result("ZDD_Random() reports a too deep recursion instead of crashing",
+                threw);
+
+    // A small level still works.
+    ZDD r = ZDD_Random(3, 100);
+    test_result("ZDD_Random(3, 100) is the whole power set", r.Card() == 8);
+    test_result("ZDD_Random(3, 0) is the empty family",
+                ZDD_Random(3, 0) == ZDD(0));
+
+    std::cout << endl;
+}
+
 void test_gc_threshold() {
     BDD_Init(256, 1024);
 
@@ -1417,6 +1523,12 @@ int main() {
     test_map();
 
     test_b_extend_mode();
+
+    // These re-initialize the manager, so they come after the tests that
+    // share the variable order set up above.
+    test_variable_order_change();
+    test_argument_validation();
+    test_random_recursion_depth();
 
     test_gc_threshold(); // This should be called finally.
 

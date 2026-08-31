@@ -148,8 +148,12 @@ ZDD ZDD::PermitSym(int n) const
 {
   if(*this == -1) return -1;
   if(*this == 0) return 0;
+  /* "at most n items" leaves nothing at all for a negative n, not even the
+     empty combination, whose size is 0.  A negative n used to be treated
+     like n == 0 and kept the empty combination. */
+  if(n < 0) return 0;
   if(*this == 1) return 1;
-  if(n < 1) return *this & 1;
+  if(n == 0) return *this & 1;
 
   int top = Top();
 
@@ -352,7 +356,12 @@ static ZDD ZDD_SymSet(const ZDD& f0, const ZDD& f1)
 ZDD ZDD::SymSet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZDD::SymSet(): invalid v.", v, ExceptionType::OutOfRange);
+  /* Only the lower bound used to be checked here; a v above the number of
+     variables in use was reported later by OffSet()/OnSet0() under the name
+     of the C-layer function, so the two ends of the same range answered with
+     different messages. */
+  if(v <= 0 || v > BDD_VarUsed())
+    BDDerr("ZDD::SymSet(): invalid v.", v, ExceptionType::OutOfRange);
   ZDD f0 = OffSet(v);
   ZDD f1 = OnSet0(v);
   return ZDD_SymSet(f0, f1);
@@ -374,7 +383,12 @@ int ZDD::ImplyChk(int v1, int v2) const
 ZDD ZDD::ImplySet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZDD::ImplySet(): invalid v.", v, ExceptionType::OutOfRange);
+  /* Only the lower bound used to be checked here; a v above the number of
+     variables in use was reported later by OffSet()/OnSet0() under the name
+     of the C-layer function, so the two ends of the same range answered with
+     different messages. */
+  if(v <= 0 || v > BDD_VarUsed())
+    BDDerr("ZDD::ImplySet(): invalid v.", v, ExceptionType::OutOfRange);
   ZDD f1 = OnSet0(v);
   if(f1 == 0) return Support();
   return f1.Always();
@@ -434,7 +448,12 @@ static ZDD ZDD_CoImplySet(const ZDD& f0, const ZDD& f1)
 ZDD ZDD::CoImplySet(int v) const
 {
   if(*this == -1) return -1;
-  if(v <= 0) BDDerr("ZDD::CoImplySet(): invalid v.", v, ExceptionType::OutOfRange);
+  /* Only the lower bound used to be checked here; a v above the number of
+     variables in use was reported later by OffSet()/OnSet0() under the name
+     of the C-layer function, so the two ends of the same range answered with
+     different messages. */
+  if(v <= 0 || v > BDD_VarUsed())
+    BDDerr("ZDD::CoImplySet(): invalid v.", v, ExceptionType::OutOfRange);
   ZDD f0 = OffSet(v);
   ZDD f1 = OnSet0(v);
   if(f1 == 0) return Support();
@@ -450,6 +469,10 @@ int ZDD::IsPoly() const
   if(top == 0) return 0;
   ZDD f1 = OnSet0(top);
   ZDD f0 = OffSet(top);
+  /* Check both cofactors before the test below: a failed OffSet() answers -1,
+     which is != 0 and used to be reported as "more than one combination" -
+     a normal answer produced by a failure. */
+  if(f0 == -1 || f1 == -1) return -1;
   if(f0 != 0) return 1;
   BDD_RECUR_INC;
   int r = f1.IsPoly();
@@ -461,7 +484,12 @@ ZDD ZDD::Divisor() const
 {
   if(*this == -1) return -1;
   if(*this == 0) return 0;
-  if(! IsPoly()) return 1;
+  /* IsPoly() is a three-valued predicate: -1 is a failure, and taking it for
+     a bool makes it "true", so the failure used to continue as if the family
+     really had several combinations. */
+  int poly = IsPoly();
+  if(poly == -1) return -1;
+  if(!poly) return 1;
   ZDD f = *this;
   ZDD g = Support();
   int t;
@@ -471,9 +499,10 @@ ZDD ZDD::Divisor() const
     t = g.Top();
     g = g.OffSet(t);
     ZDD f1 = f.OnSet0(t);
-    /* IsPoly() answers 0 for -1, which would silently keep the old f. */
     if(f1 == -1) return -1;
-    if(f1.IsPoly()) f = f1;
+    poly = f1.IsPoly();
+    if(poly == -1) return -1;
+    if(poly) f = f1;
   }
   return f;
 }
@@ -611,8 +640,16 @@ ZDD ZDD_Random(int lev, int density)
   if(density < 0 || density > 100)
     BDDerr("ZDD_Random(): Invalid density.", density, ExceptionType::OutOfRange);
   if(lev == 0) return ((std::rand()%100) < density)? 1: 0;
-  return ZDD_Random(lev-1, density) +
-         ZDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
+  /* The first of the two calls below descends all the way to level 0 before
+     anything comes back, so the machine stack is lev frames deep whatever
+     the density is.  Without the limitter a lev of a few thousand crashed
+     the process instead of reporting the limit like every other recursion
+     in the library. */
+  BDD_RECUR_INC;
+  ZDD h = ZDD_Random(lev-1, density) +
+          ZDD_Random(lev-1, density).Change(BDD_VarOfLev(lev));
+  BDD_RECUR_DEC;
+  return h;
 }
 
 ZDD ZDD_Import(FILE *strm)
@@ -920,8 +957,13 @@ int ZDDV::PrintPla() const
   else
   {
     /* unique_ptr so that the buffer is released even when the recursion below
-       throws, which BDD_RECUR_INC does on a stack overflow. */
-    std::unique_ptr<char[]> cube(new char[tlev + 1]);
+       throws, which BDD_RECUR_INC does on a stack overflow.  The nothrow form
+       keeps a failed allocation inside the library's own error contract, as
+       ZDDV::Size()/Export()/XPrint() do; the throwing new reported it as
+       std::bad_alloc, the only place in this class that did. */
+    std::unique_ptr<char[]> cube(new(std::nothrow) char[tlev + 1]);
+    if(!cube)
+      BDDerr("ZDDV::PrintPla(): Memory allocation failed.", ExceptionType::OutOfMemory);
     cube[tlev] = 0;
     int err = ZDDV_PLA(*this, tlev, len, cube.get());
     if(err == 1) return 1;

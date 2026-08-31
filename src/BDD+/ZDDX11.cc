@@ -37,20 +37,32 @@ void ZDDV::XPrint() const
 	bddvgraph(bddv.get(), len);
 }
 
-/*
-void ZDD::XPrint0()
+/* The two methods below used to be commented out, although the manual listed
+   ZDD::XPrint0() as part of the interface and BDD/BDDV/CtoI all have their
+   own.  They are back, written like XPrint() above: const, refusing the error
+   value, and allocating with the nothrow form so that a failure stays a
+   BDDException. */
+void ZDD::XPrint0() const
 {
 	bddgraph0(_zdd);
 }
 
-void ZDDV::XPrint0()
+void ZDDV::XPrint0() const
 {
+	if(GetMetaZDD() == -1)
+		BDDerr("ZDDV::XPrint0(): Error vector.", ExceptionType::InvalidBDDValue);
 	int len = Last() + 1;
-	bddword* bddv = new bddword[len];
-	for(int i=0; i<len; i++) bddv[i] = GetZDD(i).GetID(); 
-	bddvgraph0(bddv, len);
-	delete[] bddv;
+	std::unique_ptr<bddword[]> bddv(new(std::nothrow) bddword[len]);
+	if(!bddv)
+		BDDerr("ZDDV::XPrint0(): Memory allocation failed.", ExceptionType::OutOfMemory);
+	for(int i=0; i<len; i++)
+	{
+		ZDD f = GetZDD(i);
+		if(f == -1)
+			BDDerr("ZDDV::XPrint0(): Operation failed.", ExceptionType::OutOfMemory);
+		bddv[i] = f.GetID();
+	}
+	bddvgraph0(bddv.get(), len);
 }
-*/
 } // namespace sapporobdd
 
