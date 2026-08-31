@@ -31,6 +31,7 @@ struct B_CacheTable *Cache = 0;
 bddp CacheSpc = 0;
 double CacheRatio = 0.5;
 bddp GCThreshold = 0;
+int ShiftCacheUsed = 0;
 
 /* RFC-table */
 struct B_RFC_Table *RFCT = 0;
@@ -53,6 +54,7 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
   /* No recursion survives a re-initialization, so the depth counter starts
      over with everything else. */
   BDD_RecurCount = 0;
+  ShiftCacheUsed = 0;
 
   /* Set cache ratio if specified */
   if(cacheRatio > 0.0) {

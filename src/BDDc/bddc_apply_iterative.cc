@@ -15,7 +15,11 @@ static void stack_init(struct ApplyStack *stack) {
     stack->frames = (struct ApplyStackFrame *)malloc(
         sizeof(struct ApplyStackFrame) * APPLY_STACK_INIT_SIZE);
     stack->top = -1;
-    stack->capacity = APPLY_STACK_INIT_SIZE;
+    /* The capacity has to describe what was really allocated: a capacity of
+       APPLY_STACK_INIT_SIZE over a null frames pointer made the first
+       stack_push() succeed without any storage, and stack_current() then
+       returned &frames[0] for the caller to write through. */
+    stack->capacity = stack->frames? APPLY_STACK_INIT_SIZE: 0;
 }
 
 static void stack_free(struct ApplyStack *stack) {
@@ -28,7 +32,10 @@ static void stack_free(struct ApplyStack *stack) {
 static int stack_push(struct ApplyStack *stack) {
     stack->top++;
     if (stack->top >= stack->capacity) {
-        int new_capacity = stack->capacity * 2;
+        /* capacity 0 means stack_init()'s allocation failed; realloc() on the
+           null pointer it left behind is the initial allocation retried */
+        int new_capacity = stack->capacity? stack->capacity * 2:
+                                            APPLY_STACK_INIT_SIZE;
         struct ApplyStackFrame *new_frames = (struct ApplyStackFrame *)realloc(
             stack->frames, sizeof(struct ApplyStackFrame) * new_capacity);
         if (!new_frames) {
@@ -39,6 +46,19 @@ static int stack_push(struct ApplyStack *stack) {
         stack->capacity = new_capacity;
     }
     return 1; /* success */
+}
+
+/* Reports a failed stack_push().  Growing the explicit stack is the iterative
+   apply's equivalent of descending one more recursion level, and every other
+   way this library runs out of memory - getnode() above all - raises
+   BDDOutOfMemoryException.  Returning bddnull here instead used to hand the
+   caller a normal-looking result: an error ZDD (-1) from the operations that
+   return a diagram, and a huge bddnull as the numeric answer of the counting
+   operations.  The throw unwinds through the catch(...) below, which releases
+   the references the abandoned frames still own. */
+[[noreturn]] static void stack_overflow(const char *who)
+{
+    err(who, 0, ExceptionType::OutOfMemory);
 }
 
 static void stack_pop(struct ApplyStack *stack) {
@@ -259,7 +279,7 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
     /* Push initial frame */
     if (!stack_push(&stack)) {
         stack_free(&stack);
-        return bddnull;
+        stack_overflow("apply_binary_iterative: not enough memory for the apply stack");
     }
     frame = stack_current(&stack);
     frame->f = f;
@@ -292,11 +312,8 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
                 bddp saved_g = frame->g;
                 unsigned char saved_op = frame->op;
                 frame->state = 3; /* State 3: waiting for XOR negate result */
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_binary_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f;
@@ -330,11 +347,8 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
                 bddp saved_g0 = frame->g0;
                 unsigned char saved_op = frame->op;
                 frame->state = 1;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack); /* refresh after failed push */
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_binary_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f0;
@@ -361,15 +375,10 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
             {
                 bddp saved_f1 = frame->f1;
                 bddp saved_g1 = frame->g1;
-                bddp saved_h0 = frame->h0;
                 unsigned char saved_op = frame->op;
                 frame->state = 2;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    bddfree(saved_h0);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_binary_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f1;
@@ -674,7 +683,7 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     /* Push initial frame */
     if (!stack_push(&stack)) {
         stack_free(&stack);
-        return bddnull;
+        stack_overflow("apply_unary_iterative: not enough memory for the apply stack");
     }
     frame = stack_current(&stack);
     frame->f = f;
@@ -706,11 +715,8 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                 bddp saved_g = frame->g;
                 unsigned char saved_op = frame->op;
                 frame->state = 3; /* State 3: waiting for negated recursion */
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_unary_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f;
@@ -760,11 +766,8 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                 bddp saved_g = frame->g;
                 unsigned char saved_op = frame->op;
                 frame->state = 1;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_unary_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f0;
@@ -790,15 +793,10 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
             {
                 bddp saved_f1 = frame->f1;
                 bddp saved_g = frame->g;
-                bddp saved_h0 = frame->h0;
                 unsigned char saved_op = frame->op;
                 frame->state = 2;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    bddfree(saved_h0);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_unary_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f1;
@@ -1018,7 +1016,7 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     /* Push initial frame */
     if (!stack_push(&stack)) {
         stack_free(&stack);
-        return bddnull;
+        stack_overflow("apply_count_iterative: not enough memory for the apply stack");
     }
     frame = stack_current(&stack);
     frame->f = f;
@@ -1048,11 +1046,8 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                 /* Save values before push (realloc may invalidate frame pointer) */
                 bddp saved_f = frame->f;
                 frame->state = 3;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_count_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f;
@@ -1092,11 +1087,8 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                     child_f = saved_f0;
                 }
                 frame->state = 1;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_count_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = child_f;
@@ -1135,11 +1127,8 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                     child_f = saved_f1;
                 }
                 frame->state = 2;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_count_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = child_f;
@@ -1404,7 +1393,7 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
     /* Push initial frame */
     if (!stack_push(&stack)) {
         stack_free(&stack);
-        return bddnull;
+        stack_overflow("apply_special_iterative: not enough memory for the apply stack");
     }
     frame = stack_current(&stack);
     frame->f = f;
@@ -1450,11 +1439,8 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                     bddp saved_g1 = frame->g1;
                     unsigned char saved_op = frame->op;
                     frame->state = 4; /* Special state for single recursion */
-                    if (!stack_push(&stack)) {
-                        frame = stack_current(&stack);
-                        frame->result = bddnull;
-                        goto pop_frame;
-                    }
+                    if (!stack_push(&stack))
+                        stack_overflow("apply_special_iterative: not enough memory for the apply stack");
                     {
                         struct ApplyStackFrame *child = stack_current(&stack);
                         child->f = saved_f1;
@@ -1475,11 +1461,8 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                     bddp saved_g0 = frame->g0;
                     unsigned char saved_op = frame->op;
                     frame->state = 4; /* Special state for single recursion */
-                    if (!stack_push(&stack)) {
-                        frame = stack_current(&stack);
-                        frame->result = bddnull;
-                        goto pop_frame;
-                    }
+                    if (!stack_push(&stack))
+                        stack_overflow("apply_special_iterative: not enough memory for the apply stack");
                     {
                         struct ApplyStackFrame *child = stack_current(&stack);
                         child->f = saved_f0;
@@ -1504,11 +1487,8 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                 bddp saved_g0 = frame->g0;
                 unsigned char saved_op = frame->op;
                 frame->state = 4; /* Special state for single recursion */
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_special_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f0;
@@ -1530,11 +1510,8 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                 bddp saved_g0 = frame->g0;
                 unsigned char saved_op = frame->op;
                 frame->state = 1;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_special_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f0;
@@ -1561,16 +1538,11 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
                 bddp saved_f1 = frame->f1;
                 bddp saved_g0 = frame->g0;
                 bddp saved_g1 = frame->g1;
-                bddp saved_h0 = frame->h0;
                 unsigned char saved_op = frame->op;
                 bddp child_g = (saved_op == BC_UNIV) ? saved_g0 : saved_g1;
                 frame->state = 2;
-                if (!stack_push(&stack)) {
-                    frame = stack_current(&stack);
-                    bddfree(saved_h0);
-                    frame->result = bddnull;
-                    goto pop_frame;
-                }
+                if (!stack_push(&stack))
+                    stack_overflow("apply_special_iterative: not enough memory for the apply stack");
                 {
                     struct ApplyStackFrame *child = stack_current(&stack);
                     child->f = saved_f1;

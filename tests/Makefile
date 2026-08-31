@@ -103,10 +103,10 @@ test_operator: $(OBJ_OPERATOR)
 test_iterative_deep: $(OBJ_ITERATIVE_TEST)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_ITERATIVE_TEST)
 
-# Build test_mp_oom (malloc fault injection; --wrap redirects the library's
-# malloc calls to the test's __wrap_malloc)
+# Build test_mp_oom (allocation fault injection; --wrap redirects the
+# library's malloc/realloc calls to the test's __wrap_malloc/__wrap_realloc)
 test_mp_oom: $(OBJ_MP_OOM)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_MP_OOM) -Wl,--wrap=malloc
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_MP_OOM) -Wl,--wrap=malloc -Wl,--wrap=realloc
 
 # Build test_BDDCT (cost table and its caches)
 test_BDDCT: $(OBJ_BDDCT)
@@ -126,7 +126,7 @@ test_iterative_deep_extend: $(OBJ_ITERATIVE_TEST_EXTEND)
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_ITERATIVE_TEST_EXTEND)
 
 test_mp_oom_extend: $(OBJ_MP_OOM_EXTEND)
-	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_MP_OOM_EXTEND) -Wl,--wrap=malloc
+	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_MP_OOM_EXTEND) -Wl,--wrap=malloc -Wl,--wrap=realloc
 
 test_BDDCT_extend: $(OBJ_BDDCT_EXTEND)
 	$(CXX) $(CXXFLAGS_EXTEND) -o $@ $(OBJ_BDDCT_EXTEND)
@@ -142,7 +142,7 @@ test_bddc_cache_iterative: test_bddc_cache_iterative.o bddc_iterative.o
 	$(CXX) $(CXXFLAGS_ITERATIVE) -o $@ test_bddc_cache_iterative.o bddc_iterative.o
 
 test_mp_oom_iterative: $(OBJ_MP_OOM_ITERATIVE)
-	$(CXX) $(CXXFLAGS_ITERATIVE) -o $@ $(OBJ_MP_OOM_ITERATIVE) -Wl,--wrap=malloc
+	$(CXX) $(CXXFLAGS_ITERATIVE) -o $@ $(OBJ_MP_OOM_ITERATIVE) -Wl,--wrap=malloc -Wl,--wrap=realloc
 
 # Compile rules
 test_ZBDD.o: test_ZBDD.cpp $(HEADERS)

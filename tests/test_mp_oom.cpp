@@ -1,9 +1,10 @@
 /*********************************************************
- * Multi-precision table out-of-memory test               *
+ * Allocation-failure test                                *
  * Injects malloc failures into the multi-precision table  *
- * used by ZDD::CardMP16() and checks that the documented   *
- * contract (BDDOutOfMemoryException) is honoured and that   *
- * the library state stays usable afterwards.                *
+ * used by ZDD::CardMP16(), and into the explicit stack of   *
+ * the iterative apply, and checks that the documented        *
+ * contract (BDDOutOfMemoryException) is honoured and that     *
+ * the library state stays usable afterwards.                   *
  *********************************************************/
 
 #include <cstdlib>
@@ -26,17 +27,34 @@ namespace sapporobdd {
   extern bddp MPAllocFailSize;
 }
 
-/* ---- malloc fault injection ----
-   The test binary is linked with -Wl,--wrap=malloc (GNU ld / lld), so every
-   malloc() call inside the library is routed through __wrap_malloc below. */
+/* ---- allocation fault injection ----
+   The test binary is linked with -Wl,--wrap=malloc -Wl,--wrap=realloc (GNU
+   ld / lld), so every malloc() and realloc() call inside the library is
+   routed through the wrappers below. */
 
 extern "C" void *__real_malloc(size_t size);
+extern "C" void *__real_realloc(void *ptr, size_t size);
 
 static int mp_fail_armed = 0;   /* fail the next multi-precision table block */
 static int mp_fail_hit = 0;     /* set once a request was actually refused */
+/* Refuse the very next malloc / realloc, whatever the size.  They are armed
+   immediately before an apply, whose first allocation is the stack of the
+   iterative implementation and whose second is that stack's retry; the size
+   of a stack frame is internal to the library, so there is nothing else to
+   match on. */
+static int next_fail_armed = 0;
+static int next_fail_hit = 0;
+static int next_realloc_fail_armed = 0;
+static int next_realloc_fail_hit = 0;
 
 extern "C" void *__wrap_malloc(size_t size)
 {
+  if(next_fail_armed)
+  {
+    next_fail_armed = 0;
+    next_fail_hit = 1;
+    return 0;
+  }
   /* Only the first block of a multi-precision table row is refused: its size
      is sizeof(bddp) * len * 16 for a row of len words.  CardMP16() needs at
      most two words here, so matching those two sizes leaves every unrelated
@@ -49,6 +67,17 @@ extern "C" void *__wrap_malloc(size_t size)
     return 0;
   }
   return __real_malloc(size);
+}
+
+extern "C" void *__wrap_realloc(void *ptr, size_t size)
+{
+  if(next_realloc_fail_armed)
+  {
+    next_realloc_fail_armed = 0;
+    next_realloc_fail_hit = 1;
+    return 0;
+  }
+  return __real_realloc(ptr, size);
 }
 
 /* ---- test bookkeeping ---- */
@@ -75,7 +104,7 @@ static ZDD LargePowerSet()
 
 int main()
 {
-  cout << "=== Multi-precision table OOM test ===" << endl;
+  cout << "=== Allocation failure test ===" << endl;
 
   BDD_Init(256, 1024 * 1024);
 
@@ -167,6 +196,68 @@ int main()
   catch(const BDDException&)           { }
   test_result("a cardinality one larger throws BDDOutOfRangeException",
               over_threw);
+
+  /* 6. Once the variable count passes the threshold, apply() runs its
+        iterative implementation, which keeps its own stack on the heap.  A
+        refused allocation there used to be recorded as a capacity for
+        storage that was never obtained, and the first frame was written
+        through the null pointer; growing that stack later reported the
+        failure by returning bddnull, which reached the caller as an ordinary
+        error ZDD instead of the documented exception. */
+  while(BDD_VarUsed() < 8200) BDD_NewVar();
+  ZDD a = ZDD(1).Change(BDD_VarOfLev(1)) + ZDD(1).Change(BDD_VarOfLev(2));
+  ZDD b = ZDD(1).Change(BDD_VarOfLev(3));
+  /* built before anything is armed: every one of these operations allocates
+     an apply stack of its own */
+  ZDD b2 = ZDD(1).Change(BDD_VarOfLev(4));
+
+  /* 6a. The initial allocation is refused, but the retry inside the first
+         push succeeds: the operation has to come out with the right answer.
+         The old code set the capacity of a buffer it had never obtained and
+         wrote the first frame through the null pointer instead. */
+  next_fail_armed = 1;
+  next_fail_hit = 0;
+  bool init_threw = false;
+  ZDD c(0);
+  try { c = a + b; }
+  catch(const BDDException&) { init_threw = true; }
+  next_fail_armed = 0;
+
+  test_result("the apply stack allocation was actually refused",
+              next_fail_hit == 1);
+  test_result("a refused apply stack does not crash and the retry answers",
+              !init_threw && c.Card() == 3);
+
+  /* 6b. When there is no memory for the stack at all, the failure has to be
+         an exception; returning bddnull made it an ordinary error ZDD. */
+  next_fail_armed = 1;
+  next_fail_hit = 0;
+  next_realloc_fail_armed = 1;
+  next_realloc_fail_hit = 0;
+  bool stack_oom = false;
+  bool stack_other = false;
+  ZDD e(0);
+  try { e = a + b2; }
+  catch(const BDDOutOfMemoryException&) { stack_oom = true; }
+  catch(const BDDException&)            { stack_other = true; }
+  next_fail_armed = 0;
+  next_realloc_fail_armed = 0;
+
+  test_result("both apply stack allocations were actually refused",
+              next_fail_hit == 1 && next_realloc_fail_hit == 1);
+  test_result("a refused apply stack throws BDDOutOfMemoryException",
+              stack_oom && !stack_other);
+  test_result("the failed apply produces no error ZDD", e == ZDD(0));
+  test_result("BDD_RecurCount is restored after the failed apply",
+              BDD_RecurCount == 0);
+
+  /* The same operation has to work once memory is available again. */
+  bool apply_retry_threw = false;
+  ZDD d(0);
+  try { d = a + b2; }
+  catch(const BDDException&) { apply_retry_threw = true; }
+  test_result("the same apply succeeds on retry",
+              !apply_retry_threw && d.Card() == 3);
 
   cout << endl;
   cout << "=======================================" << endl;

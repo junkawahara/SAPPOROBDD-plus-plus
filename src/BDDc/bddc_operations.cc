@@ -64,18 +64,46 @@ bddvar bddnewvar()
   return VarUsed;
 }
 
+static void shift_cache_clear(void)
+/* Drops the cached results of the shift operations.  They are the only
+   cached operations whose result depends on the variable ORDER rather than
+   on the diagram alone: bddlshift()/bddrshift() rewrite a node's variable
+   into the one that now sits "shift" levels away, so a cache entry keyed by
+   (op, f, shift) answers for the level assignment that produced it.  Every
+   other operation only ever compares levels, and an insertion leaves the
+   relative order of the existing variables intact. */
+{
+  struct B_CacheTable *cachep;
+
+  /* Nothing to sweep unless a shift has run since the last sweep; the cache
+     can be very large, and a program that never shifts must not pay for a
+     full scan on every variable it inserts. */
+  if(!ShiftCacheUsed) return;
+  for(cachep=Cache; cachep<Cache+CacheSpc; cachep++)
+    if(cachep->op == BC_LSHIFT || cachep->op == BC_RSHIFT)
+      cachep->op = BC_NULL;
+  ShiftCacheUsed = 0;
+}
+
 bddvar bddnewvaroflev(bddvar lev)
 {
   bddvar i;
+  int moved;
 
   /* the ++VarUsed used to live inside this condition, so the error path for
      an invalid level had already created a ghost variable when it threw */
   if(lev == 0 || lev > VarUsed + 1U)
     err("bddnewvaroflev: Invalid level", lev, ExceptionType::OutOfRange);
+  moved = (lev <= VarUsed);
   ++VarUsed;
   if(VarUsed == VarSpc) var_enlarge();
   for(i=VarUsed; i>lev; i--) Var[ VarID[i] = VarID[i-1U] ].lev = i;
   Var[ VarID[lev] = VarUsed ].lev = lev;
+  /* The levels of the variables at lev and above have just moved, so the
+     shift results cached under the old assignment are wrong now.  An
+     insertion at the very top (which is what bddnewvar() and BDD_NewVar()
+     do) moves nothing and keeps them valid. */
+  if(moved) shift_cache_clear();
   return VarUsed;
 }
 
@@ -360,6 +388,8 @@ bddp bddlshift(bddp f, bddvar shift)
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
     err("bddlshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
+  /* tells bddnewvaroflev() that there may be order-dependent cache entries */
+  ShiftCacheUsed = 1;
   return apply(f, (bddp)shift, BC_LSHIFT, 0);
 }
 
@@ -379,6 +409,8 @@ bddp bddrshift(bddp f, bddvar shift)
   if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
     err("bddrshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
+  /* tells bddnewvaroflev() that there may be order-dependent cache entries */
+  ShiftCacheUsed = 1;
   return apply(f, (bddp)shift, BC_RSHIFT, 0);
 }
 
@@ -422,7 +454,12 @@ bddp    bddonset(bddp f, bddvar v)
   bddp g, h;
 
   g = bddonset0(f, v);
-  h = bddchange(g, v);
+  /* bddchange() throws when it runs out of memory, and the intermediate g
+     would then keep its node referenced for the rest of the run: bddgc()
+     could not collect it, which is the opposite of what a caller that
+     catches BDDOutOfMemoryException and retries needs. */
+  try { h = bddchange(g, v); }
+  catch(...) { bddfree(g); throw; }
   bddfree(g);
   return h;
 }

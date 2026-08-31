@@ -327,6 +327,11 @@ extern struct B_CacheTable *Cache; /* Opeartion cache */
 extern bddp CacheSpc;              /* Current cache size */
 extern double CacheRatio;          /* Cache size ratio to node table size */
 extern bddp GCThreshold;           /* GC threshold - minimum freed nodes for successful GC */
+/* Set when a shift operation may have left entries in the operation cache.
+   Those are the only entries that depend on the variable order, so
+   bddnewvaroflev() has to drop them; the flag keeps that sweep out of the
+   way of programs that never shift.  See shift_cache_clear(). */
+extern int ShiftCacheUsed;
 
 extern struct B_RFC_Table *RFCT;   /* RFC-Table */
 extern bddp RFCT_Spc;              /* Current RFC-table size */
