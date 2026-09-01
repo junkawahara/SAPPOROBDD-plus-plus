@@ -264,6 +264,55 @@ void test_gc_threshold_sweeps_cache() {
     bddsetgcthreshold(0);
 }
 
+// Regression tests for review_20260830_3 items 1, 3, 4 and 7.
+// NaN used to slip through every range check in setcacheratiovalue() and
+// reach a float-to-int conversion no int can represent, leaving CacheRatio
+// negative; a ratio one ulp below a power of 2 was truncated and rejected
+// while its symmetric counterpart below 1 was accepted; bddinit() forgot to
+// reset GCThreshold, so a new session inherited the old GC policy; and the
+// diagnostics blamed bddsetcacheratio() even when bddinit() did the check.
+void test_cacheratio_and_reinit_guards() {
+    std::cout << "\n=== Testing cache ratio guards and re-initialization ===" << endl;
+
+    bddinit(1000, 10000);
+    setcacheratiovalue(0.5);
+
+    try {
+        setcacheratiovalue(NAN);
+        test_result("setcacheratiovalue(NaN) - should throw exception", false);
+    } catch (const std::exception& e) {
+        test_result("setcacheratiovalue(NaN) - should throw exception", true);
+    }
+    test_result("a rejected NaN leaves CacheRatio untouched", CacheRatio == 0.5);
+
+    /* 1.9999999999999998, the double just below 2.0 */
+    try {
+        setcacheratiovalue(nextafter(2.0, 1.0));
+        test_result("a ratio one ulp below 2.0 is rounded to 2", CacheRatio == 2.0);
+    } catch (const std::exception& e) {
+        test_result("a ratio one ulp below 2.0 is rounded to 2", false);
+    }
+    /* the symmetric input below 1 has always been accepted */
+    setcacheratiovalue(nextafter(0.5, 1.0));
+    test_result("the symmetric ratio just above 0.5 is rounded to 0.5",
+                CacheRatio == 0.5);
+
+    bddsetgcthreshold(12345);
+    bddinit(1000, 10000);
+    test_result("bddinit() resets the GC threshold", bddgetgcthreshold() == 0);
+
+    try {
+        bddinit(1000, 10000, 0.3);
+        test_result("bddinit() rejects a ratio that is not a power of 2", false);
+    } catch (const std::exception& e) {
+        test_result("bddinit() rejects a ratio that is not a power of 2", true);
+        test_result("the diagnostic names bddinit(), not bddsetcacheratio()",
+                    strstr(e.what(), "bddinit:") != NULL);
+    }
+    test_result("the rejected bddinit() leaves the running ratio in place",
+                CacheRatio == 0.5);
+}
+
 // Test allocatecache function
 void test_allocatecache() {
     std::cout << "\n=== Testing allocatecache function ===" << endl;
@@ -300,6 +349,7 @@ int main() {
     try {
         test_apply_cache_store_rejects_bddnull();
         test_gc_threshold_sweeps_cache();
+        test_cacheratio_and_reinit_guards();
         test_setcacheratiovalue();
         test_allocatecache();
         

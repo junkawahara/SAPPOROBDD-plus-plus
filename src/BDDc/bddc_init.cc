@@ -45,24 +45,33 @@ int MPCountOverflowed = 0;
 
 /* ------------------ External functions ------------------ */
 int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
-/* Returns 1 if not enough memory (usually 0) */
+/* Throws BDDOutOfMemoryException when a table cannot be allocated and
+   BDDOutOfRangeException for an illegal cacheRatio.  The return value is
+   always 0; it only remains for source compatibility with the old interface,
+   which returned 1 instead of throwing. */
 {
   bddp   ix;
   bddvar i;
   bool cacheallocated = false;
 
-  /* No recursion survives a re-initialization, so the depth counter starts
-     over with everything else. */
-  BDD_RecurCount = 0;
-  ShiftCacheUsed = 0;
-
-  /* Set cache ratio if specified */
+  /* Set cache ratio if specified.  This validates its argument and throws for
+     an illegal one, so it runs before any global is touched: a rejected ratio
+     has to leave the running environment exactly as it was. */
   if(cacheRatio > 0.0) {
-    /* throw an exeption if cacheRatio is illegal */
-    setcacheratiovalue(cacheRatio);
+    setcacheratiovalue(cacheRatio, "bddinit");
   } else {
     CacheRatio = 0.5; /* Default cache ratio */
   }
+
+  /* Nothing of the old environment survives, so the globals that describe it
+     start over as well: the recursion depth, the shift-cache flag and the GC
+     threshold set by bddsetgcthreshold().  They are reset here rather than at
+     the top of the function because the check above may throw, and clearing
+     ShiftCacheUsed while the old cache still holds the shift entries it
+     stands for would keep bddnewvaroflev() from ever sweeping them. */
+  BDD_RecurCount = 0;
+  ShiftCacheUsed = 0;
+  GCThreshold = 0;
 
   /* Check dupulicate initialization */
   if(Node){ free(Node); Node = 0; }
@@ -111,7 +120,31 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
     if(VarID){ free(VarID); VarID = 0; }
     if(Var){ free(Var); Var = 0; }
     if(Node){ free(Node); Node = 0; }
+    /* The tables are gone, so every size and counter that describes them has
+       to go with them.  What normally resets those is the initialization
+       below, which the throw skips: an application that catches the exception
+       and keeps calling the library would otherwise find NodeSpc, VarSpc and
+       the used counters still holding the previous session's values, making
+       the freed tables look alive and turning a clean error into a
+       null-pointer crash.  The tables that survive a table-less state (RFC
+       and MP-Count) are released here for the same reason. */
     NodeLimit = 0;
+    NodeSpc = 0;
+    NodeUsed = 0;
+    Avail = bddnull;
+    VarSpc = 0;
+    VarUsed = 0;
+    if(RFCT){ free(RFCT); RFCT = 0; }
+    RFCT_Spc = 0;
+    RFCT_Used = 0;
+    for(i=0; i<B_MP_LMAX; i++)
+    {
+      mptable[i].size = 0;
+      mptable[i].used = 0;
+      if(mptable[i].word){ free(mptable[i].word); mptable[i].word = 0; }
+    }
+    MPAllocFailSize = 0;
+    MPCountOverflowed = 0;
     err("bddinit: Memory allocation failed", 0, ExceptionType::OutOfMemory);
   }
 
@@ -161,24 +194,44 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
   return 0;
 }
 
-void setcacheratiovalue(double ratio)
+/* The same validation serves bddsetcacheratio() and the cacheRatio argument
+   of bddinit(), so the diagnostics name the function the user actually
+   called instead of always blaming bddsetcacheratio(). */
+[[noreturn]] static void ratio_err(const char *caller, const char *detail)
+{
+  char msg[128];
+  snprintf(msg, sizeof(msg), "%s: %s", caller, detail);
+  err(msg, 0, ExceptionType::OutOfRange);
+}
+
+void setcacheratiovalue(double ratio, const char *caller)
 {
   const double epsilon = 1e-9;
 
+  /* NaN compares false against every bound below, so it would pass all three
+     range checks and reach the float-to-int conversion, which is undefined
+     for a value no int can represent.  It has to be rejected first. */
+  if (isnan(ratio)) {
+    ratio_err(caller, "ratio is not a number");
+  }
+
  /* Check if ratio is a power of 2 */
   if (ratio <= 0.0) {
-    err("bddsetcacheratio: ratio must be positive", 0, ExceptionType::OutOfRange);
+    ratio_err(caller, "ratio must be positive");
   } else if (ratio > static_cast<double>(CACHE_RATIO_MAX)) {
-    err("bddsetcacheratio: ratio exceeds maximum", 0, ExceptionType::OutOfRange);
+    ratio_err(caller, "ratio exceeds maximum");
   } else if (ratio < 1.0 / static_cast<double>(CACHE_RATIO_MAX)) {
-    err("bddsetcacheratio: ratio is too small", 0, ExceptionType::OutOfRange);
+    ratio_err(caller, "ratio is too small");
   }
 
   if (ratio >= 1.0) {
-    int ratio_integer = static_cast<int>(ratio);
+    /* Rounded, not truncated, exactly as the inverse branch below does it:
+       a ratio computed rather than written down can land just under the
+       power of 2 it means (2.0 - 1ulp), and truncation would reject it. */
+    int ratio_integer = static_cast<int>(ratio + epsilon);
     if (fabs(static_cast<double>(ratio_integer) - ratio) > epsilon
         || (ratio_integer & (ratio_integer - 1)) != 0) {
-      err("bddsetcacheratio: ratio must be a power of 2", 0, ExceptionType::OutOfRange);
+      ratio_err(caller, "ratio must be a power of 2");
     }
     CacheRatio = static_cast<double>(ratio_integer);
   } else {
@@ -187,13 +240,17 @@ void setcacheratiovalue(double ratio)
     int ratio_integer = static_cast<int>(inverse_ratio + epsilon);
     if (fabs(static_cast<double>(ratio_integer) - inverse_ratio) > epsilon
         || (ratio_integer & (ratio_integer - 1)) != 0) {
-      err("bddsetcacheratio: ratio must be a power of 2", 0, ExceptionType::OutOfRange);
+      ratio_err(caller, "ratio must be a power of 2");
     }
     CacheRatio = 1.0 / static_cast<double>(ratio_integer);
   }
 }
 
-// return true if cache is allocated successfully
+/* Sizes the operation cache at CacheRatio times the node table size, rounded
+   up to a power of 2, and moves the current entries over.  The cache never
+   grows past B_NODE_MAX/2 entries, so a large node table combined with a
+   large ratio silently gets a smaller cache than asked for.
+   Returns true if the cache is allocated successfully. */
 bool allocatecache()
 {
   bddp oldCacheSpc = 0;
@@ -209,15 +266,18 @@ bool allocatecache()
   /* Calculate new cache size */
   bddp targetCacheSize;
   double targetCacheSizeDouble = static_cast<double>(NodeSpc) * CacheRatio;
-  if (targetCacheSizeDouble > B_NODE_MAX) {
-    targetCacheSize = B_NODE_MAX;
+  /* The search below stops at B_NODE_MAX/2, so the target is clamped there
+     too: clamping it to B_NODE_MAX instead would name a size the loop can
+     never reach. */
+  if (targetCacheSizeDouble > static_cast<double>(B_NODE_MAX >> 1U)) {
+    targetCacheSize = B_NODE_MAX >> 1U;
   } else if (targetCacheSizeDouble < B_NODE_SPC0) {
     targetCacheSize = B_NODE_SPC0;
   } else {
     targetCacheSize = static_cast<bddp>(targetCacheSizeDouble);
   }
 
-  /* Find the smallest power of 2 exceeding targetCacheSize */
+  /* Find the smallest power of 2 not less than targetCacheSize */
   for (newCacheSpc = B_NODE_SPC0; newCacheSpc < targetCacheSize
        && newCacheSpc < (B_NODE_MAX >> 1U);
         newCacheSpc <<= 1U) ;
@@ -257,8 +317,18 @@ bool allocatecache()
       }
       free(Cache);
     } else {
-      /* Initialize new cache */
-      for(ix=0; ix<newCacheSpc; ix++) newCache[ix].op = BC_NULL;
+      /* Initialize new cache.  f, g and h are cleared along with op because
+         an enlargement copies whole entries, empty ones included, and reading
+         the indeterminate contents of a fresh malloc to copy them is
+         undefined behaviour (and a MemorySanitizer report) even though every
+         reader tests op first. */
+      for(ix=0; ix<newCacheSpc; ix++)
+      {
+        newCache[ix].op = BC_NULL;
+        B_SET_BDDP(newCache[ix].f, bddnull);
+        B_SET_BDDP(newCache[ix].g, bddnull);
+        B_SET_BDDP(newCache[ix].h, bddnull);
+      }
     }
 
     /* Update pointers */

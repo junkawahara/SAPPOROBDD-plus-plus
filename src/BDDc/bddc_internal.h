@@ -91,6 +91,11 @@ inline void *b_realloc_checked(void *ptr, size_t elemsize, size_t count)
 /* Table spaces */
 #define B_NODE_MAX (B_VAL_MASK>>1U) /* Max number of BDD nodes */
 #define B_NODE_SPC0 256 /* Default initial node size */
+/* allocatecache() derives every cache size by doubling B_NODE_SPC0, and
+   B_CACHEKEY reduces a key modulo that size with a & (CacheSpc-1U) mask,
+   which is only a modulo while the sizes are powers of 2. */
+static_assert((B_NODE_SPC0 & (B_NODE_SPC0 - 1)) == 0,
+              "B_NODE_SPC0 must be a power of 2");
 #define B_VAR_SPC0   16 /* Initial var table size */
 #define B_HASH_SPC0   4 /* Initial hash size */
 #define B_RFCT_SPC0   4 /* Initial RFCT size */
@@ -391,7 +396,11 @@ int andfalse(bddp f, bddp g);
 int mp_add(struct B_MP *p, bddp ix);
 
 /* Cache management */
-void setcacheratiovalue(double cacheRatio);
+/* Validates a cache ratio and stores it in CacheRatio.  caller names the
+   public function the diagnostics should blame, since bddinit() checks its
+   cacheRatio argument through this same code. */
+void setcacheratiovalue(double cacheRatio,
+                        const char *caller = "bddsetcacheratio");
 bool allocatecache();
 void fprintf_check(FILE *strm, const char *format, ...);
 
