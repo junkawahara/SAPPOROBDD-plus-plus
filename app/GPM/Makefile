@@ -22,6 +22,11 @@ OBJ64   = gpm_64.o
 OBJ_ST  = gpm_st.o
 OBJ64_ST = gpm_64_st.o
 
+# gpm.cc includes BDDCT.h as well, and a change to a header changes what
+# the object may call: without it here a stale object hid a header the
+# source no longer compiles against.
+HDRS	= gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h $(INCL)/BDDCT.h
+
 all:	$(PRG64)    
 
 32:	$(PRG)    
@@ -42,16 +47,16 @@ $(PRG_ST): $(OBJ_ST) $(LIB)
 $(PRG64_ST): $(OBJ64_ST) $(LIB64)
 	$(CC) $(OPT64_ST) $(OBJ64_ST) $(LIB64) -o $(PRG64_ST)
 
-gpm.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
+gpm.o: gpm.cc $(HDRS)
 	$(CC) $(OPT) -c gpm.cc
 
-gpm_64.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
+gpm_64.o: gpm.cc $(HDRS)
 	$(CC) $(OPT64) -c gpm.cc -o gpm_64.o
 
-gpm_st.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
+gpm_st.o: gpm.cc $(HDRS)
 	$(CC) $(OPT_ST) -c gpm.cc -o gpm_st.o
 
-gpm_64_st.o: gpm.cc gpm.h $(INCL)/ZDD.h $(INCL)/BDD.h
+gpm_64_st.o: gpm.cc $(HDRS)
 	$(CC) $(OPT64_ST) -c gpm.cc -o gpm_64_st.o
 
 clean:

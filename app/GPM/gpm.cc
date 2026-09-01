@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
       }
       size = h.Size();
       cerr << " (ZDD size)     " << size << "\n";
-      cerr << " (total calls)  " << ct._call << "\n";
+      cerr << " (total calls)  " << ct.CallCount() << "\n";
 
       cerr << "cost low_bound: " << l_bound << "\n";
       h_lb = ct.ZDD_CostLE(f, l_bound-1, acc_worst, rej_best);
@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
       }
       size = h_lb.Size();
       cerr << " (ZDD size)     " << size << "\n";
-      cerr << " (total calls)  " << ct._call << "\n";
+      cerr << " (total calls)  " << ct.CallCount() << "\n";
       h -= h_lb;
     }
   
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
     size = h.Size();
     cerr << "(ZDD size)      " << size << "\n";
     if(l_bound == bddcost_null)
-      cerr << "(total calls)   " << ct._call << "\n";
+      cerr << "(total calls)   " << ct.CallCount() << "\n";
   
     if(prn)
     {
