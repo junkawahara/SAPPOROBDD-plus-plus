@@ -97,3 +97,58 @@ not have.
 
 The link-time consequence is documented in `man/classes/ZDD.md` under
 `XPrint()` and `XPrint0()`.
+
+## 5. The BDDCT cache can be filled with entries the class then believes
+
+- `include/BDDCT.h` (`CacheRef`, `CacheEnt`, `Cache0Ref`, `Cache0Ent`),
+  `src/BDD+/BDDCT.cc`, `man/classes/BDDCT.md` (演算キャッシュ)
+
+The four cache methods are public and check nothing about what goes in: an
+entry is keyed by a ZDD and answered as the result of a cost operation, so
+`Cache0Ent(4, f, 999)` makes `MinCost(f)` answer 999, and a hand-made
+all-rejected entry makes `ZDD_CostLE()` answer the empty family for a family
+that is inside the bound.  The two opcodes the class uses for itself, 4 for
+`MinCost()` and 5 for `MaxCost()`, are not reserved by the type system
+either.
+
+**Why it is still there.** These are part of the class's published interface,
+and this repository keeps them: closing them off would drop methods that code
+outside it may call, for a hazard that only a caller reaching into the cache
+can reach.  What was missing was the contract, which the header and the
+manual now carry: the reserved opcodes, and the requirement that an entry
+hold what the current cost table gives for the key ZDD.  `CacheClear()` and
+`Cache0Clear()`, the calls a caller who only wants the memory back needs,
+lose no information and cannot break an invariant.
+
+**What a fix would cost.** Making the entry and lookup methods private, and
+leaving only the two clears public, is a small change to the class and a
+breaking change to its interface -- including the white-box cache tests in
+`tests/test_BDDCT.cpp`, which would need a friend declaration in the library
+to keep testing the enlargement and the collision handling.  Validating an
+entry instead is not possible at the price of a cache: checking that
+acc_worst and rej_best describe the key ZDD is the cost operation itself.
+
+## 6. B_EXTEND can name variables and levels that BDDCT's `int` cannot
+
+- `include/bddc.h` (`bddvar`), `include/BDDCT.h`, `src/BDD+/BDDCT.cc`,
+  `include/ZDD.h` (`Top`), `man/classes/BDDCT.md` (注意事項)
+
+With `B_EXTEND` a `bddvar` is a 32bit unsigned integer, so a VarID or a level
+above `INT_MAX` is representable, while BDDCT takes and stores its size,
+indices and levels in `int` -- and reaches the variable of a node through
+`ZDD::Top()`, which is an `int` as well.  The upper half of the level range
+B_EXTEND advertises is therefore not a range BDDCT can price.
+
+**Why it is still there.** The `int` is not BDDCT's own: `ZDD::Top()`,
+`BDD_LevOfVar()` and the rest of the BDD+ layer speak `int` throughout, so
+widening BDDCT alone moves the conversion one call outwards without removing
+it.  The behaviour at the boundary is safe: a VarID above `INT_MAX` comes
+back from `Top()` as a negative `int`, which `CostOfLev()` answers with the
+bddcost_null mark and `TopCost()` turns into a BDDOutOfRangeException, so
+such a variable is refused rather than priced wrongly.  A table that large
+needs more than 8 GB for its cost array before any of this can be reached.
+The limit is written down in the manual.
+
+**What a fix would cost.** Every level and VarID API of the BDD+ layer would
+have to change to `bddvar` together, which is an interface change to `BDD`
+and `ZDD`, not a fix inside the cost table.
