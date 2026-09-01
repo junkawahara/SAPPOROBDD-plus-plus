@@ -57,6 +57,9 @@ BDDOutOfRangeException を投げる。
 typedef int bddcost;
 const bddcost bddcost_null = 0x7FFFFFFF;
 const int CT_STRLEN = 15;
+
+typedef long long bddcostsum;
+const bddcostsum bddcostsum_null = 0x7FFFFFFFFFFFFFFFLL;
 ```
 
 - `bddcost` はコストを表す型で、符号付き 32 ビット整数である。
@@ -69,6 +72,20 @@ const int CT_STRLEN = 15;
 - `CT_STRLEN` はラベル文字列の最大長である。
 - ~~この 2 つはマクロ (#define) である。~~
   SAPPOROBDD++ では名前空間 sapporobdd 内の定数であり、グローバルなマクロ空間を汚さない。
+- **【SAPPOROBDD++のみ】** `bddcostsum` は演算の途中に現れる値を保持する型で、
+  符号付き 64 ビット整数である。表に格納するコストは bddcost だが、
+  **経路上のコストの部分和**、**変数のコストを引いた後に残る閾値**、
+  **部分 ZDD のコスト最小値・最大値**はいずれも表が持つコストそのものではなく、
+  符号の異なるコストが後で相殺される場合は、集合のコストが bddcost の範囲に
+  収まっていても途中でその範囲を出ることがある。
+  表の大きさは int の範囲、各コストの絶対値は 2^31 未満であるから、
+  経路上のどの部分和も 2^62 を超えず、この型の範囲を出ることはない。
+  `bddcostsum_null` はこの型の「値が無い」印である。
+  4 つの演算と 2 つのキャッシュはこの型で計算し、**呼び出し側へ bddcost として
+  返す値だけ**を bddcost の範囲に照らして検査する
+  （`MinCost()` / `MaxCost()` の戻り値と、4 引数の `ZDD_CostLE()` が返す
+  acc_worst・rej_best）。
+  ~~途中の部分和や閾値が bddcost の範囲を出たら、そこで例外を投げる。~~
 
 ## コピーの禁止
 
@@ -158,6 +175,7 @@ int SetLabelOfLev(const int lev, const char* label)
 正常終了時は 0 を返し、添字（level）が範囲外の場合は 1 を返す。
 **文字列長が CT_STRLEN を超える場合は 1 を返し、既存のラベルは変更しない。**
 **空白文字（スペース・タブ・改行など）を含むラベルも 1 を返して拒否する。**
+**label が null の場合も 1 を返す**（以前は読み出しに行って異常終了した）。
 Export() の書式はラベルを空白区切りの 1 トークンとして書き出すため、
 空白を含むラベルは Export → Import の往復で復元できない。
 ~~文字列長が CT_STRLEN を超える場合は先頭の CT_STRLEN 文字のみを代入する。~~
@@ -186,6 +204,8 @@ n 個の変数のコストを記録する領域を確保し、各変数に min �
 乱数コストを設定する。正常終了時は 0 を返す。
 **min > max の場合、または min・max が格納可能な範囲外の場合は、表を変更せずに 1 を返す。**
 ~~min > max の場合はすべての変数のコストが min になる。~~
+範囲が正当なら領域確保は `Alloc()` に委ねるので、**n が負の場合は `Alloc()` と同じく
+大きさ 0 の表になり、戻り値は 0 である**（元の表は残らない）。
 
 乱数は C 標準ライブラリの `rand()` で生成する。したがって `srand()` を呼ばない
 プログラムは毎回同じ表を得る。実行ごとに異なる表が必要な場合は、呼び出し前に
@@ -201,12 +221,16 @@ fp で指定したファイルから表を読み込む。正常終了時は 0 �
 フォーマットが不正な場合は 1 を返す。
 **読み込みに失敗した場合、表は必ず空（大きさ 0）になる**
 （古い表や途中まで読み込んだ表が残ることはない）。
+**fp が null の場合も 1 を返す**（以前は検査せずに `fgetc()` へ渡していた）。
 記憶領域の確保に失敗した場合は BDDOutOfMemoryException を投げる。
 
 ~~トークンは strtol() で解釈する。~~
 数値トークンは検証され、数字以外を含むもの、int の範囲を超えるもの、
 負の要素数はいずれもフォーマットエラーになる。
 CT_STRLEN より長いラベルもフォーマットエラーである。
+このフォーマットの正当なトークンは高々 CT_STRLEN + 1 文字なので、
+**それより長いトークンは、残りをストリームから読み捨てた上でフォーマットエラーにする**。
+1 個の巨大なトークンだけで記憶領域を食い尽くすことはない。
 
 ### BDDCT::Export
 
@@ -215,6 +239,13 @@ void Export(void) const
 ```
 
 自分自身の内容を標準出力に出力する。フォーマットは `Import()` と同じである。
+
+**【SAPPOROBDD++のみ】** 数値の整形は cout の状態に左右されない。
+基数・showpos・showbase だけでなく **locale** も出力を変えるため
+（3 桁区切りの locale では 1000 が `1,000` となり、`Import()` はこれを拒否する）、
+数値は classic locale と既定のフラグを設定した内部のストリームで文字列にし、
+cout へはその文字を書き出す。cout の状態は読みも変えもしないので、
+出力中に例外が起きても復元し損ねる状態は無い。
 
 ### ファイルフォーマット
 
@@ -238,6 +269,11 @@ void Export(void) const
   読まれてフォーマットエラーになる。空白を含まない 1 トークン（例 `#要修正`）
   として書けば読み飛ばされる。
 - 大きさ 0 の表（`#n 0` だけのファイル）も正当である。
+- **表の最後のコスト（大きさ 0 の表なら要素数）より後ろに置けるのはコメントトークンだけである。**
+  それ以外のトークンがあるとフォーマットエラーになる。
+  ラベルかどうかを見るために各コストの直後のトークンを 1 個先読みする以上、
+  表の後ろのトークンもストリームから失われる。
+  ~~最後のコストの後ろの余分なトークンは読み捨てて正常終了する。~~
 
 ## 演算メソッド
 
@@ -252,6 +288,16 @@ ZDD f が表す組合せ集合のうち、コストの合計が bound 以下で�
 組合せ集合を返す。4 引数の形式では、受理された要素のコストの最大値を acc_worst に、
 拒絶された要素のコストの最小値を rej_best に代入する（該当する要素が無い場合は
 それぞれ bddcost_null）。
+
+**【SAPPOROBDD++のみ】** bound は閾値であって表のコストではない。
+再帰の途中では変数のコストを引いた残余閾値を用いるが、これは bddcost の範囲を
+出てもよく（例えばコスト -1 の変数と bound = 2147483646）、範囲外になったことを
+理由に演算が失敗することはない。同様に、集合のコストの合計も内部では bddcostsum で
+求めるので、正負のコストが相殺される表でも演算は成功する。
+**2 引数の形式はコストを返さないので、要素のコストが bddcost の範囲外であっても
+組合せ集合を返す。4 引数の形式は acc_worst・rej_best を bddcost として返すため、
+そのどちらかが範囲外になる場合に限り BDDOutOfRangeException を投げる**
+（このとき組合せ集合自体は正しく求まっている）。
 
 ~~記憶あふれの場合は ZDD(-1) を返す。~~
 記憶あふれの場合は BDDOutOfMemoryException を投げる。
@@ -268,6 +314,9 @@ ZDD ZDD_CostLE0(const ZDD& f, const bddcost bound)
 `ZDD_CostLE()` と同じ結果を返す旧版のアルゴリズム。
 各部分 ZDD のコスト最小値・最大値による枝刈りを行い、その値を
 `MinCost()` / `MaxCost()` と共有するキャッシュに残す。
+枝刈りに使う最小値・最大値も内部では bddcostsum で保持し、呼び出し側へは返さないので、
+2 引数の `ZDD_CostLE()` と同じく、コストが bddcost の範囲外の要素を含む
+組合せ集合も絞り込める。
 互換のため `ZBDD_CostLE0()` という名前でも呼び出せる。
 
 ### BDDCT::MinCost, BDDCT::MaxCost
@@ -280,6 +329,8 @@ bddcost MaxCost(const ZDD& f)
 ZDD f が表す組合せ集合の要素のうち、コストの最小値・最大値を返す。
 f が空集合の場合は bddcost_null を返す。単位元集合（`ZDD(1)`）の場合は 0 を返す。
 f が ZDD(-1) の場合は BDDInvalidBDDValueException を投げる。
+**戻り値は bddcost なので、求めた最小値・最大値が bddcost の範囲を超える場合は
+BDDOutOfRangeException を投げる**（途中の部分和が範囲を出ただけでは投げない）。
 
 ### BDDCT::CallCount
 
@@ -291,6 +342,8 @@ bddword CallCount(void) const
 直前に実行した `ZDD_CostLE()`、`ZDD_CostLE0()`、`MinCost()`、`MaxCost()` が
 行った再帰呼び出しの回数を返す。4 つの演算はいずれも開始時にこの計数を 0 に戻すので、
 値は常に直前の 1 回の演算を表す。
+**引数の検査より前に 0 に戻すので、例外を投げて終わった演算の後も
+前回の値が残ることはない**（ZDD(-1) を渡して例外を捕捉した場合は 0 になる）。
 ~~この値は公開データメンバ _call である。~~
 （データメンバはすべて private である。）
 
@@ -311,8 +364,26 @@ bddcost Cache0Ref(const unsigned char op, const ZDD& f) const
 int Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
 ```
 
+**これらは呼び出し側が直接使える API だが、登録した内容はコスト演算の結果として
+そのまま返る。** 登録値が現在のコスト表やキーの ZDD と整合しているかは検査しないので、
+整合しないエントリは「例外も警告も無い誤った結果」になる。手で登録する場合の前提は
+次の 2 つである。
+
+- **opcode 4 と 5 はこのクラス自身が使う予約値である**（4 が `MinCost()`、
+  5 が `MaxCost()`。`ZDD_CostLE0()` も両方を読む）。
+  ここに自分の結果を入れると、そのキー ZDD に対する当該演算の答えが置き換わる。
+- エントリはキーの ZDD と現在のコスト表から定まる値でなければならない
+  （acc_worst は bound 以下で受理された要素のコストの最大値、
+  rej_best は拒絶された要素のコストの最小値、h はその bound での絞り込み結果）。
+
+記憶領域だけを解放したい場合は、情報を失わない `CacheClear()` /
+`Cache0Clear()` を使えばよい。
+
 - `CacheRef()` はヒットしなければ ZDD(-1) を、`Cache0Ref()` はヒットしなければ
   bddcost_null を返す。
+- 両キャッシュは値を bddcostsum で保持する。**bddcost で表せない値を持つエントリは
+  bddcost 版の `CacheRef()` / `Cache0Ref()` では報告できないので、ヒットではなく
+  ミスとして返す**（コスト演算自体は bddcostsum のまま扱うので影響を受けない）。
 - `Cache0Ent()` は b が bddcost_null の場合、登録せずに 1 を返す
   （bddcost_null は空きスロットの印であるため）。
 - `CacheClear()` / `Cache0Clear()` は常に 0 を返す。エントリを解放するだけで、
@@ -322,9 +393,10 @@ int Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
   例外は投げず、計算はそのまま続行できる）。
 - 空のキャッシュ（初期状態または Clear 直後）に対する `CacheEnlarge()` /
   `Cache0Enlarge()` は、初期容量の表を新規に確保する。
-- `CacheEnt()` は、acc_worst または rej_best の符号反転がキャッシュの番兵値
-  bddcost_null と衝突する場合（コスト -2147483647）、登録を行わず 1 を返す。
-  計算結果自体は正常に返される。
+- ~~`CacheEnt()` は、acc_worst または rej_best の符号反転がキャッシュの番兵値
+  bddcost_null と衝突する場合（コスト -2147483647）、登録を行わず 1 を返す。~~
+  キーは bddcostsum の符号反転値になったため、bddcost で表せるコストはすべて
+  登録できる（合成コスト -2147483647 も含む）。
 - ~~Cache0Ref() / Cache0Ent() のキーは bddword の ID である。~~
   キーは ZDD である。
 
@@ -360,7 +432,7 @@ const メンバの `Cache0Ref()` だけは照合の代わりに、スナップ�
 | 例外クラス | 発生条件 |
 | --- | --- |
 | BDDInvalidBDDValueException | 演算メソッドに ZDD(-1) を与えた |
-| BDDOutOfRangeException | 表が持たない level の変数を含む ZDD を与えた、コストや閾値の加減算が bddcost の範囲を超えた |
+| BDDOutOfRangeException | 表が持たない level の変数を含む ZDD を与えた、呼び出し側へ bddcost として返す値（`MinCost()` / `MaxCost()` の戻り値、4 引数 `ZDD_CostLE()` の acc_worst・rej_best）が bddcost の範囲を超えた |
 | BDDOutOfMemoryException | コスト表・ラベルの確保に失敗した、ZDD 演算が記憶あふれを起こした |
 | BDDInternalErrorException | 再帰の深さが BDD_RecurLimit（8192）を超えた |
 
@@ -370,6 +442,15 @@ const メンバの `Cache0Ref()` だけは照合の代わりに、スナップ�
   ~~4 つの演算はファイルスタティック変数で状態を受け渡す。~~
   ただし各インスタンスは独立しており、あるインスタンスの演算が他のインスタンスの
   状態を壊すことはない。
-- コストの合計は bddcost の範囲内でなければならない。大きなコストと多数の変数の
-  組合せでは合計が範囲を超えることがあり、その場合は BDDOutOfRangeException を投げる
+- 演算の途中に現れる値（部分和・残余閾値・部分 ZDD の最小値と最大値）は bddcostsum で
+  扱うので、bddcost の範囲を出入りしても演算は失敗しない。
+  一方、**呼び出し側へ bddcost として返す値**は bddcost の範囲内でなければならない。
+  大きなコストと多数の変数の組合せでは範囲を超えることがあり、
+  その場合は BDDOutOfRangeException を投げる
   （黙ってオーバーフローした値を返すことはない）。
+  ~~途中の部分和が範囲を超えた時点で BDDOutOfRangeException を投げる。~~
+- 表の大きさ・添字・level・コストはいずれも int で受け渡す。B_EXTEND ビルドの
+  `bddvar` は 32 ビット符号無しで INT_MAX より大きい VarID・level を表せるが、
+  **BDDCT が扱えるのは int で表せる範囲の level までである**。
+  それを超える level の変数を含む ZDD は「表が持たない level の変数」として
+  BDDOutOfRangeException になる。

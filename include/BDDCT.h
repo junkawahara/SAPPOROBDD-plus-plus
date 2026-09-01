@@ -32,7 +32,24 @@ typedef int bddcost;
 const bddcost bddcost_null = 0x7FFFFFFF;
 const int CT_STRLEN = 15;
 
-typedef std::map<bddcost, ZDD> Zmap;
+/* The costs a table holds are bddcost values, but the numbers the four cost
+   operations work with are not: the sum along a path, the bound that is left
+   over after the cost of a variable has been taken off it, and the smallest
+   and largest cost of a sub-ZDD are all intermediate values, and costs of
+   different signs that cancel in the end can drive any of them outside the
+   range of a bddcost on the way.  Every one of them used to overflow
+   silently, and then every one of them was made to throw, which refused
+   families whose own costs the table can express perfectly well.  They are
+   held in bddcostsum instead, which is wide enough for every sum a table of
+   bddcost values can produce, and the range is checked where a value is
+   handed back to the caller as a bddcost.
+
+   bddcostsum_null is the "no value" mark of that type, as bddcost_null is of
+   bddcost. */
+typedef long long bddcostsum;
+const bddcostsum bddcostsum_null = 0x7FFFFFFFFFFFFFFFLL;
+
+typedef std::map<bddcostsum, ZDD> Zmap;
 
 class BDDCT;
 
@@ -95,6 +112,24 @@ public:
   int AllocRand(const int n, const bddcost min, const bddcost max);
   void Export(void) const;
 
+  /* The cache of the four cost operations, open to the caller.  What is in
+     it is answered as the result of a cost operation, and nothing here
+     checks an entry against the cost table or against the ZDD it is keyed
+     by, so an entry that does not describe the operation it is filed under
+     is a wrong result returned without a word.  The preconditions of a
+     hand-made entry are therefore:
+
+       - the two opcodes the class itself uses are reserved: 4 is MinCost()
+         and 5 is MaxCost(), which ZDD_CostLE0() reads as well.  A caller
+         that files its own results under one of them replaces the answer of
+         that operation for that ZDD;
+       - an entry has to hold what the current cost table gives for the key
+         ZDD: acc_worst the largest cost accepted under a bound, rej_best the
+         smallest cost rejected by it, and h the family the bound leaves.
+
+     Everything a cost operation of this class enters satisfies them.  The
+     safe calls for a caller that only wants the memory back are
+     CacheClear() and Cache0Clear(), which lose no information. */
   int CacheClear(void);
   int CacheEnlarge(void);
   ZDD CacheRef(const ZDD &, const bddcost, bddcost &, bddcost &);
@@ -105,8 +140,12 @@ public:
   bddcost Cache0Ref(const unsigned char, const ZDD &) const;
   int Cache0Ent(const unsigned char, const ZDD &, const bddcost);
 
+  /* The two-argument form reports no cost, so it answers a family whose
+     costs leave the range of bddcost as well; the four-argument form has to
+     express acc_worst and rej_best as bddcost values and reports a
+     BDDOutOfRangeException when one of them does not fit. */
   ZDD ZDD_CostLE(const ZDD& f, const bddcost bound)
-  { bddcost aw, rb; return ZDD_CostLE(f, bound, aw, rb); }
+  { bddcostsum aw, rb; return CostLE(f, bound, aw, rb); }
   ZDD ZDD_CostLE(const ZDD &, const bddcost, bddcost &, bddcost &);
 
   // For backward compatibility
@@ -168,11 +207,11 @@ private:
   struct Cache0Entry
   {
     ZDD _key;
-    bddcost _b;
+    bddcostsum _b;
     unsigned char _op;
     Cache0Entry(void)
     {
-      _b = bddcost_null;
+      _b = bddcostsum_null;
       _op = 255;
     }
     ~Cache0Entry(void) { }
@@ -209,10 +248,22 @@ private:
   void Snapshot(void);
   void CacheSync(void);
   bddcost TopCost(const int, const char *) const;
-  ZDD CLE(const ZDD &, const bddcost, bddcost &, bddcost &);
-  bddcost MinC(const ZDD &);
-  bddcost MaxC(const ZDD &);
-  ZDD CLE0(const ZDD &, const bddcost, const bddcost, bddcost &, bddcost &);
+  /* The recursions and both caches work in bddcostsum.  The four public cache
+     methods above are these four with the conversion to and from bddcost: an
+     entry whose costs are not bddcost values is one the narrow form cannot
+     describe, so it answers a miss for it and files nothing for it. */
+  ZDD CacheRefSum(const ZDD &, const bddcostsum, bddcostsum &, bddcostsum &);
+  int CacheEntSum(const ZDD &, const ZDD &, const bddcostsum, const bddcostsum);
+  bddcostsum Cache0RefSum(const unsigned char, const ZDD &) const;
+  int Cache0EntSum(const unsigned char, const ZDD &, const bddcostsum);
+  /* the body both ZDD_CostLE() forms run, before either of them looks at
+     whether the two costs it reports fit in a bddcost */
+  ZDD CostLE(const ZDD &, const bddcostsum, bddcostsum &, bddcostsum &);
+  ZDD CLE(const ZDD &, const bddcostsum, bddcostsum &, bddcostsum &);
+  bddcostsum MinC(const ZDD &);
+  bddcostsum MaxC(const ZDD &);
+  ZDD CLE0(const ZDD &, const bddcostsum, const bddcostsum,
+           bddcostsum &, bddcostsum &);
 };
 
 } // namespace sapporobdd

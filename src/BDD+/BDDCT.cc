@@ -4,6 +4,8 @@
  ****************************************/
 
 #include <new>
+#include <locale>
+#include <sstream>
 
 #include "BDDCT.h"
 #include "bddplus_internal.h"
@@ -12,38 +14,37 @@ using namespace std;
 namespace sapporobdd {
 
 
-/* bddcost is a plain int, so the sums taken along a path can leave its range;
-   every one of them used to overflow silently.  The helpers below report the
-   overflow instead.  They also keep the smallest int out of the class, as it
-   is the one value whose negation does not exist and the cache keys are
-   negated costs. */
+/* The range a bddcost can carry back to the caller.  CostMin is one above the
+   smallest int: that is the one value whose negation does not exist, and
+   CostMax is one below the bddcost_null mark, which a computed cost must
+   never come out as.
+
+   The recursions themselves work in bddcostsum and need no overflow check of
+   their own: Alloc() takes an int, so a table has at most INT_MAX entries,
+   and every cost it holds is smaller than 2^31 in magnitude, which bounds
+   every sum along a path by 2^31 * 2^31 = 2^62.  A residual bound is such a
+   sum away from a bddcost, and 2^62 + 2^31 is still far below the 2^63 of
+   bddcostsum. */
 static const bddcost CostMin = -bddcost_null;
 static const bddcost CostMax = bddcost_null - 1;
 
-static bddcost NegCost(const bddcost a)
+/* whether a sum is one a bddcost can carry */
+static int SumFits(const bddcostsum v)
+{ return (v >= (bddcostsum)CostMin && v <= (bddcostsum)CostMax); }
+
+/* a sum on its way back to the caller as a bddcost.  The "no value" mark of
+   the wide type becomes the mark of the narrow one; a sum the narrow type
+   cannot hold is the range error this class has always reported for it. */
+static bddcost NarrowSum(const bddcostsum v, const char* what)
 {
-  if(a < CostMin)
-    BDDerr("BDDCT: cost out of range", ExceptionType::OutOfRange);
-  return -a;
+  if(v == bddcostsum_null) return bddcost_null;
+  if(!SumFits(v)) BDDerr(what, ExceptionType::OutOfRange);
+  return (bddcost)v;
 }
 
-static bddcost AddCost(const bddcost a, const bddcost b)
-{
-  if(a < CostMin || b < CostMin)
-    BDDerr("BDDCT: cost out of range", ExceptionType::OutOfRange);
-  /* both operands are in [CostMin, bddcost_null] now, so the bounds compared
-     against here cannot overflow themselves.  The result is held to CostMax
-     so that a computed cost never comes out as the bddcost_null mark, which
-     the callers read as "no value". */
-  if((b > 0)? (a > CostMax - b): (a < CostMin - b))
-    BDDerr("BDDCT: cost overflow", ExceptionType::OutOfRange);
-  return a + b;
-}
-
-static bddcost SubCost(const bddcost a, const bddcost b)
-{
-  return AddCost(a, NegCost(b));
-}
+/* a bddcost given to one of the public cache methods, as a sum */
+static bddcostsum WidenCost(const bddcost c)
+{ return (c == bddcost_null)? bddcostsum_null: (bddcostsum)c; }
 
 
 BDDCT::BDDCT()
@@ -107,8 +108,10 @@ const char* BDDCT::Label(const int ix) const
 
 /* bddcost_null is the "no value" mark: Cost() returns it for an index past
    the table and the recursions read it as "this branch holds no set", so it
-   cannot double as a cost.  CostMin is left out as well, as it is the one
-   value the negated cache keys have no room for. */
+   cannot double as a cost.  Its negation is left out with it, which keeps the
+   range of a stored cost symmetric.  A sum of stored costs may well come out
+   as -bddcost_null; that is a cost of a set, not of the table, and both
+   caches hold it. */
 static int CostChk(const bddcost cost)
 { return (cost > CostMax || cost <= CostMin)? 1: 0; }
 
@@ -134,6 +137,12 @@ int BDDCT::SetCost(const int ix, const bddcost cost)
 int BDDCT::SetLabel(const int ix, const char* label)
 {
   if(ix < 0 || ix >= _n) return 1;
+  /* A null label is refused like a label the table cannot hold.  It used to
+     be read from straight away, so a class that answers a label of the wrong
+     length or with a blank in it by returning 1 crashed the process on the
+     one that is not there at all -- which is what a C interface or an
+     optional value hands over when it holds nothing. */
+  if(!label) return 1;
   int j;
   for(j=0; j<=CT_STRLEN; j++) if(!label[j]) break;
   if(j > CT_STRLEN) return 1;
@@ -238,6 +247,15 @@ static int ParseCost(const std::string& s, bddcost& val)
   return 0;
 }
 
+/* One token of a cost table.  Returns EOF at the end of the file, 1 for a
+   token longer than any this format has -- the longest is a label of
+   CT_STRLEN characters behind its '#' -- and 0 with the token in s.  Both
+   non-zero answers are format errors where a token is required; the length is
+   passed on so that a single unbounded token in a hostile file cannot exhaust
+   the memory of the process before the table's own limits are looked at. */
+static int ReadCTToken(FILE* fp, std::string& s)
+{ return ReadToken(fp, s, (std::string::size_type)(CT_STRLEN + 1)); }
+
 /* Reads a cost table in the format Export() writes:
 
      #n 5
@@ -266,18 +284,29 @@ int BDDCT::Import(FILE *fp)
      either the old table or a half-imported one, depending on where the
      input broke off */
   std::string s;
-  do if(ReadToken(fp, s) == EOF) { Alloc(0); return 1; }
+  int r;
+  /* a stream that is not there is not a stream that holds a table; fgetc()
+     used to be handed the null pointer */
+  if(!fp) { Alloc(0); return 1; }
+  do if((r = ReadCTToken(fp, s))) { Alloc(0); return 1; }
   while(s[0] == '#'); // go next word
   /* strtol() used to turn junk into a size 0 and quietly truncate numbers
      past the int range; both are format errors */
   unsigned long long n;
   if(ReadDecimal(s, (unsigned long long)INT_MAX, n)) { Alloc(0); return 1; }
   if(Alloc((int)n)) return 1;
-  /* an empty table has nothing after its size, so its own Export() output
-     used to be rejected at the EOF here */
-  if(_n == 0) return 0;
+  /* an empty table has no cost after its size, so its own Export() output
+     used to be rejected at the EOF here; comments may still follow, data
+     may not */
+  if(_n == 0)
+  {
+    do if((r = ReadCTToken(fp, s)) == EOF) return 0;
+    while(!r && s[0] == '#');
+    Alloc(0);
+    return 1;
+  }
 
-  do if(ReadToken(fp, s) == EOF) { Alloc(0); return 1; }
+  do if((r = ReadCTToken(fp, s))) { Alloc(0); return 1; }
   while(s[0] == '#'); // go next word
   int e = 0;
   int eof = 0;
@@ -286,19 +315,65 @@ int BDDCT::Import(FILE *fp)
     bddcost cost;
     if((e = ParseCost(s, cost))) break;
     if((e = SetCost(ix, cost))) break;
-    if(ReadToken(fp, s) == EOF) { eof = 1; if(ix<_n-1) e = 1; break; }
+    if((r = ReadCTToken(fp, s)))
+    {
+      if(r != EOF) { e = 1; break; }
+      eof = 1; if(ix<_n-1) e = 1;
+      break;
+    }
     if(s[0] == '#') 
     {
       if((e = SetLabel(ix, s.c_str()+1))) break;
       /* an EOF inside this skip has to end the outer loop as well: it used
          to only leave the do-while, and the next round then reused the
          label token as a cost and overwrote the error flag */
-      do if(ReadToken(fp, s) == EOF) { eof = 1; if(ix<_n-1) e = 1; break; }
-      while(!eof && s[0] == '#'); // go next word
+      do
+      {
+        if((r = ReadCTToken(fp, s)))
+        {
+          if(r != EOF) e = 1;
+          else { eof = 1; if(ix<_n-1) e = 1; }
+          break;
+        }
+      }
+      while(s[0] == '#'); // go next word
     }
   }
+  /* One token is read past each cost, to see whether it is that variable's
+     label.  Past the last cost that token is not part of the table: a
+     comment is read over, but anything else is data this format does not
+     have -- and data the caller's own parser will not see again either, as
+     the token is gone from the stream.  It used to end the import as a
+     success and be dropped. */
+  if(!e && !eof) e = 1;
   if(e) { Alloc(0); return 1; }
   return 0;
+}
+
+/* The number of bits one rand() call is asked for: the largest b with
+   2^b - 1 <= RAND_MAX, which is 15 on the smallest conforming library and 31
+   on the common one.  The pieces used to be the low 15 bits of each rand(),
+   which assumes those bits are uniform and independent by themselves;
+   C promises nothing but the range of the value.  Where RAND_MAX + 1 is not
+   a multiple of 32768 -- RAND_MAX == 32768 is conforming -- the masked piece
+   is not uniform however good rand() is. */
+static int RandChunkBits(void)
+{
+  int bits = 1;
+  while(((1ULL << (bits + 1)) - 1ULL) <= (unsigned long long)RAND_MAX) bits++;
+  return bits;
+}
+
+/* one uniform piece of that many bits: a whole rand() value, and a value
+   above the piece is drawn again rather than folded into it */
+static unsigned long long RandChunk(const int bits)
+{
+  const unsigned long long lim = 1ULL << bits;
+  for(;;)
+  {
+    const unsigned long long r = (unsigned long long)rand();
+    if(r < lim) return r;
+  }
 }
 
 /* Draws a value uniformly from [0, m); m is at most 2^32 - 3, the width of
@@ -306,17 +381,17 @@ int BDDCT::Import(FILE *fp)
    used to be, reaches at most RAND_MAX + 1 distinct values -- with the
    common RAND_MAX of 2^31 - 1 less than half of a wide range could ever be
    generated, and even a small range was biased where RAND_MAX + 1 did not
-   divide evenly.  Assemble enough 15-bit pieces (the least a conforming
-   rand() provides) and reject the overshoot instead. */
+   divide evenly.  Assemble enough pieces and reject the overshoot instead. */
 static unsigned long long RandBelow(const unsigned long long m)
 {
+  const int chunk = RandChunkBits();
   int bits = 0;
   while((1ULL << bits) < m) bits++;
   for(;;)
   {
     unsigned long long r = 0;
-    for(int have=0; have<bits; have+=15)
-      r = (r << 15) | (unsigned long long)(rand() & 0x7FFF);
+    for(int have=0; have<bits; have+=chunk)
+      r = (r << chunk) | RandChunk(chunk);
     r &= (1ULL << bits) - 1ULL;
     if(r < m) return r;
   }
@@ -350,25 +425,40 @@ int BDDCT::AllocRand(const int n, const bddcost min, const bddcost max)
   return 0;
 }
 
+/* one line of the exported table, written to cout as characters */
+static void ExportLine(std::ostringstream& os)
+{
+  const std::string line = os.str();
+  /* an unformatted write: cout may carry a field width the caller set and
+     has not used yet, which would pad the line */
+  cout.write(line.data(), (std::streamsize)line.size());
+  os.str("");
+}
+
 void BDDCT::Export() const
 {
-  /* The Import() format is plain decimal.  cout keeps whatever basefield /
-     showpos / showbase state the caller set, and exporting under std::hex
-     used to write a file Import() refused -- or, worse, one it read back as
-     different decimal numbers.  Pin the format and restore the caller's
-     flags afterwards. */
-  const std::ios_base::fmtflags saved = cout.flags();
-  cout << std::dec;
-  cout.unsetf(std::ios_base::showpos | std::ios_base::showbase);
-  cout << "#n " << _n << "\n";
+  /* The Import() format is plain decimal, and every property of cout that
+     could write something else is the caller's to set: the basefield,
+     showpos and showbase used to make Export() write a file Import() refused
+     -- or, worse, one it read back as different decimal numbers -- and the
+     locale still did, as one that groups digits writes 1000 as "1,000",
+     which ReadDecimal() and ParseCost() refuse.  The numbers are therefore
+     formatted by a stream of this function's own, under the classic locale
+     and the default flags, and cout only ever sees the characters.  Nothing
+     of the caller's stream is touched, so there is nothing left to restore
+     when an output exception unwinds this. */
+  std::ostringstream os;
+  os.imbue(std::locale::classic());
+  os << "#n " << _n << "\n";
+  ExportLine(os);
   for(int i=0; i<_n; i++)
   {
-    cout << _cost[i];
+    os << _cost[i];
     if(_label[i] && _label[i][0])
-      cout << " #" << _label[i];
-    cout << "\n";
+      os << " #" << _label[i];
+    os << "\n";
+    ExportLine(os);
   }
-  cout.flags(saved);
 }
 
 /* Records which variable sits on each level the table covers, as far up as a
@@ -478,8 +568,8 @@ int BDDCT::CacheEnlarge()
   return 0;
 }
 
-ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
-                      bddcost& acc_worst, bddcost& rej_best)
+ZDD BDDCT::CacheRefSum(const ZDD& f, const bddcostsum bound,
+                       bddcostsum& acc_worst, bddcostsum& rej_best)
 {
   CacheSync();
   if(!_casize) return -1;
@@ -491,24 +581,24 @@ ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
     if(_ca[k]._key.GetID() == id)
     {
       Zmap* zm = _ca[k]._zmap;
-      Zmap::iterator itr = zm->lower_bound(NegCost(bound));
+      Zmap::iterator itr = zm->lower_bound(-bound);
       /* Every key is a negated cost, so landing past the end means the entry
          knows of nothing at or below this bound, which is a miss.
 
          The branch that used to be here walked back from end() looking for
          the "every set was rejected" mark.  That mark is stored under the key
-         bddcost_null, the largest key there is, so a lower_bound() never runs
-         past it and the walk could not reach it: the mark is served by the
-         ordinary path below.  On an entry whose map is empty -- which the
+         bddcostsum_null, the largest key there is, so a lower_bound() never
+         runs past it and the walk could not reach it: the mark is served by
+         the ordinary path below.  On an entry whose map is empty -- which the
          public CacheEnt() leaves behind when both of its bounds are the
          bddcost_null mark and its result is not the empty family -- the same
          walk stepped off the front of the map, which is undefined. */
       if(itr == zm->end()) return -1;
       ZDD h = itr->second;
       if(h == -1) return -1;
-      acc_worst = -(itr->first);
-      if(acc_worst == -bddcost_null) acc_worst = bddcost_null;
-      if(itr == zm->begin()) rej_best = bddcost_null;
+      acc_worst = (itr->first == bddcostsum_null)?
+                    bddcostsum_null: -(itr->first);
+      if(itr == zm->begin()) rej_best = bddcostsum_null;
       else
       {
         --itr;
@@ -521,17 +611,31 @@ ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
   }
 }
 
-int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
-                     const bddcost acc_worst, const bddcost rej_best)
+/* the same lookup in bddcost.  An entry whose costs are not bddcost values
+   is one this form cannot describe, so it answers the miss it would have
+   answered before the entry was made. */
+ZDD BDDCT::CacheRef(const ZDD& f, const bddcost bound,
+                      bddcost& acc_worst, bddcost& rej_best)
 {
-  /* The entries are keyed by the negated cost and the key bddcost_null is
-     reserved for "every set was rejected", so a cost negating onto it cannot
-     be stored.  It is a legal composite cost, though (-2147483646 + -1
-     reaches it), and this used to throw: ZDD_CostLE() then failed after its
-     result had been computed, on an input MinCost() and ZDD_CostLE0()
-     answered without complaint.  Caching is an optimisation, so only the
-     entry is given up. */
-  if(acc_worst == -bddcost_null || rej_best == -bddcost_null) return 1;
+  bddcostsum aw, rb;
+  ZDD h = CacheRefSum(f, (bddcostsum)bound, aw, rb);
+  if(h == -1) return h;
+  if(aw != bddcostsum_null && !SumFits(aw)) return -1;
+  if(rb != bddcostsum_null && !SumFits(rb)) return -1;
+  acc_worst = (aw == bddcostsum_null)? bddcost_null: (bddcost)aw;
+  rej_best = (rb == bddcostsum_null)? bddcost_null: (bddcost)rb;
+  return h;
+}
+
+int BDDCT::CacheEntSum(const ZDD& f, const ZDD& h,
+                       const bddcostsum acc_worst, const bddcostsum rej_best)
+{
+  /* The entries are keyed by the negated cost, and the key bddcostsum_null is
+     reserved for "every set was rejected".  No cost of a table negates onto
+     it -- the sums are bounded by 2^62 -- so, unlike the bddcost keys these
+     used to be, every cost that reaches this point can be stored.  The
+     composite cost -2147483647 was the one that could not, and its entry was
+     given up. */
   CacheSync();
   if(!_casize && CacheAlloc()) return 1;
   if(_caent >= (_casize >> 1) && CacheEnlarge()) return 1;
@@ -563,13 +667,20 @@ int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
      served for bounds beyond the one it was computed under */
   try
   {
-    if(rej_best != bddcost_null)
-       if(zm->find(NegCost(rej_best)) == zm->end()) (*zm)[NegCost(rej_best)] = -1;
-    if(acc_worst != bddcost_null) (*zm)[NegCost(acc_worst)] = h;
-    else if(h == 0) (*zm)[bddcost_null] = 0;
+    if(rej_best != bddcostsum_null)
+       if(zm->find(-rej_best) == zm->end()) (*zm)[-rej_best] = -1;
+    if(acc_worst != bddcostsum_null) (*zm)[-acc_worst] = h;
+    else if(h == 0) (*zm)[bddcostsum_null] = 0;
   }
   catch(const std::bad_alloc&) { return 1; }
   return 0;
+}
+
+/* the same entry from bddcost values */
+int BDDCT::CacheEnt(const ZDD& f, const ZDD& h,
+                     const bddcost acc_worst, const bddcost rej_best)
+{
+  return CacheEntSum(f, h, WidenCost(acc_worst), WidenCost(rej_best));
 }
 
 /* as CacheClear(), for the cost cache */
@@ -605,13 +716,13 @@ int BDDCT::Cache0Enlarge()
   if(!newca0) return 1;
   for(bddword i=0; i<_ca0size; i++)
   {
-    if(_ca0[i]._b != bddcost_null)
+    if(_ca0[i]._b != bddcostsum_null)
     {
       unsigned char op = _ca0[i]._op;
       bddword k = Hash0(op, _ca0[i]._key.GetID()) & (newsize - 1);
       while(1)
       {
-        if(newca0[k]._b == bddcost_null) break;
+        if(newca0[k]._b == bddcostsum_null) break;
 	k++;
 	k &= newsize - 1;
       }
@@ -626,31 +737,40 @@ int BDDCT::Cache0Enlarge()
   return 0;
 }
 
-bddcost BDDCT::Cache0Ref(const unsigned char op, const ZDD& f) const
+bddcostsum BDDCT::Cache0RefSum(const unsigned char op, const ZDD& f) const
 {
   /* const, so a stale cache cannot be dropped here, and this runs once per
      visited node, so the level-by-level comparison cannot be afforded here
      either: any variable created since the snapshot -- harmless or not --
      is answered as a miss, until a non-const cache call re-snapshots */
-  if(bddvarused() != _snapvars) return bddcost_null;
-  if(!_ca0size) return bddcost_null;
+  if(bddvarused() != _snapvars) return bddcostsum_null;
+  if(!_ca0size) return bddcostsum_null;
   bddword id = f.GetID();
   bddword k = Hash0(op, id) & (_ca0size - 1);
   while(1)
   {
-    if(_ca0[k]._b == bddcost_null) return bddcost_null;
+    if(_ca0[k]._b == bddcostsum_null) return bddcostsum_null;
     if(_ca0[k]._op == op && _ca0[k]._key.GetID() == id) return _ca0[k]._b;
     k++;
     k &= _ca0size - 1;
   }
 }
 
-int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
+/* the same lookup in bddcost: as CacheRef(), a cost this form cannot express
+   is answered as a miss */
+bddcost BDDCT::Cache0Ref(const unsigned char op, const ZDD& f) const
 {
-  /* An entry holding bddcost_null is the mark for an empty slot, so storing
+  const bddcostsum b = Cache0RefSum(op, f);
+  return SumFits(b)? (bddcost)b: bddcost_null;
+}
+
+int BDDCT::Cache0EntSum(const unsigned char op, const ZDD& f,
+                        const bddcostsum b)
+{
+  /* An entry holding bddcostsum_null is the mark for an empty slot, so storing
      one would make Cache0Ref miss this entry, hide the entries behind it on
      the same probe chain, and have Cache0Enlarge drop them all. */
-  if(b == bddcost_null) return 1;
+  if(b == bddcostsum_null) return 1;
   CacheSync();
   if(!_ca0size && Cache0Alloc()) return 1;
   if(_ca0ent >= (_ca0size >> 1) && Cache0Enlarge()) return 1;
@@ -658,7 +778,7 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
   bddword k = Hash0(op, id) & (_ca0size - 1);
   while(1)
   {
-    if(_ca0[k]._b == bddcost_null) { _ca0ent++; break; }
+    if(_ca0[k]._b == bddcostsum_null) { _ca0ent++; break; }
     if(_ca0[k]._op == op && _ca0[k]._key.GetID() == id) break;
     k++;
     k &= _ca0size - 1;
@@ -667,6 +787,13 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
   _ca0[k]._key = f;
   _ca0[k]._b = b;
   return 0;
+}
+
+/* the same entry from a bddcost, whose own "no value" mark stays refused */
+int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
+{
+  if(b == bddcost_null) return 1;
+  return Cache0EntSum(op, f, (bddcostsum)b);
 }
 
 
@@ -685,14 +812,14 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
    used behind after that table was destroyed.  Passing the context in the
    ordinary way costs nothing and removes all of it. */
 
-ZDD BDDCT::CLE(const ZDD& f, const bddcost bound,
-               bddcost& acc_worst, bddcost& rej_best)
+ZDD BDDCT::CLE(const ZDD& f, const bddcostsum bound,
+               bddcostsum& acc_worst, bddcostsum& rej_best)
 {
   _call++;
   if(f == 0)
   {
-    acc_worst = bddcost_null;
-    rej_best = bddcost_null;
+    acc_worst = bddcostsum_null;
+    rej_best = bddcostsum_null;
     return 0;
   }
   if(f == 1)
@@ -700,138 +827,166 @@ ZDD BDDCT::CLE(const ZDD& f, const bddcost bound,
     if(bound >= 0)
     {
       acc_worst = 0;
-      rej_best = bddcost_null;
+      rej_best = bddcostsum_null;
       return 1;
     }
     else
     {
-      acc_worst = bddcost_null;
+      acc_worst = bddcostsum_null;
       rej_best = 0;
       return 0;
     }
   }
   ZDD h;
-  h =  CacheRef(f, bound, acc_worst, rej_best);
+  h =  CacheRefSum(f, bound, acc_worst, rej_best);
   if(h != -1) return h;
   BDD_RECUR_INC;
   int top = f.Top();
-  bddcost cost = TopCost(top,
+  bddcostsum cost = TopCost(top,
     "BDDCT::ZDD_CostLE(): variable outside the cost table");
-  bddcost aw0, aw1, rb0, rb1;
+  bddcostsum aw0, aw1, rb0, rb1;
   ZDD f1 = f.OnSet0(top);
   ZDD f0 = f.OffSet(top);
   if(f1 == -1 || f0 == -1)
     BDDerr("BDDCT::ZDD_CostLE(): memory overflow", ExceptionType::OutOfMemory);
-  h = CLE(f1, SubCost(bound, cost), aw1, rb1).Change(top)
+  /* The bound the 1-branch is filtered by is what is left of this one after
+     the cost of the variable: not a cost of any set, but the threshold the
+     rest of the path is measured against, which may lie outside the range of
+     a bddcost while every set of the family is well inside it.  Taking it
+     off in bddcost used to make that a range error -- and one the caches
+     could hide, as a bound the cache answered never reached this line. */
+  h = CLE(f1, bound - cost, aw1, rb1).Change(top)
     + CLE(f0, bound, aw0, rb0);
   /* the error value must never reach the cache: it is what CacheRef returns
      for a miss and what CacheEnt stores for a rejected bound */
   if(h == -1)
     BDDerr("BDDCT::ZDD_CostLE(): memory overflow", ExceptionType::OutOfMemory);
-  if(aw1 == bddcost_null) acc_worst = aw0;
+  if(aw1 == bddcostsum_null) acc_worst = aw0;
   else
   {
-    aw1 = AddCost(aw1, cost);
-    acc_worst = (aw0 == bddcost_null)? aw1: (aw0 > aw1)? aw0: aw1;
+    aw1 += cost;
+    acc_worst = (aw0 == bddcostsum_null)? aw1: (aw0 > aw1)? aw0: aw1;
   }
-  if(rb1 == bddcost_null) rej_best = rb0;
+  if(rb1 == bddcostsum_null) rej_best = rb0;
   else
   {
-    rb1 = AddCost(rb1, cost);
-    rej_best = (rb0 == bddcost_null)? rb1: (rb0 < rb1)? rb0: rb1;
+    rb1 += cost;
+    rej_best = (rb0 == bddcostsum_null)? rb1: (rb0 < rb1)? rb0: rb1;
   }
-  CacheEnt(f, h, acc_worst, rej_best);
+  CacheEntSum(f, h, acc_worst, rej_best);
   BDD_RECUR_DEC;
   return h;
+}
+
+/* the body of both public forms: the filtered family, and the two costs as
+   the sums they are */
+ZDD BDDCT::CostLE(const ZDD& f, const bddcostsum bound,
+                  bddcostsum& acc_worst, bddcostsum& rej_best)
+{
+  /* the count describes the operation that ran last, so it starts before the
+     argument is looked at: a failed operation used to leave the count of the
+     one before it, exactly where a caller reads it to see what went wrong */
+  _call = 0;
+  if(f == -1)
+    BDDerr("BDDCT::ZDD_CostLE(): invalid ZDD", ExceptionType::InvalidBDDValue);
+  CacheSync();
+  return CLE(f, bound, acc_worst, rej_best);
 }
 
 ZDD BDDCT::ZDD_CostLE(const ZDD& f, const bddcost bound,
                          bddcost& acc_worst, bddcost& rej_best)
 {
-  if(f == -1)
-    BDDerr("BDDCT::ZDD_CostLE(): invalid ZDD", ExceptionType::InvalidBDDValue);
-  CacheSync();
-  _call = 0;
-  ZDD h = CLE(f, bound, acc_worst, rej_best);
+  bddcostsum aw, rb;
+  ZDD h = CostLE(f, bound, aw, rb);
+  /* the family is the answer whatever its costs are, but these two are
+     reported as bddcost values and there the range holds */
+  acc_worst = NarrowSum(aw,
+    "BDDCT::ZDD_CostLE(): accepted cost out of range");
+  rej_best = NarrowSum(rb,
+    "BDDCT::ZDD_CostLE(): rejected cost out of range");
   return h;
 }
 
-bddcost BDDCT::MinC(const ZDD& f)
+bddcostsum BDDCT::MinC(const ZDD& f)
 {
   _call++;
-  if(f == 0) return bddcost_null;
+  if(f == 0) return bddcostsum_null;
   if(f == 1) return 0;
-  bddcost min = Cache0Ref(4, f);
-  if(min != bddcost_null) return min;
+  bddcostsum min = Cache0RefSum(4, f);
+  if(min != bddcostsum_null) return min;
   BDD_RECUR_INC;
   int top = f.Top();
   ZDD f0 = f.OffSet(top);
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::MinCost(): memory overflow", ExceptionType::OutOfMemory);
-  bddcost cost = TopCost(top,
+  bddcostsum cost = TopCost(top,
     "BDDCT::MinCost(): variable outside the cost table");
   min = MinC(f0);
-  bddcost min1 = MinC(f1);
-  if(min1 != bddcost_null) min1 = AddCost(min1, cost);
-  min = (min != bddcost_null && min < min1)? min: min1;
-  Cache0Ent(4, f, min);
+  bddcostsum min1 = MinC(f1);
+  /* the cheapest set through the 1-branch: a partial sum of the sets of f,
+     which costs of different signs can carry outside the range of a bddcost
+     and back again before the whole set is priced */
+  if(min1 != bddcostsum_null) min1 += cost;
+  min = (min != bddcostsum_null && min < min1)? min: min1;
+  Cache0EntSum(4, f, min);
   BDD_RECUR_DEC;
   return min;
 }
 
 bddcost BDDCT::MinCost(const ZDD& f)
 {
+  _call = 0;
   if(f == -1)
     BDDerr("BDDCT::MinCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CacheSync();
-  _call = 0;
-  return MinC(f);
+  return NarrowSum(MinC(f), "BDDCT::MinCost(): cost out of range");
 }
 
-bddcost BDDCT::MaxC(const ZDD& f)
+bddcostsum BDDCT::MaxC(const ZDD& f)
 {
   _call++;
-  if(f == 0) return bddcost_null;
+  if(f == 0) return bddcostsum_null;
   if(f == 1) return 0;
-  bddcost max = Cache0Ref(5, f);
-  if(max != bddcost_null) return max;
+  bddcostsum max = Cache0RefSum(5, f);
+  if(max != bddcostsum_null) return max;
   BDD_RECUR_INC;
   int top = f.Top();
   ZDD f0 = f.OffSet(top);
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::MaxCost(): memory overflow", ExceptionType::OutOfMemory);
-  bddcost cost = TopCost(top,
+  bddcostsum cost = TopCost(top,
     "BDDCT::MaxCost(): variable outside the cost table");
   max = MaxC(f0);
-  bddcost max1 = MaxC(f1);
-  if(max1 != bddcost_null) max1 = AddCost(max1, cost);
-  max = (max != bddcost_null && max > max1)? max: max1;
-  Cache0Ent(5, f, max);
+  bddcostsum max1 = MaxC(f1);
+  /* as MinC(): a partial sum, not a cost of the table */
+  if(max1 != bddcostsum_null) max1 += cost;
+  max = (max != bddcostsum_null && max > max1)? max: max1;
+  Cache0EntSum(5, f, max);
   BDD_RECUR_DEC;
   return max;
 }
 
 bddcost BDDCT::MaxCost(const ZDD& f)
 {
+  _call = 0;
   if(f == -1)
     BDDerr("BDDCT::MaxCost(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CacheSync();
-  _call = 0;
-  return MaxC(f);
+  return NarrowSum(MaxC(f), "BDDCT::MaxCost(): cost out of range");
 }
 
 /* retmin and retmax report the minimum and the maximum cost of f, which the
    caller needs on top of the filtered family itself; they used to be two
    file-static variables. */
-ZDD BDDCT::CLE0(const ZDD& f, const bddcost bound, const bddcost spent,
-                bddcost& retmin, bddcost& retmax)
+ZDD BDDCT::CLE0(const ZDD& f, const bddcostsum bound, const bddcostsum spent,
+                bddcostsum& retmin, bddcostsum& retmax)
 {
   _call++;
   if(f == 0)
   {
-    retmin = bddcost_null; retmax = bddcost_null;
+    retmin = bddcostsum_null; retmax = bddcostsum_null;
     return 0;
   }
   if(f == 1)
@@ -839,47 +994,50 @@ ZDD BDDCT::CLE0(const ZDD& f, const bddcost bound, const bddcost spent,
     retmin = 0; retmax = 0;
     return (bound >= spent)? 1: 0;
   }
-  bddcost min = Cache0Ref(4, f);
-  bddcost max = Cache0Ref(5, f);
+  bddcostsum min = Cache0RefSum(4, f);
+  bddcostsum max = Cache0RefSum(5, f);
   // Pruning returns without recurring, so retmin and retmax have to be known
   // beforehand: the caller reads them as the minimum and the maximum cost of
-  // this very sub-ZDD, and cannot tell a missing cache entry (bddcost_null)
+  // this very sub-ZDD, and cannot tell a missing cache entry (bddcostsum_null)
   // from the same value's other meaning, "this branch holds no set at all".
   // With one of the two missing we fall through to the recursion below, which
   // computes and caches it; only the first visit of the node pays for that.
-  if(min != bddcost_null && max != bddcost_null)
+  if(min != bddcostsum_null && max != bddcostsum_null)
   {
     retmin = min; retmax = max;
-    if(bound < AddCost(min, spent)) return 0;
-    if(bound >= AddCost(max, spent)) return f;
+    /* the cheapest and the dearest set through this node, each of them the
+       sum of what the path above has spent and what the node itself can
+       add: both are compared with the bound, neither is reported */
+    if(bound < min + spent) return 0;
+    if(bound >= max + spent) return f;
   }
   BDD_RECUR_INC;
   int top = f.Top();
-  bddcost cost = TopCost(top,
+  bddcostsum cost = TopCost(top,
     "BDDCT::ZDD_CostLE0(): variable outside the cost table");
   ZDD f0 = f.OffSet(top);
   ZDD f1 = f.OnSet0(top);
   if(f0 == -1 || f1 == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
-  bddcost min0, max0, min1, max1;
+  bddcostsum min0, max0, min1, max1;
   ZDD h = CLE0(f0, bound, spent, min0, max0);
-  ZDD h1 = CLE0(f1, bound, AddCost(spent, cost), min1, max1).Change(top);
+  ZDD h1 = CLE0(f1, bound, spent + cost, min1, max1).Change(top);
   if(h1 == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
   h += h1;
   if(h == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): memory overflow", ExceptionType::OutOfMemory);
-  if(min == bddcost_null)
+  if(min == bddcostsum_null)
   {
-    min = AddCost(min1, cost);
-    if(min0 != bddcost_null) min = (min0 <= min)? min0: min;
-    Cache0Ent(4, f, min);
+    min = min1 + cost;
+    if(min0 != bddcostsum_null) min = (min0 <= min)? min0: min;
+    Cache0EntSum(4, f, min);
   }
-  if(max == bddcost_null)
+  if(max == bddcostsum_null)
   {
-    max = AddCost(max1, cost);
-    if(max0 != bddcost_null) max = (max0 >= max)? max0: max;
-    Cache0Ent(5, f, max);
+    max = max1 + cost;
+    if(max0 != bddcostsum_null) max = (max0 >= max)? max0: max;
+    Cache0EntSum(5, f, max);
   }
   retmin = min; retmax = max;
   BDD_RECUR_DEC;
@@ -888,11 +1046,14 @@ ZDD BDDCT::CLE0(const ZDD& f, const bddcost bound, const bddcost spent,
 
 ZDD BDDCT::ZDD_CostLE0(const ZDD& f, const bddcost bound)
 {
+  _call = 0;
   if(f == -1)
     BDDerr("BDDCT::ZDD_CostLE0(): invalid ZDD", ExceptionType::InvalidBDDValue);
   CacheSync();
-  _call = 0;
-  bddcost retmin, retmax;
+  /* the two costs stay here, so this form reports no cost and, like the
+     two-argument ZDD_CostLE() it has to agree with, filters a family whose
+     costs are outside the range of a bddcost as well */
+  bddcostsum retmin, retmax;
   ZDD h = CLE0(f, bound, 0, retmin, retmax);
   return h;
 }

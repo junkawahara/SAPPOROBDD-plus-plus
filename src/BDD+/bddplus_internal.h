@@ -14,25 +14,41 @@
 namespace sapporobdd {
 
 /* Reads one whitespace-delimited token from strm into s.  Returns EOF when the
-   stream ends before a token starts, 0 otherwise.
+   stream ends before a token starts, 1 when the token is longer than max
+   characters, and 0 otherwise.
 
    The importers read their tokens with fscanf(strm, "%s", s) into a char
    s[256].  Without a field width that smashes the stack on any longer token,
    and a "%255s" would not do either: a PLA product term is a single token as
    long as the input count, so a legitimate file with 256 or more inputs would
    be silently truncated and then rejected as a format error.  Letting the
-   string grow removes both failure modes at once. */
-inline int ReadToken(FILE *strm, std::string& s)
+   string grow removes both failure modes at once.
+
+   A format whose tokens do have a length -- a number, a fixed-length label --
+   passes that length as max, and then a token of any length is read to its
+   end but only max + 1 characters of it are ever held: without a limit a
+   single hostile token exhausts the memory of the process before anything
+   looks at it, and the caller's own error path, which the length it passes is
+   part of, is never reached.  max == 0, the default, is no limit. */
+inline int ReadToken(FILE *strm, std::string& s,
+                     std::string::size_type max = 0)
 {
   int c;
+  int over = 0;
 
   s.erase();
   while((c = fgetc(strm)) != EOF && isspace(c))
     ; /* skip the separators in front of the token */
   if(c == EOF) return EOF;
-  do s += (char)c;
+  do
+  {
+    /* one character past the limit is kept, so that a token that was cut is
+       still a token the caller rejects for its length */
+    if(max && s.size() > max) over = 1;
+    else s += (char)c;
+  }
   while((c = fgetc(strm)) != EOF && !isspace(c));
-  return 0;
+  return over;
 }
 
 /* Parses one decimal token read from an imported file.  Stores the value and

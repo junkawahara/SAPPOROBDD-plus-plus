@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <sstream>
 #include <string>
+#include <locale>
 #include <type_traits>
 
 #define BDD_CPP
@@ -361,6 +362,14 @@ public:
   std::string Str(void) const { return _oss.str(); }
 };
 
+/* groups digits in threes, as a great many locales do */
+class GroupingPunct : public std::numpunct<char>
+{
+protected:
+  virtual std::string do_grouping(void) const { return "\3"; }
+  virtual char do_thousands_sep(void) const { return ','; }
+};
+
 /* feeds text to Import() through a temporary file that is always closed */
 static int ImportFromString(BDDCT& ct, const std::string& text)
 {
@@ -397,6 +406,15 @@ static int TryMaxCost(BDDCT& ct, const ZDD& f, bddcost& out)
 static int TryCostLE(BDDCT& ct, const ZDD& f, const bddcost b, ZDD& out)
 {
   try { bddcost aw, rb; out = ct.ZDD_CostLE(f, b, aw, rb); return 0; }
+  catch(const BDDOutOfRangeException&) { return 1; }
+  catch(const BDDException&) { return 2; }
+}
+
+/* the same with the two costs the four-argument form reports */
+static int TryCostLEB(BDDCT& ct, const ZDD& f, const bddcost b, ZDD& out,
+                      bddcost& aw, bddcost& rb)
+{
+  try { out = ct.ZDD_CostLE(f, b, aw, rb); return 0; }
   catch(const BDDOutOfRangeException&) { return 1; }
   catch(const BDDException&) { return 2; }
 }
@@ -547,7 +565,11 @@ static void test_cost_boundaries(void)
               intact);
 }
 
-/* ---- P0-10..P0-12: path sums beyond the bddcost range ---- */
+/* ---- P0-10..P0-12: path sums beyond the bddcost range ----
+   A cost the caller is given back has to be a bddcost, and a set whose cost
+   is not one is the range error below.  The two filters report no cost, so
+   they answer such a family instead of refusing it: the sums themselves are
+   taken in the wider type the recursions work in. */
 
 static void test_overflow_and_bounds(void)
 {
@@ -564,10 +586,13 @@ static void test_overflow_and_bounds(void)
                 TryMinCost(ct, f, c) == 1);
     test_result("P0-10: MaxCost() reports the positive overflow",
                 TryMaxCost(ct, f, c) == 1);
-    test_result("P0-10: ZDD_CostLE() reports the positive overflow",
-                TryCostLE(ct, f, 100, z) == 1 && TryCostLE2(ct, f, 100, z) == 1);
-    test_result("P0-10: ZDD_CostLE0() reports the positive overflow",
-                TryCostLE0(ct, f, 100, z) == 1);
+    /* the one set costs 2 * kCostMax, so the bound rejects it and its cost
+       is what rej_best would have to report */
+    test_result("P0-10: ZDD_CostLE() reports the cost it cannot express",
+                TryCostLE(ct, f, 100, z) == 1);
+    test_result("P0-10: the forms that report no cost filter the family",
+                TryCostLE2(ct, f, 100, z) == 0 && z == ZDD(0) &&
+                TryCostLE0(ct, f, 100, z) == 0 && z == ZDD(0));
   }
   {
     BDDCT ct;
@@ -579,10 +604,12 @@ static void test_overflow_and_bounds(void)
                 TryMinCost(ct, f, c) == 1);
     test_result("P0-11: MaxCost() reports the negative overflow",
                 TryMaxCost(ct, f, c) == 1);
-    test_result("P0-11: ZDD_CostLE() reports the negative overflow",
-                TryCostLE(ct, f, 0, z) == 1 && TryCostLE2(ct, f, 0, z) == 1);
-    test_result("P0-11: ZDD_CostLE0() reports the negative overflow",
-                TryCostLE0(ct, f, 0, z) == 1);
+    test_result("P0-11: ZDD_CostLE() reports the cost it cannot express",
+                TryCostLE(ct, f, 0, z) == 1);
+    /* 2 * kCostMin is below every bound, so the set is accepted */
+    test_result("P0-11: the forms that report no cost keep the family",
+                TryCostLE2(ct, f, 0, z) == 0 && z == f &&
+                TryCostLE0(ct, f, 0, z) == 0 && z == f);
   }
   {
     BDDCT ct;
@@ -607,6 +634,96 @@ static void test_overflow_and_bounds(void)
     }
     test_result("P0-12: an unnegatable bound is rejected or rejects every set",
                 ok);
+  }
+}
+
+/* ---- sums that leave the bddcost range and come back ----
+   The cost of a set, the bound that is left after the cost of a variable has
+   been taken off it, and the smallest and largest cost of a sub-ZDD are three
+   different things, and only the first has to be a bddcost.  The recursions
+   used to work in bddcost throughout and reported a range error for any of
+   them, so a table whose costs cancel refused families it prices perfectly
+   well -- and the answer depended on what was in the cache, as a bound the
+   cache answered never reached the arithmetic. */
+
+static void test_wide_sums(void)
+{
+  cout << endl << "--- intermediate sums outside the bddcost range ---" << endl;
+  ZDD z;
+  bddcost aw, rb;
+  {
+    /* the bound at the top of the range and a negative cost: what is left of
+       the bound for the 1-branch is kCostMax + 1, while the one set of the
+       family costs -1 */
+    BDDCT cold;
+    cold.Alloc(NV);
+    for(int i=0; i<NV; i++) SetVarCost(cold, i, -1);
+    ZDD f = Set(0);
+    bddcost caw = 0, crb = 0;
+    int r = TryCostLEB(cold, f, kCostMax, z, caw, crb);
+    test_result("the widest bound is a bound, not a cost of the table",
+                r == 0 && z == f && caw == -1 && crb == bddcost_null);
+
+    /* the same call on a table that has already answered another bound for
+       the same family: the cache used to decide whether this threw */
+    BDDCT warm;
+    warm.Alloc(NV);
+    for(int i=0; i<NV; i++) SetVarCost(warm, i, -1);
+    warm.ZDD_CostLE(f, 0, aw, rb);
+    ZDD w;
+    bddcost waw = 0, wrb = 0;
+    int rw = TryCostLEB(warm, f, kCostMax, w, waw, wrb);
+    test_result("the answer is the same on a cold and on a warm cache",
+                rw == r && w == z && waw == caw && wrb == crb);
+
+    test_result("ZDD_CostLE0() answers the widest bound alike",
+                TryCostLE0(cold, f, kCostMax, z) == 0 && z == f);
+  }
+  {
+    /* costs that cancel: the one set of the family costs 1, and the sum of
+       the two variables below the top passes through kCostMax + 1 */
+    BDDCT ct;
+    ct.Alloc(NV);
+    for(int i=0; i<NV; i++) SetVarCost(ct, i, 0);
+    SetVarCost(ct, 0, 1);
+    SetVarCost(ct, 1, kCostMax);
+    SetVarCost(ct, 2, kCostMin);
+    ZDD f = Set(0) * Set(1) * Set(2);
+    bddcost mn = 0, mx = 0;
+    bool ok = TryMinCost(ct, f, mn) == 0 && mn == 1;
+    ok = ok && TryMaxCost(ct, f, mx) == 0 && mx == 1;
+    test_result("MinCost() and MaxCost() price the set the table can express",
+                ok);
+    ok = TryCostLE(ct, f, 1, z) == 0 && z == f;
+    ok = ok && ct.ZDD_CostLE(f, 1, aw, rb) == f &&
+         aw == 1 && rb == bddcost_null;
+    test_result("ZDD_CostLE() accepts it under its own cost", ok);
+    ok = ct.ZDD_CostLE(f, 0, aw, rb) == ZDD(0) &&
+         aw == bddcost_null && rb == 1;
+    test_result("ZDD_CostLE() rejects it below its own cost", ok);
+    test_result("ZDD_CostLE0() answers both bounds alike",
+                TryCostLE0(ct, f, 1, z) == 0 && z == f &&
+                TryCostLE0(ct, f, 0, z) == 0 && z == ZDD(0));
+  }
+  {
+    /* -bddcost_null is a cost no table stores but two stored costs reach.
+       The cache keys used to be negated bddcost values, which left no room
+       for it: the entry was given up, and the manual said so. */
+    BDDCT ct;
+    ct.Alloc(NV);
+    for(int i=0; i<NV; i++) SetVarCost(ct, i, 0);
+    SetVarCost(ct, 0, -1);
+    SetVarCost(ct, 1, kCostMin);
+    ZDD f = Set(0) * Set(1);
+    bool ok = ct.ZDD_CostLE(f, -bddcost_null, aw, rb) == f &&
+              aw == -bddcost_null && rb == bddcost_null;
+    ZDD again = ct.ZDD_CostLE(f, -bddcost_null, aw, rb);
+    ok = ok && again == f && aw == -bddcost_null && rb == bddcost_null;
+    test_result("a composite cost of -bddcost_null goes through the cache",
+                ok && ct.CallCount() == 1);
+    bddcost c = 0;
+    test_result("MinCost() reports the same composite cost",
+                TryMinCost(ct, f, c) == 0 && c == -bddcost_null);
   }
 }
 
@@ -785,6 +902,15 @@ static void test_labels(void)
   test_result("P1-12: Label() is null outside the table",
               ct.Label(-1) == 0 && ct.Label(4) == 0);
 
+  /* a label that is not there at all -- what a C interface or an optional
+     value hands over when it holds nothing -- used to be read from and take
+     the process down, in a method that answers every other label it cannot
+     store by returning 1 */
+  const std::string kept = ct.Label(0);
+  ok = ct.SetLabel(0, (const char*)0) != 0 && kept == ct.Label(0);
+  ok = ok && ct.SetLabelOfLev(4, (const char*)0) != 0 && kept == ct.Label(0);
+  test_result("a null label is refused and changes nothing", ok);
+
   /* the buffer behind the pointer belongs to the table: a plain char* let a
      caller write CT_STRLEN or more characters into it and wreck the heap */
   test_result("Label() hands out a pointer that cannot be written through",
@@ -911,6 +1037,80 @@ static void test_export_import(void)
     bool fail_c = ImportFromString(c, "") != 0;
     test_result("P1-20: the empty-input failure leaves the empty table",
                 fail_c && c.Size() == 0);
+  }
+  {
+    /* Data behind the table is not part of the format, and the token that
+       holds it is read from the stream to find out whether it is the last
+       variable's label: accepting it both took a broken file for a good one
+       and swallowed a token of whatever follows the table in the stream. */
+    BDDCT a;
+    a.Alloc(2, 8);
+    test_result("data behind the table is a format error",
+                ImportFromString(a, "1 5 trailing\n") != 0 && a.Size() == 0);
+    BDDCT b;
+    test_result("a comment behind the table is read over",
+                ImportFromString(b, "1 5 #lab #note\n") == 0 &&
+                b.Size() == 1 && strcmp(b.Label(0), "lab") == 0);
+    BDDCT c;
+    test_result("data behind the empty table is a format error",
+                ImportFromString(c, "0 1\n") != 0 && c.Size() == 0);
+    BDDCT d;
+    test_result("a comment behind the empty table is read over",
+                ImportFromString(d, "0 #done\n") == 0 && d.Size() == 0);
+  }
+  {
+    /* a token longer than any this format has is a format error, and only
+       the first few characters of it are ever held: without a limit one
+       token of a hostile file exhausts the memory of the process before
+       anything looks at what is in it */
+    std::string huge = "1 ";
+    huge.append(200000, '9');
+    huge += "\n";
+    BDDCT a;
+    test_result("an unbounded numeric token is a format error",
+                ImportFromString(a, huge) != 0 && a.Size() == 0);
+    std::string label = "1 5 #";
+    label.append(200000, 'x');
+    label += "\n";
+    BDDCT b;
+    test_result("an unbounded label token is a format error",
+                ImportFromString(b, label) != 0 && b.Size() == 0);
+    std::string comment = "#";
+    comment.append(200000, 'c');
+    comment += "\n2 1 2\n";
+    BDDCT c;
+    test_result("an unbounded comment token is a format error",
+                ImportFromString(c, comment) != 0 && c.Size() == 0);
+  }
+  {
+    /* a stream that is not there used to be handed to fgetc() */
+    BDDCT a;
+    a.Alloc(2, 8);
+    test_result("a null stream is refused and leaves the empty table",
+                a.Import((FILE*)0) != 0 && a.Size() == 0);
+  }
+  {
+    /* The format is plain decimal, and everything cout carries that could
+       write something else is the caller's: a locale that groups digits
+       used to write "#n 1,000", which Import() then refused. */
+    BDDCT src;
+    src.Alloc(4, 1000);
+    src.SetCost(1, -1234567);
+    std::string dump;
+    {
+      CoutCapture cap;
+      std::locale saved = cout.getloc();
+      cout.imbue(std::locale(cout.getloc(), new GroupingPunct));
+      src.Export();
+      cout.imbue(saved);
+      dump = cap.Str();
+    }
+    BDDCT dst;
+    bool ok = dump.find(',') == std::string::npos;
+    ok = ok && ImportFromString(dst, dump) == 0 && dst.Size() == 4;
+    if(ok)
+      for(int i=0; i<4; i++) if(dst.Cost(i) != src.Cost(i)) ok = false;
+    test_result("Export() writes the format under any locale of cout", ok);
   }
 }
 
@@ -1379,6 +1579,28 @@ static void test_call_count(void)
   ct.ZDD_CostLE(f, mn, aw, rb);
   hit = hit && ct.CallCount() == 1;
   test_result("a repeated operation counts the one call the cache serves", hit);
+
+  /* the count describes the operation that ran last, and an operation that
+     threw ran: it used to be checked for the error ZDD before the count was
+     reset, so a caller looking at the count of the call that just failed was
+     given the count of the one before it */
+  ZDD bad(-1);
+  bool reset = true;
+  ct.MinCost(f);
+  try { ct.MinCost(bad); } catch(const BDDException&) { }
+  if(ct.CallCount() != 0) reset = false;
+  ct.MaxCost(f);
+  try { ct.MaxCost(bad); } catch(const BDDException&) { }
+  if(ct.CallCount() != 0) reset = false;
+  ct.ZDD_CostLE(f, mn, aw, rb);
+  try { ct.ZDD_CostLE(bad, 5, aw, rb); } catch(const BDDException&) { }
+  if(ct.CallCount() != 0) reset = false;
+  try { ct.ZDD_CostLE(bad, 5); } catch(const BDDException&) { }
+  if(ct.CallCount() != 0) reset = false;
+  ct.ZDD_CostLE0(f, mn);
+  try { ct.ZDD_CostLE0(bad, 5); } catch(const BDDException&) { }
+  if(ct.CallCount() != 0) reset = false;
+  test_result("a failed operation leaves the count of no other one", reset);
 }
 
 /* ---- a variable inserted below the top level ----
@@ -1514,6 +1736,7 @@ int main(void)
     test_zero_negative_costs();
     test_cost_boundaries();
     test_overflow_and_bounds();
+    test_wide_sums();
     test_error_zdd_all();
     test_copy_move_policy();
     test_alloc_accessors();
