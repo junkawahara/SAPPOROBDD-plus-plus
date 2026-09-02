@@ -8,15 +8,79 @@
 
 namespace sapporobdd {
 
+/* ------- Operand validation shared by the entry points below ------- */
+
+/* Every public operation validates its operands here, under its own name:
+   the derived operations (bddor(), bddexist(), ...) used to leave the check
+   to the primitive they call, and an invalid operand was then reported as an
+   error of bddand() or bdduniv().  The three checks differ in the kind of
+   node they accept.  A constant is accepted only as bddfalse or bddtrue:
+   the value-carrying constants (bddconst(), the counts returned by bddcard()
+   and the multi-precision table references) are not diagrams, and the
+   single-operand entry points used to pass them straight through -- into a
+   node in the case of bddchange(). */
+
+static void check_const(const char *who, bddp f)
+{
+  if(B_ABS(f) != bddfalse)
+  {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%s: Invalid bddp", who);
+    err(msg, f, ExceptionType::InvalidBDDValue);
+  }
+}
+
+[[noreturn]] static void bad_operand(const char *who, const char *what, bddp f)
+{
+  char msg[64];
+  snprintf(msg, sizeof(msg), "%s: %s", who, what);
+  err(msg, f, ExceptionType::InvalidBDDValue);
+}
+
+/* a live node of either kind, or bddfalse/bddtrue */
+static void check_node(const char *who, bddp f)
+{
+  if(B_CST(f)) { check_const(who, f); return; }
+  if(B_BAD_NODE(f)) bad_operand(who, "Invalid bddp", f);
+}
+
+/* a BDD: a live non-ZDD node, or bddfalse/bddtrue */
+static void check_bdd(const char *who, bddp f)
+{
+  check_node(who, f);
+  if(!B_CST(f) && B_Z_NP(B_NP(f))) bad_operand(who, "applying ZDD node", f);
+}
+
+/* a ZDD: a live ZDD node, or bddfalse/bddtrue */
+static void check_zdd(const char *who, bddp f)
+{
+  check_node(who, f);
+  if(!B_CST(f) && !B_Z_NP(B_NP(f))) bad_operand(who, "applying non-ZDD node", f);
+}
+
+/* a variable in use.  Every entry point reports a VarID outside 1..VarUsed
+   as BDDOutOfRangeException; bddprime(), bddat0() and bddat1() used to
+   report the same condition as BDDInvalidBDDValueException. */
+static void check_var(const char *who, bddvar v)
+{
+  if(v == 0 || v > VarUsed)
+  {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%s: Invalid VarID", who);
+    err(msg, v, ExceptionType::OutOfRange);
+  }
+}
+
+/* ------- Reference management ------- */
+
 bddp bddcopy(bddp f)
 {
   struct B_NodeTable *fp;
 
   if(f == bddnull) return bddnull;
   if(B_CST(f)) return f; /* Constant */
+  if(B_BAD_NODE(f)) bad_operand("bddcopy", "Invalid bddp", f);
   fp = B_NP(f);
-  if(fp >= Node+NodeSpc || fp->varrfc == 0)
-    err("bddcopy: Invalid bddp", f, ExceptionType::InvalidBDDValue);
   B_RFC_INC_NP(fp);
   return f;
 }
@@ -27,19 +91,27 @@ void bddfree(bddp f)
 
   if(f == bddnull) return;
   if(B_CST(f)) return; /* Constant */
+  if(B_BAD_NODE(f)) bad_operand("bddfree", "Invalid bddp", f);
   fp = B_NP(f);
-  if(fp >= Node+NodeSpc || fp->varrfc == 0)
-    err("bddfree: Invalid bddp", f, ExceptionType::InvalidBDDValue);
   B_RFC_DEC_NP(fp);
 }
 
 bddp bddnot(bddp f)
+/* Logical negation of a BDD.  A ZDD node is refused: flipping the edge of a
+   ZDD toggles the membership of the empty set, which is not a complement,
+   and the result would still be accepted by every ZDD operation. */
 {
   if(f == bddnull) return bddnull;
+  check_bdd("bddnot", f);
   return B_NOT(bddcopy(f));
 }
 
+/* ------- Variables ------- */
+
 bddvar bddlevofvar(bddvar v)
+/* v = 0 is the pseudo variable of the constants, whose level is 0; bddtop()
+   returns it for a constant, and bddlevofvar(bddtop(f)) has to work for
+   every f. */
 {
   if(v > VarUsed)
     err("bddlevofvar: Invalid VarID", v, ExceptionType::OutOfRange);
@@ -47,6 +119,8 @@ bddvar bddlevofvar(bddvar v)
 }
 
 bddvar bddvaroflev(bddvar lev)
+/* lev = 0 is the level of the constants and answers VarID 0, see
+   bddlevofvar(). */
 {
   if(lev > VarUsed)
     err("bddvaroflev: Invalid level", lev, ExceptionType::OutOfRange);
@@ -58,10 +132,25 @@ bddvar bddvarused()
   return VarUsed;
 }
 
+/* The variable table is grown before the new variable is counted.  With the
+   count incremented first, a var_enlarge() that threw (index range full, or
+   no memory) left VarUsed == VarSpc behind: a variable that had no table
+   entry, and a count that never triggered the enlargement again. */
+static void var_reserve(const char *who)
+{
+  if(VarUsed >= bddvarmax)
+  {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%s: var index range full", who);
+    err(msg, VarUsed, ExceptionType::OutOfRange);
+  }
+  if(VarUsed + 1U >= VarSpc) var_enlarge();
+}
+
 bddvar bddnewvar()
 {
-  if(++VarUsed == VarSpc) var_enlarge();
-  return VarUsed;
+  var_reserve("bddnewvar");
+  return ++VarUsed;
 }
 
 static void shift_cache_clear(void)
@@ -91,12 +180,15 @@ bddvar bddnewvaroflev(bddvar lev)
   int moved;
 
   /* the ++VarUsed used to live inside this condition, so the error path for
-     an invalid level had already created a ghost variable when it threw */
+     an invalid level had already created a ghost variable when it threw.
+     The range check comes after the capacity check: with B_EXTEND and every
+     variable in use, VarUsed + 1 wraps to 0 and would refuse every level
+     under the wrong name. */
+  var_reserve("bddnewvaroflev");
   if(lev == 0 || lev > VarUsed + 1U)
     err("bddnewvaroflev: Invalid level", lev, ExceptionType::OutOfRange);
   moved = (lev <= VarUsed);
   ++VarUsed;
-  if(VarUsed == VarSpc) var_enlarge();
   for(i=VarUsed; i>lev; i--) Var[ VarID[i] = VarID[i-1U] ].lev = i;
   Var[ VarID[lev] = VarUsed ].lev = lev;
   /* The levels of the variables at lev and above have just moved, so the
@@ -109,274 +201,169 @@ bddvar bddnewvaroflev(bddvar lev)
 
 bddvar bddtop(bddp f)
 {
-  struct B_NodeTable *fp;
-
   if(f == bddnull) return 0;
   if(B_CST(f)) return 0; /* Constant */
-  fp = B_NP(f);
-  if(fp >= Node+NodeSpc || fp->varrfc == 0)
-    err("bddtop: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-  return B_VAR_NP(fp);
+  if(B_BAD_NODE(f)) bad_operand("bddtop", "Invalid bddp", f);
+  return B_VAR_NP(B_NP(f));
 }
 
-bddp    bddprime(bddvar v)
-/* Returns bddnull if not enough memory */
+/* ------- BDD operations ------- */
+
+bddp bddprime(bddvar v)
 {
-        if(v == 0 || v > VarUsed)
-		err("bddprime: Invalid VarID", v, ExceptionType::InvalidBDDValue);
-        return getbddp(v, bddfalse, bddtrue);
+  check_var("bddprime", v);
+  return getbddp(v, bddfalse, bddtrue);
 }
+
+/* The operations below propagate bddnull (the error value of the BDD+
+   layer) and otherwise validate their operands before applying; memory
+   exhaustion inside apply() is reported by BDDOutOfMemoryException. */
 
 bddp bddand(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddand: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddand: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddand: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddand: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddand: applying ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddand", f);
+  check_bdd("bddand", g);
   return apply(f, g, BC_AND, 0);
 }
 
 bddp bddor(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  bddp h;
-
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  h = bddand(B_NOT(f), B_NOT(g));
-  if(h == bddnull) return bddnull;
-  return B_NOT(h);
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddor", f);
+  check_bdd("bddor", g);
+  return B_NOT(apply(B_NOT(f), B_NOT(g), BC_AND, 0));
 }
 
 bddp bddxor(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddxor: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddxor: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddxor: applying ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddxor: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddxor: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddxor: applying ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddxor", f);
+  check_bdd("bddxor", g);
   return apply(f, g, BC_XOR, 0);
 }
 
 bddp bddnand(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  bddp h;
-
-  h = bddand(f, g);
-  if(h == bddnull) return bddnull;
-  return B_NOT(h);
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddnand", f);
+  check_bdd("bddnand", g);
+  return B_NOT(apply(f, g, BC_AND, 0));
 }
 
 bddp bddnor(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  return bddand(B_NOT(f), B_NOT(g));
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddnor", f);
+  check_bdd("bddnor", g);
+  return apply(B_NOT(f), B_NOT(g), BC_AND, 0);
 }
 
 bddp bddxnor(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  if(g == bddnull) return bddnull;
-  return bddxor(f, B_NOT(g));
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddxnor", f);
+  check_bdd("bddxnor", g);
+  return apply(f, B_NOT(g), BC_XOR, 0);
 }
 
 bddp bddcofactor(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddcofactor: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddcofactor: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddcofactor: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddcofactor: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddcofactor: applying ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddcofactor", f);
+  check_bdd("bddcofactor", g);
   return apply(f, g, BC_COFACTOR, 0);
 }
 
-bddp bdduniv(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
+/* True when g has the shape bdduniv()/bddexist() quantify over: the
+   disjunction of a set of variables, which is what bddsupport() returns and
+   what x | y | ... builds.  That BDD is a positive chain in which every node
+   has the constant 1 on its 1-edge and the next variable on its 0-edge,
+   ending in the constant 0.  The quantification only ever descends the
+   0-edges of g, so a g of any other shape -- a cube x & y & ..., say -- was
+   quantified over its top variable alone, without a word.  The constants
+   stand for the empty set. */
+static int is_varset(bddp g)
 {
-  struct B_NodeTable *fp;
+  struct B_NodeTable *gp;
 
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bdduniv: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
+  if(B_CST(g)) return 1;
+  if(B_NEG(g)) return 0;
+  while(!B_CST(g))
   {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bdduniv: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", f, ExceptionType::InvalidBDDValue);
+    gp = B_NP(g);
+    if(B_GET_BDDP(gp->f1) != bddtrue) return 0;
+    g = B_GET_BDDP(gp->f0); /* the stored 0-edge of a BDD node is positive */
   }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bdduniv: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bdduniv: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bdduniv: applying ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
+  return g == bddfalse;
+}
 
+bddp bdduniv(bddp f, bddp g)
+{
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bdduniv", f);
+  check_bdd("bdduniv", g);
+  if(!is_varset(g))
+    bad_operand("bdduniv", "g is not a set of variables (x | y | ...)", g);
   return apply(f, g, BC_UNIV, 0);
 }
 
 bddp bddexist(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  bddp h;
-
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  h = bdduniv(B_NOT(f), g);
-  if(h == bddnull) return bddnull;
-  return B_NOT(h);
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_bdd("bddexist", f);
+  check_bdd("bddexist", g);
+  if(!is_varset(g))
+    bad_operand("bddexist", "g is not a set of variables (x | y | ...)", g);
+  return B_NOT(apply(B_NOT(f), g, BC_UNIV, 0));
 }
 
 int bddimply(bddp f, bddp g)
+/* 1 if f implies g, 0 if it does not.  bddnull is refused: an int has no
+   error value, and answering 0 for it used to be indistinguishable from
+   "does not imply". */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return 0;
-  if(g == bddnull) return 0;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddimply: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddimply: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddimply: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddimply: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(B_Z_NP(fp)) err("bddimply: applying ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull) bad_operand("bddimply", "Invalid bddp", f);
+  if(g == bddnull) bad_operand("bddimply", "Invalid bddp", g);
+  check_bdd("bddimply", f);
+  check_bdd("bddimply", g);
   return ! andfalse(f, B_NOT(g));
 }
 
 bddp bddsupport(bddp f)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
   if(f == bddnull) return bddnull;
+  check_node("bddsupport", f);
   if(B_CST(f)) return bddfalse;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddsupport: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, bddfalse, BC_SUPPORT, 0);
 }
 
+/* bddat0() and bddat1() are BDD operations: the negative-edge rule the
+   cofactor applies is the BDD one, and on a ZDD bddat1() used to answer with
+   a set that bddonset0() disagrees with.  ZDD nodes are refused, as the
+   other BDD operations do; bddoffset() and bddonset0() are the ZDD
+   counterparts. */
+
 bddp bddat0(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(v > VarUsed || v == 0) err("bddat0: Invalid VarID", v, ExceptionType::InvalidBDDValue);
+  check_var("bddat0", v);
   if(f == bddnull) return bddnull;
+  check_bdd("bddat0", f);
   if(B_CST(f)) return f;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddat0: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, (bddp)v, BC_AT0, 0);
 }
 
 bddp bddat1(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(v > VarUsed || v == 0) err("bddat1: Invalid VarID", v, ExceptionType::InvalidBDDValue);
+  check_var("bddat1", v);
   if(f == bddnull) return bddnull;
+  check_bdd("bddat1", f);
   if(B_CST(f)) return f;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddat1: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, (bddp)v, BC_AT1, 0);
 }
 
 bddp bddlshift(bddp f, bddvar shift)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
   /* Check operands.  A shift of 0 is the identity whatever the variable
      count; testing it after the range check used to make "f << 0" fail
      when no variable existed yet (shift >= VarUsed with VarUsed == 0). */
@@ -384,9 +371,8 @@ bddp bddlshift(bddp f, bddvar shift)
   if(shift == 0) return bddcopy(f);
   if(shift >= VarUsed)
     err("bddlshift: Invalid shift", shift, ExceptionType::OutOfRange);
+  check_node("bddlshift", f);
   if(B_CST(f)) return f;
-  if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddlshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   /* tells bddnewvaroflev() that there may be order-dependent cache entries */
   ShiftCacheUsed = 1;
@@ -394,62 +380,43 @@ bddp bddlshift(bddp f, bddvar shift)
 }
 
 bddp bddrshift(bddp f, bddvar shift)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
   /* Check operands.  A shift of 0 is the identity whatever the variable
-     count; testing it after the range check used to make "f << 0" fail
+     count; testing it after the range check used to make "f >> 0" fail
      when no variable existed yet (shift >= VarUsed with VarUsed == 0). */
   if(f == bddnull) return bddnull;
   if(shift == 0) return bddcopy(f);
   if(shift >= VarUsed)
     err("bddrshift: Invalid shift", shift, ExceptionType::OutOfRange);
+  check_node("bddrshift", f);
   if(B_CST(f)) return f;
-  if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddrshift: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   /* tells bddnewvaroflev() that there may be order-dependent cache entries */
   ShiftCacheUsed = 1;
   return apply(f, (bddp)shift, BC_RSHIFT, 0);
 }
 
+/* ------- ZDD operations ------- */
+
 bddp    bddoffset(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(v > VarUsed || v == 0) err("bddoffset: Invalid VarID", v, ExceptionType::OutOfRange);
+  check_var("bddoffset", v);
   if(f == bddnull) return bddnull;
+  check_zdd("bddoffset", f);
   if(B_CST(f)) return f;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddoffset: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-  if(!B_Z_NP(fp)) err("bddoffset: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, (bddp)v, BC_OFFSET, 0);
 }
 
 bddp    bddonset0(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(v > VarUsed || v == 0) err("bddonset0: Invalid VarID", v, ExceptionType::OutOfRange);
+  check_var("bddonset0", v);
   if(f == bddnull) return bddnull;
+  check_zdd("bddonset0", f);
   if(B_CST(f)) return bddfalse;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddonset0: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-  if(!B_Z_NP(fp)) err("bddonset0: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, (bddp)v, BC_ONSET, 0);
 }
 
 bddp    bddonset(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
 {
   bddp g, h;
 
@@ -465,202 +432,106 @@ bddp    bddonset(bddp f, bddvar v)
 }
 
 bddp    bddchange(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(v > VarUsed || v == 0) err("bddchange: Invalid VarID", v, ExceptionType::OutOfRange);
+  check_var("bddchange", v);
   if(f == bddnull) return bddnull;
-  if(!B_CST(f))
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddchange: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddchange: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-
+  check_zdd("bddchange", f);
   return apply(f, (bddp)v, BC_CHANGE, 0);
 }
 
 bddp bddintersec(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddintersec: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddintersec: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddintersec: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddintersec: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddintersec: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_zdd("bddintersec", f);
+  check_zdd("bddintersec", g);
   return apply(f, g, BC_INTERSEC, 0);
 }
 
 bddp bddunion(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddunion: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddunion: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddunion: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddunion: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddunion: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_zdd("bddunion", f);
+  check_zdd("bddunion", g);
   return apply(f, g, BC_UNION, 0);
 }
 
 bddp bddsubtract(bddp f, bddp g)
-/* Returns bddnull if not enough memory */
 {
-  struct B_NodeTable *fp;
-
-  /* Check operands */
-  if(f == bddnull) return bddnull;
-  if(g == bddnull) return bddnull;
-  if(B_CST(f))
-  { if(B_ABS(f) != bddfalse) err("bddsubtract: Invalid bddp", f, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddsubtract: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddsubtract: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-  }
-  if(B_CST(g))
-  { if(B_ABS(g) != bddfalse) err("bddsubtract: Invalid bddp", g, ExceptionType::InvalidBDDValue); }
-  else
-  {
-    fp = B_NP(g);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddsubtract: Invalid bddp", g, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddsubtract: applying non-ZDD node", g, ExceptionType::InvalidBDDValue);
-  }
-
+  if(f == bddnull || g == bddnull) return bddnull;
+  check_zdd("bddsubtract", f);
+  check_zdd("bddsubtract", g);
   return apply(f, g, BC_SUBTRACT, 0);
 }
 
 bddp bddcard(bddp f)
 {
-  struct B_NodeTable *fp;
-
   if(f == bddnull) return 0;
+  check_zdd("bddcard", f);
   if(B_CST(f)) return (f == bddfalse)? 0: 1;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddcard: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-  if(!B_Z_NP(fp)) err("bddcard: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, bddfalse, BC_CARD, 0);
 }
 
 bddp bddlit(bddp f)
 {
-  struct B_NodeTable *fp;
-
   if(f == bddnull) return 0;
+  check_zdd("bddlit", f);
   if(B_CST(f)) return 0;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddlit: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-  if(!B_Z_NP(fp)) err("bddlit: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, bddfalse, BC_LIT, 0);
 }
 
 bddp bddlen(bddp f)
 {
-  struct B_NodeTable *fp;
-
   if(f == bddnull) return 0;
+  check_zdd("bddlen", f);
   if(B_CST(f)) return 0;
-  fp = B_NP(f);
-  if(fp>=Node+NodeSpc || !fp->varrfc)
-    err("bddlen: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-  if(!B_Z_NP(fp)) err("bddlen: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-
   return apply(f, bddfalse, BC_LEN, 0);
 }
 
 char *bddcardmp16(bddp f, char *s)
 {
-  struct B_NodeTable *fp;
   int i, j, k, nz;
   struct B_MP mp;
   bddp h, d;
 
   mp.len = 1;
   if(f == bddnull) mp.word[0] = 0;
-  else if(B_CST(f)) mp.word[0] = (f == bddtrue)? 1: 0;
   else
   {
-    fp = B_NP(f);
-    if(fp>=Node+NodeSpc || !fp->varrfc)
-      err("bddcardmp16: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-    if(!B_Z_NP(fp)) err("bddcardmp16: applying non-ZDD node", f, ExceptionType::InvalidBDDValue);
-    MPAllocFailSize = 0;
-    MPCountOverflowed = 0;
-    h = apply(B_ABS(f), bddfalse, BC_CARD2, 0);
-    if(h == B_MP_NULL)
-    {
-      /* Out of memory while counting: the documented contract is to raise
-         BDDOutOfMemoryException.  A B_MP_NULL without a recorded allocation
-         failure means the multi-precision table index space is exhausted,
-         which keeps its historical behaviour of storing an empty string. */
-      if(MPAllocFailSize != 0)
-      {
-        bddp failsize = MPAllocFailSize;
-        MPAllocFailSize = 0;
-        err("bddcardmp16: not enough memory for mp table", failsize,
-            ExceptionType::OutOfMemory);
-      }
-      if(MPCountOverflowed)
-      {
-        MPCountOverflowed = 0;
-        err("bddcardmp16: cardinality does not fit in B_MP_LMAX words",
-            B_MP_LMAX, ExceptionType::OutOfRange);
-      }
-      mp.len = 0;
-    }
+    check_zdd("bddcardmp16", f);
+    if(B_CST(f)) mp.word[0] = (f == bddtrue)? 1: 0;
     else
     {
-      mp.word[0] = B_NEG(f)? 1: 0;
-      if(mp_add(&mp, h))
-        err("bddcardmp16: cardinality does not fit in B_MP_LMAX words",
-            B_MP_LMAX, ExceptionType::OutOfRange);
+      MPAllocFailSize = 0;
+      MPCountOverflowed = 0;
+      h = apply(B_ABS(f), bddfalse, BC_CARD2, 0);
+      if(h == B_MP_NULL)
+      {
+        /* Out of memory while counting: the documented contract is to raise
+           BDDOutOfMemoryException.  A B_MP_NULL without a recorded allocation
+           failure means the multi-precision table index space is exhausted,
+           which keeps its historical behaviour of storing an empty string. */
+        if(MPAllocFailSize != 0)
+        {
+          bddp failsize = MPAllocFailSize;
+          MPAllocFailSize = 0;
+          err("bddcardmp16: not enough memory for mp table", failsize,
+              ExceptionType::OutOfMemory);
+        }
+        if(MPCountOverflowed)
+        {
+          MPCountOverflowed = 0;
+          err("bddcardmp16: cardinality does not fit in B_MP_LMAX words",
+              B_MP_LMAX, ExceptionType::OutOfRange);
+        }
+        mp.len = 0;
+      }
+      else
+      {
+        mp.word[0] = B_NEG(f)? 1: 0;
+        if(mp_add(&mp, h))
+          err("bddcardmp16: cardinality does not fit in B_MP_LMAX words",
+              B_MP_LMAX, ExceptionType::OutOfRange);
+      }
     }
   }
   if(!s) s = B_MALLOC(char, mp.len*sizeof(bddp)*2+1);
@@ -693,26 +564,18 @@ char *bddcardmp16(bddp f, char *s)
 
 int bddisbdd(bddp f)
 {
-  struct B_NodeTable* fp;
-
   if(f == bddnull) return 0;
   if(B_CST(f)) return 1;
-  if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddisbdd: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-
-  return (B_NEG(B_GET_BDDP(fp->f0)) ? 0 : 1);
+  if(B_BAD_NODE(f)) bad_operand("bddisbdd", "Invalid bddp", f);
+  return (B_Z_NP(B_NP(f)) ? 0 : 1);
 }
 
 int bddiszdd(bddp f)
 {
-  struct B_NodeTable* fp;
-
   if(f == bddnull) return 0;
   if(B_CST(f)) return 1;
-  if((fp=B_NP(f))>=Node+NodeSpc || !fp->varrfc)
-    err("bddiszdd: Invalid bddp", f, ExceptionType::InvalidBDDValue);
-
-  return (B_NEG(B_GET_BDDP(fp->f0)) ? 1 : 0);
+  if(B_BAD_NODE(f)) bad_operand("bddiszdd", "Invalid bddp", f);
+  return (B_Z_NP(B_NP(f)) ? 1 : 0);
 }
 
 // for compatibility
@@ -721,28 +584,44 @@ int bddiszbdd(bddp f)
   return bddiszdd(f);
 }
 
+/* ------- SeqBDD operations ------- */
+
 bddp    bddpush(bddp f, bddvar v)
-/* Returns bddnull if not enough memory */
+/* The node (v, 0, f) of a sequence BDD.  The level of v is deliberately not
+   compared with the top level of f: a SeqBDD repeats variables along a
+   path, in any order.  f itself is validated like every other operand --
+   this used to be the one entry point that touched its operand unchecked,
+   and a BDD node under a ZDD node makes a diagram no operation can read. */
 {
   struct B_NodeTable *fp;
   bddp h;
 
   /* Check operands */
-  if(v > VarUsed || v == 0) err("bddpush: Invalid VarID", v, ExceptionType::OutOfRange);
+  check_var("bddpush", v);
   if(f == bddnull) return bddnull;
+  check_zdd("bddpush", f);
 
   if(!B_CST(f)) { fp = B_NP(f); B_RFC_INC_NP(fp); }
-  h = getzddp(v, bddfalse, f);
-  if(h == bddnull) bddfree(f);
+  /* getnode() reports memory exhaustion by exception; release the reference
+     taken above instead of leaking it */
+  try { h = getzddp(v, bddfalse, f); }
+  catch(...) { bddfree(f); throw; }
   return h;
 }
+
+/* ------- Configuration ------- */
 
 void bddsetcacheratio(double cacheRatio)
 /* Set cache size ratio (must be power of 2: ..., 0.25, 0.5, 1, 2, 4, ...) */
 {
+  double oldRatio = CacheRatio;
+
   /* throw an exception if cacheRatio is illegal */
   setcacheratiovalue(cacheRatio);
   if (!allocatecache()) {
+    /* the cache is still the old one, so the ratio it reports has to be the
+       old one as well */
+    CacheRatio = oldRatio;
     err("bddsetcacheratio: memory allocation failed", 0, ExceptionType::OutOfMemory);
   }
 }
