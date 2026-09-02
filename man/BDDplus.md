@@ -9,7 +9,9 @@
 
 - 入力変数番号(通称VarID)は1から始まるint型の整数で識別する（0は定数を表す）。
   負の変数番号は用いない。VarIDの最大値は定数BDD_MaxVarで与えられる。
-  デフォルトは65535(16ビット)。
+  デフォルトは 1048575（20ビット）である。B_EXTEND を定義してコンパイルした
+  場合は 32 ビット幅になるが、C++ インタフェースは int で受け渡すため
+  INT_MAX に丸められる。
 
 - 各VarIDごとにBDDでの上下の順位(通称level)の情報を保持している。
   levelもまた1から始まるint型の整数で識別する。大きい数値ほど
@@ -23,9 +25,11 @@
   演算結果のインデックスの値が同じかどうかを比較することで行える。
 
 - BDD節点テーブルの最大サイズは、BDD_Init() の２つの引数で指定する。
-  BDD_Initを省略した場合の default は、初期値 256、最大値 1,024に
-  設定されている。計算中に記憶あふれを起こした場合は、計算を中断して、
-  nullオブジェクトBDD(-1) を返す。
+  BDD_Initを省略した場合の default は、初期値 256、最大値 BDD_MaxNode
+  （節点テーブルが表現できる最大の節点数）に設定されている。
+  計算中に記憶あふれを起こした場合は、計算を中断して
+  BDDOutOfMemoryException 例外を投げる（オリジナルの SAPPOROBDD が
+  返していた null オブジェクト BDD(-1) は、明示的に生成しない限り現れない）。
 
 ## SAPPOROBDD++ 独自の機能
 
@@ -46,19 +50,38 @@
 
 ## 提供するクラスとその依存関係
 
-- [BDD](classes/BDD.md) - BDDで表現された個々の論理関数を指すクラス
-  - [BDDV](classes/BDDV.md) - BDDの配列（論理関数の配列）を表すクラス
-    - [BtoI](classes/BtoI.md) - ２値入力整数値出力の論理関数を表すクラス
-  - [BDDDG](classes/BDDDG.md) - BDDを単純直交分解した結果を表すクラス
+個別のマニュアルがあるのは [ZDD](classes/ZDD.md)（ZDDV と BDD.h の関数を含む）、
+[BDDCT](classes/BDDCT.md)、および [BDD_Hash / ZDD_Hash](classes/others.md) である。
+それ以外のクラスの個別マニュアルは未整備であり、ヘッダファイルを参照されたい。
+
+- BDD - BDDで表現された個々の論理関数を指すクラス
+  - BDDV - BDDの配列（論理関数の配列）を表すクラス
+    - BtoI - ２値入力整数値出力の論理関数を表すクラス
+  - BDDDG - BDDを単純直交分解した結果を表すクラス
   - [ZDD](classes/ZDD.md) - ゼロサプレス型BDDで表現された組合せ集合を指すクラス
-    - [ZDDV](classes/ZDDV.md) - ZDDの配列（組合せ集合の配列）を表すクラス
-      - [CtoI](classes/CtoI.md) - 整数値組合せ集合（整係数ユネイト論理式）を表すクラス
-    - [SOP](classes/SOP.md) - 正負のリテラルからなる積和形論理式を表現するクラス
-      - [SOPV](classes/SOPV.md) - SOPの配列（積和形論理式の配列）を表すクラス
-    - [PiDD](classes/PiDD.md) - 順列集合を表現するクラス
-    - [SeqBDD](classes/SeqBDD.md) - 系列集合を表現するクラス
-    - [GBase](classes/GBase.md) - ZDDでパス/サイクル列挙を行うためのクラス
+    - ZDDV - ZDDの配列（組合せ集合の配列）を表すクラス
+      - CtoI - 整数値組合せ集合（整係数ユネイト論理式）を表すクラス
+    - SOP - 正負のリテラルからなる積和形論理式を表現するクラス
+      - SOPV - SOPの配列（積和形論理式の配列）を表すクラス
+    - PiDD - 順列集合を表現するクラス
+    - SeqBDD - 系列集合を表現するクラス
+    - GBase - ZDDでパス/サイクル列挙を行うためのクラス
     - [BDDCT](classes/BDDCT.md) - BDD/ZDDでコスト制約付き変数を扱うためのクラス
+
+## BDD クラスに関する注意
+
+- `Univ(g)` / `Exist(g)` の g は消去する変数の集合であり、`BDDvar(x) | BDDvar(y) | ...`
+  の形（`Support()` が返す形）で与える。積 `BDDvar(x) & BDDvar(y)` のようなキューブは
+  受け付けず、BDDInvalidBDDValueException 例外を投げる（以前は先頭の変数だけが
+  消去され、誤りは報告されなかった）。
+- `At0()` / `At1()` / `operator~` は BDD 専用である。ZDD の節点を C API の
+  bddat0() / bddat1() / bddnot() に渡すと BDDInvalidBDDValueException 例外になる
+  （ZDD には OffSet() / OnSet0() を用いる）。
+- `Imply()` は int を返すため誤りを戻り値で表せない。null オブジェクト BDD(-1) を
+  被演算子にすると BDDInvalidBDDValueException 例外を投げる。
+- `Print()` は null オブジェクトに対して `[ null (error BDD) ]` と印字する。
+- BDD_Import() / ZDD_Import() が読むファイルには BDD と ZDD の区別が記録されて
+  いない。詳細は [ZDD](classes/ZDD.md) の ZDD_Import の項を参照。
 
 ## BDDクラスの使用例
 

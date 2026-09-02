@@ -217,8 +217,9 @@ inline int operator!=(const BDD& f, const BDD& g)
 
 inline int BDD_Imply(const BDD& f, const BDD& g) 
 {
-  /* bddimply() answers 0 for a null operand, so the -1 of a failed
-     operation would silently decay into "does not imply" */
+  /* an int has no error value, so the -1 of a failed operation would
+     silently decay into "does not imply"; bddimply() refuses a null operand
+     as well, but this check names the function the user called */
   if(f.GetID() == bddnull || g.GetID() == bddnull)
     BDDerr("BDD_Imply: null operand.", ExceptionType::InvalidBDDValue);
   return bddimply(f.GetID(), g.GetID());

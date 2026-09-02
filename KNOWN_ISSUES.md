@@ -152,3 +152,34 @@ The limit is written down in the manual.
 **What a fix would cost.** Every level and VarID API of the BDD+ layer would
 have to change to `bddvar` together, which is an interface change to `BDD`
 and `ZDD`, not a fix inside the cost table.
+
+## 7. An import trusts the sizes its header declares
+
+- `src/BDDc/bddc_io.cc` (`import`, the `_i` count), `src/BDD+/BDD.cc`
+  (`BDDV_Import`), `src/BDD+/ZDD.cc` (`ZDDV_Import`), `src/BDD+/BDDCT.cc`
+  (`Import`, the `#n` count)
+
+The `_i` count of a BDD/ZDD file makes the importer create that many
+variables before a single node is read, and they stay when the import fails
+later; the `#n` count of a cost table makes `BDDCT::Import()` allocate a table
+of that many entries.  Both counts are bounded only by what the manager can
+represent (`bddvarmax`, `INT_MAX`), so a file of a few bytes can ask for
+hundreds of megabytes -- and, where the system overcommits memory, be granted
+them and then killed while touching them.  (The `_n` count of the C importer
+is bounded by the node limit, since a file with more distinct nodes than that
+cannot be imported anyway.)
+
+**Why it is still there.** The counts are the format's own statement of what
+the file needs, and a legitimate file can need that much: a diagram over a
+million variables, a cost table for every variable of a large problem.  There
+is no smaller bound that would not refuse such a file.  The creation of the
+variables is documented in `man/classes/ZDD.md` under `ZDD_Import`, and the
+failure of a huge allocation is reported as `BDDOutOfMemoryException`; what
+is not defended against is a hostile file, which no other part of the library
+defends against either.
+
+**What a fix would cost.** Creating the variables lazily as nodes refer to
+them, or growing the cost table as costs arrive, would change what the
+functions leave behind on a malformed file and how the format is read.  A
+caller that reads untrusted files can bound the sizes itself by reading the
+header first.
