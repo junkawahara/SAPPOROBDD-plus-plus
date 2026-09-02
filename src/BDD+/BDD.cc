@@ -63,6 +63,15 @@ void BDD::Export(FILE *strm) const
 
 void BDD::Print() const
 {
+  /* as ZDD::Print(): the error value used to be printed as a huge ID with
+     "Var:0(0) Size:0", indistinguishable from a real constant without
+     knowing the number */
+  if(_bdd == bddnull)
+  {
+    cout << "[ null (error BDD) ]\n";
+    cout.flush();
+    return;
+  }
   cout << "[ " << GetID();
   cout << " Var:" << Top() << "(" << BDD_LevOfVar(Top()) << ")";
   cout << " Size:" << Size() << " ]\n";
@@ -220,13 +229,16 @@ void BDDerr(const char* msg, ExceptionType exType)
 {
   /* As in the C core's err(): the exception unwinds every BDD+ recursion
      frame without passing their BDD_RECUR_DEC, and by the time it reaches
-     the user no library frame is left, so the correct depth is 0. */
+     the user no library frame is left, so the correct depth is 0.
+     This form has no value to report, so the exceptions are built without
+     one: a 0 passed instead used to append " (bddp value: 0x0)" or
+     " (value: 0)" to a message the value had nothing to do with. */
   BDD_RecurCount = 0;
   switch (exType) {
     case ExceptionType::InvalidBDDValue:
-      throw BDDInvalidBDDValueException(msg, 0);
+      throw BDDInvalidBDDValueException(msg);
     case ExceptionType::OutOfRange:
-      throw BDDOutOfRangeException(msg, 0);
+      throw BDDOutOfRangeException(msg);
     case ExceptionType::OutOfMemory:
       throw BDDOutOfMemoryException(msg, 0);
     case ExceptionType::FileFormat:
@@ -418,7 +430,12 @@ BDDV BDDV::Part(int start, int len) const
   if(_bdd == -1) return *this;
   if(len == 0) return BDDV();
 
-  if(start < 0 || start + len  > _len)
+  /* The range is checked without forming start + len, which overflows for a
+     large len, and a negative len is refused: both used to pass the check
+     and reach "1 << (_lev-1)" with _lev == 0 in the recursion below, from
+     where Former().Part() called itself until the stack ran out.  (ZDDV::Mask
+     had the same check rewritten the same way.) */
+  if(start < 0 || len < 0 || start > _len || len > _len - start)
     BDDerr("BDDV::Part: Illegal index.", ExceptionType::OutOfRange);
   
   if(start == 0 && len == _len) return *this;
@@ -445,6 +462,14 @@ BDD BDDV::GetBDD(int index) const
 
 void BDDV::Print() const
 {
+  /* as ZDDV::Print(): the error vector used to print its components and
+     then throw from Size() */
+  if(_bdd == -1)
+  {
+    cout << "[ null (error BDDV) ]\n";
+    cout.flush();
+    return;
+  }
   for(int i=0; i<_len; i++)
   {
     cout << "f" << i << ": ";
@@ -479,11 +504,15 @@ BDDV operator||(const BDDV& fv, const BDDV& gv)
   if(!BDDV_Active)
     BDDerr("BDDV::operator||: BDDV_Init() has not been run.", ExceptionType::InternalError);
   BDDV hv;
+  /* The length is checked before the partitioning variable is fetched: at
+     the maximum length that variable is the one above BDDV_SysVarTop, a user
+     variable, and fetching it first reported the overflow as an invalid
+     VarID (or consumed the variable) instead of as a length error. */
+  if((hv._len = fv._len + gv._len) > BDDV_MaxLen)
+    BDDerr("BDDV::operator||: Too large len.", hv._len, ExceptionType::OutOfRange);
   BDD x = BDDvar(fv._lev + 1);
   if((hv._bdd = (~x & fv._bdd)|(x & gv._bdd)) == -1) 
     BDDerr("BDDV::operator||: Operation failed.", ExceptionType::OutOfMemory);
-  if((hv._len = fv._len + gv._len) > BDDV_MaxLen)
-    BDDerr("BDDV::operator||: Too large len.", hv._len, ExceptionType::OutOfRange);
   hv._lev = fv._lev + 1;
   return hv;
 }
@@ -516,12 +545,10 @@ static const unsigned long long ImportMaxLev =
     (unsigned long long)bddvarmax: (unsigned long long)INT_MAX;
 static const unsigned long long ImportMaxLen = (unsigned long long)BDDV_MaxLen;
 static const unsigned long long ImportMaxNode = (unsigned long long)BDD_MaxNode;
-
-#ifdef B_32
-#  define B_STRTOI strtol
-#else
-#  define B_STRTOI strtoll
-#endif
+/* Node IDs stay below B_VAL_MASK, the empty-slot mark of the hash table
+   below: a reference equal to the mark stopped the search at the first empty
+   slot and resolved to whatever that slot held. */
+static const unsigned long long ImportMaxId = (unsigned long long)B_VAL_MASK - 1ULL;
 
 BDDV BDDV_Import(FILE *strm)
 {
@@ -587,11 +614,14 @@ BDDV BDDV_Import(FILE *strm)
   for(bddword ix=0; ix<n_nd; ix++)
   {
     /* The node IDs are read with the same validation as the header counts:
-       B_STRTOI turned a corrupt token into 0, and node ID 0 is a real node
+       strtoll() turned a corrupt token into 0, and node ID 0 is a real node
        (the table starts at index 0), so a damaged file could resolve the
-       junk into a silent reference to that node instead of being refused. */
+       junk into a silent reference to that node instead of being refused.
+       An odd ID is refused too: the exporter writes even IDs, and an odd
+       reference means "inverted", so an odd definition could never be
+       found. */
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
-    if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+    if(ReadDecimal(s, ImportMaxId, uval) || (uval & 1)) { e = 1; break; }
     bddword nd = (bddword)uval;
     
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
@@ -606,7 +636,9 @@ BDDV BDDV_Import(FILE *strm)
     else if(s == "T") f0 = 1;
     else
     {
-      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+      /* a 0-edge is never inverted; the 1-edge and the outputs are the
+         references that carry the inverter bit */
+      if(ReadDecimal(s, ImportMaxId, uval) || (uval & 1)) { e = 1; break; }
       bddword nd0 = (bddword)uval;
 
       bddword ixx = IMPORTHASH(nd0);
@@ -625,7 +657,7 @@ BDDV BDDV_Import(FILE *strm)
     else if(s == "T") f1 = 1;
     else
     {
-      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+      if(ReadDecimal(s, ImportMaxId, uval)) { e = 1; break; }
       bddword nd1 = (bddword)uval;
       if(nd1 & 1) { inv = 1; nd1 ^= 1; }
       else inv = 0;
@@ -675,7 +707,7 @@ BDDV BDDV_Import(FILE *strm)
     else if(s == "T") v = v || BDD(1);
     else
     {
-      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval))
+      if(ReadDecimal(s, ImportMaxId, uval))
         BDDerr("BDDV_Import: Invalid node ID.", ExceptionType::FileFormat);
       bddword nd = (bddword)uval;
       if(nd & 1) { inv = 1; nd ^= 1; }

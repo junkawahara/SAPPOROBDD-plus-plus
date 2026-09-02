@@ -807,10 +807,11 @@ int BDDCT::Cache0Ent(const unsigned char op, const ZDD& f, const bddcost b)
    file-static functions that reached their table through a file-static
    BDDCT* and handed the bound and the two cost results of ZDD_CostLE0() to
    each other through three more file-static variables.  That made every one
-   of these operations non-reentrant and unusable from more than one thread
-   even on tables of their own, and it left the pointer to the last table
-   used behind after that table was destroyed.  Passing the context in the
-   ordinary way costs nothing and removes all of it. */
+   of these operations non-reentrant, and it left the pointer to the last
+   table used behind after that table was destroyed.  Passing the context in
+   the ordinary way costs nothing and removes all of it.  (It does not make
+   the class usable from several threads: the BDD core underneath keeps its
+   tables in global state, see bddc.h.) */
 
 ZDD BDDCT::CLE(const ZDD& f, const bddcostsum bound,
                bddcostsum& acc_worst, bddcostsum& rej_best)

@@ -63,6 +63,11 @@ public:
         ss << message << " (bddp value: 0x" << std::hex << value << ")";
         message = ss.str();
     }
+    /* An error that has no value to report: the message is left as it is.
+       (Passing 0 to the constructor above would append " (bddp value: 0x0)",
+       and 0 is a real bddp.) */
+    explicit BDDInvalidBDDValueException(const std::string& msg)
+        : BDDException(msg), value(0) {}
 
     bddp getValue() const { return value; }
     
@@ -85,6 +90,9 @@ public:
         ss << message << " (value: " << value << ")";
         message = ss.str();
     }
+    /* An error that has no value to report, see BDDInvalidBDDValueException */
+    explicit BDDOutOfRangeException(const std::string& msg)
+        : BDDException(msg), value(0) {}
 
     bddp getValue() const { return value; }
     

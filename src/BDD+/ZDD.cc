@@ -339,6 +339,9 @@ static ZDD ZDD_SymSet(const ZDD& f0, const ZDD& f1)
   ZDD f01 = f0.OnSet0(t);
   ZDD f10 = f1.OffSet(t);
   ZDD f11 = f1.OnSet0(t);
+  /* as SymChk(): two error values compare equal, so a failed cofactor has
+     to be caught before the comparisons below, or 0 would be cached */
+  if(f00 == -1 || f01 == -1 || f10 == -1 || f11 == -1) return -1;
   
   ZDD h;
   if(f11 == 0) h = ZDD_SymSet(f00, f10) - f01.Support();
@@ -346,9 +349,11 @@ static ZDD ZDD_SymSet(const ZDD& f0, const ZDD& f1)
   else
   {
     h = ZDD_SymSet(f01, f11);
-    if(h != 0) h &= ZDD_SymSet(f00, f10);
+    if(h != 0 && h != -1) h &= ZDD_SymSet(f00, f10);
   }
+  if(h == -1) return -1;
   if(f10 == f01) h += ZDD(1).Change(t);
+  if(h == -1) return -1;
 
   ZDD_CACHE_ENT_RETURN(BC_ZDD_SYMSET, fx, gx, h);
 }
@@ -431,6 +436,8 @@ static ZDD ZDD_CoImplySet(const ZDD& f0, const ZDD& f1)
   ZDD f01 = f0.OnSet0(t);
   ZDD f10 = f1.OffSet(t);
   ZDD f11 = f1.OnSet0(t);
+  /* as ZDD_SymSet(): a failed cofactor is caught before the comparisons */
+  if(f00 == -1 || f01 == -1 || f10 == -1 || f11 == -1) return -1;
   
   ZDD h;
   if(f11 == 0) h = ZDD_CoImplySet(f00, f10);
@@ -438,9 +445,11 @@ static ZDD ZDD_CoImplySet(const ZDD& f0, const ZDD& f1)
   else
   {
     h = ZDD_CoImplySet(f01, f11);
-    if(h != 0) h &= ZDD_CoImplySet(f00, f10);
+    if(h != 0 && h != -1) h &= ZDD_CoImplySet(f00, f10);
   }
+  if(h == -1) return -1;
   if(f10 - f01 == 0) h += ZDD(1).Change(t);
+  if(h == -1) return -1;
 
   ZDD_CACHE_ENT_RETURN(BC_ZDD_COIMPSET, fx, gx, h);
 }
@@ -949,8 +958,10 @@ int ZDDV::PrintPla() const
   cout << ".o " << len << "\n";
   if(tlev == 0)
   {
+    /* the same output symbols as ZDDV_PLA() prints for the rows of a
+       non-constant vector: "~" for an output that is 0, "1" otherwise */
     for(int i=0; i<len; i++)
-    if(GetZDD(i) == 0) cout << "0";
+    if(GetZDD(i) == 0) cout << "~";
     else cout << "1";
     cout << "\n";
   }
@@ -986,12 +997,9 @@ static const unsigned long long ImportMaxLev =
     (unsigned long long)bddvarmax: (unsigned long long)INT_MAX;
 static const unsigned long long ImportMaxLen = (unsigned long long)BDDV_MaxLen;
 static const unsigned long long ImportMaxNode = (unsigned long long)BDD_MaxNode;
-
-#ifdef B_32
-#  define B_STRTOI strtol
-#else
-#  define B_STRTOI strtoll
-#endif
+/* Node IDs stay below B_VAL_MASK, the empty-slot mark of the hash table
+   below, see BDDV_Import(). */
+static const unsigned long long ImportMaxId = (unsigned long long)B_VAL_MASK - 1ULL;
 
 ZDDV ZDDV_Import(FILE *strm)
 {
@@ -1046,11 +1054,12 @@ ZDDV ZDDV_Import(FILE *strm)
   for(bddword ix=0; ix<n_nd; ix++)
   {
     /* The node IDs are read with the same validation as the header counts:
-       B_STRTOI turned a corrupt token into 0, and node ID 0 is a real node
+       strtoll() turned a corrupt token into 0, and node ID 0 is a real node
        (the table starts at index 0), so a damaged file could resolve the
-       junk into a silent reference to that node instead of being refused. */
+       junk into a silent reference to that node instead of being refused.
+       An odd definition ID is refused as in BDDV_Import(). */
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
-    if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+    if(ReadDecimal(s, ImportMaxId, uval) || (uval & 1)) { e = 1; break; }
     bddword nd = (bddword)uval;
     
     if(ReadToken(strm, s) == EOF) { e = 1; break; }
@@ -1065,7 +1074,8 @@ ZDDV ZDDV_Import(FILE *strm)
     else if(s == "T") f0 = 1;
     else
     {
-      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+      /* a 0-edge is never inverted */
+      if(ReadDecimal(s, ImportMaxId, uval) || (uval & 1)) { e = 1; break; }
       bddword nd0 = (bddword)uval;
 
       bddword ixx = IMPORTHASH(nd0);
@@ -1084,7 +1094,7 @@ ZDDV ZDDV_Import(FILE *strm)
     else if(s == "T") f1 = 1;
     else
     {
-      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval)) { e = 1; break; }
+      if(ReadDecimal(s, ImportMaxId, uval)) { e = 1; break; }
       bddword nd1 = (bddword)uval;
       if(nd1 & 1) { inv = 1; nd1 ^= 1; }
       else inv = 0;
@@ -1129,7 +1139,7 @@ ZDDV ZDDV_Import(FILE *strm)
     else if(s == "T") v += ZDDV(1, i);
     else
     {
-      if(ReadDecimal(s, (unsigned long long)B_VAL_MASK, uval))
+      if(ReadDecimal(s, ImportMaxId, uval))
         BDDerr("ZDDV_Import(): Invalid node ID", ExceptionType::FileFormat);
       bddword nd = (bddword)uval;
       if(nd & 1) { inv = 1; nd ^= 1; }
