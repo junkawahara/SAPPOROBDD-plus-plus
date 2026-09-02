@@ -187,14 +187,14 @@ void test_setcacheratiovalue() {
 void test_apply_cache_store_rejects_bddnull() {
     std::cout << "\n=== Testing APPLY_CACHE_STORE with a bddnull result ===" << endl;
 
-    /* APPLY_CACHE_STORE substitutes its parameter names into cachep->op,
-       cachep->f, ... so the arguments must be variables with these very
-       names, exactly as the apply functions call it. */
+    /* APPLY_CACHE_STORE recomputes the slot from (op, f, g) when it writes
+       (the cache may have been enlarged since the key was taken), so the
+       entry to inspect is the one that key names. */
     struct B_CacheTable *cachep = 0;
-    struct B_CacheTable *entry;
-    bddp key = 0;              /* any valid cache index */
+    struct B_CacheTable *entry, *entry2;
     bddp f = 2, g = 4, h;      /* arbitrary operands */
     unsigned char op = BC_AND;
+    bddp key = B_CACHEKEY(op, f, g);
 
     entry = Cache + key;
     entry->op = BC_NULL;
@@ -213,11 +213,14 @@ void test_apply_cache_store_rejects_bddnull() {
                 B_GET_BDDP(entry->h) == h);
 
     op = BC_UNION;
+    entry2 = Cache + B_CACHEKEY(op, f, g);
+    if(entry2 != entry) entry2->op = BC_NULL;
     h = bddnull;
     APPLY_CACHE_STORE(key, op, f, g, h, cachep);
     test_result("bddnull does not overwrite a valid entry",
                 entry->op == BC_AND &&
-                B_GET_BDDP(entry->h) == 6);
+                B_GET_BDDP(entry->h) == 6 &&
+                (entry2 == entry || entry2->op == BC_NULL));
 
     entry->op = BC_NULL;
 }

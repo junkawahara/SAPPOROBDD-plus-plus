@@ -9,17 +9,26 @@
 namespace sapporobdd {
 
 bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
-/* Special operations: BC_COFACTOR, BC_UNIV */
-/* Returns bddnull if not enough memory */
+/* Special operations: BC_COFACTOR, BC_UNIV.  Both are BDD operations; the
+   public entry points refuse ZDD nodes, and a ZDD node reaching the
+   recursion is reported below rather than combined with getbddp().
+   Memory exhaustion is reported by BDDOutOfMemoryException from getnode();
+   the function never returns bddnull (the bddnull tests below are only a
+   defence).  skip is always 0 here: no negation rule of these operations
+   re-enters with skip = 1, and with skip = 1 a constant operand would reach
+   the child extraction. */
 {
   struct B_NodeTable *fp, *gp;
   struct B_CacheTable *cachep;
-  bddp key, f0, f1, g0 = 0, g1 = 0, h0, h1, h;
+  bddp key, f0 = 0, f1 = 0, g0 = 0, g1 = 0, h0, h1, h;
   bddvar v = 0, flev, glev;
   char z = 0;
 
+  if(skip)
+    err("apply_special: skip is not defined", op, ExceptionType::InternalError);
+
   /* Check terminal case */
-  if(!skip) switch(op)
+  switch(op)
   {
   case BC_COFACTOR:
     /* Check trivial cases */
@@ -38,7 +47,6 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
 
   default:
     err("apply_special: unknown opcode", op, ExceptionType::InternalError);
-    break;
   }
 
   /* Non-trivial operations */
@@ -63,14 +71,17 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
 
   /* Get (f0, f1) and (g0, g1) */
   APPLY_GET_CHILDREN_BINARY(f, g, fp, gp, flev, glev, f0, f1, g0, g1, v, z);
+  if(z)
+    err("apply_special: ZDD node in a BDD operation", f, ExceptionType::InternalError);
 
-  /* Stack overflow limitter */
+  /* Stack overflow limiter */
   BDD_RECUR_INC;
 
   /* Get result node.  The recursions and getbddp() report memory exhaustion
      by exception, which would skip the bddfree() calls below; the references
      held in h0/h1 are released on the way out instead of leaking and pinning
-     their nodes against bddgc() forever. */
+     their nodes against bddgc() forever.  See apply_binary() for what this
+     relies on. */
   h0 = bddnull;
   h1 = bddnull;
   try
@@ -98,6 +109,9 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   case BC_UNIV:
+    /* g is the disjunction of the variables to quantify (bdduniv() checks
+       the shape), so only its 0-edge chain is followed: g0 is the rest of
+       the set, and g1 == g0 exactly when v is not in it. */
     if(f0 == f1)
     {
       /* f does not depend on v, so both branches would recur on the same
@@ -129,8 +143,6 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
 
   default:
     err("apply_special: unknown opcode", op, ExceptionType::InternalError);
-    h = bddnull;
-    break;
   }
   }
   catch(...)
@@ -140,7 +152,7 @@ bddp apply_special(bddp f, bddp g, unsigned char op, unsigned char skip)
     throw;
   }
 
-  /* Stack overflow limitter */
+  /* Stack overflow limiter */
   BDD_RECUR_DEC;
 
   /* Saving to Cache */

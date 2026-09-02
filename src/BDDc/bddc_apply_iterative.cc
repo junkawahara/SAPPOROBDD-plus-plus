@@ -2,7 +2,8 @@
 *  BDD Package (SAPPORO-1.94)   - Apply Iterative *
 *  (C) Shin-ichi MINATO  (Apr. 19, 2022)          *
 *  Non-recursive apply using explicit stack       *
-*  Used when VarUsed > APPLY_RECURSION_THRESHOLD  *
+*  Used when the recursive version would not fit  *
+*  into the recursion budget (b_recursion_fits)   *
 ******************************************/
 
 #include "bddc_apply_common.h"
@@ -10,11 +11,14 @@
 
 namespace sapporobdd {
 
-/* Stack management functions */
+/* Stack management functions.  top counts the frames in use; the sizes are
+   bddp, so the doubling below cannot overflow a signed int on a graph over
+   2^31 levels (B_EXTEND allows 2^32 variables), and the allocations go
+   through the overflow-checked B_MALLOC/B_REALLOC like the rest of the
+   library. */
 static void stack_init(struct ApplyStack *stack) {
-    stack->frames = (struct ApplyStackFrame *)malloc(
-        sizeof(struct ApplyStackFrame) * APPLY_STACK_INIT_SIZE);
-    stack->top = -1;
+    stack->frames = B_MALLOC(struct ApplyStackFrame, APPLY_STACK_INIT_SIZE);
+    stack->top = 0;
     /* The capacity has to describe what was really allocated: a capacity of
        APPLY_STACK_INIT_SIZE over a null frames pointer made the first
        stack_push() succeed without any storage, and stack_current() then
@@ -30,21 +34,20 @@ static void stack_free(struct ApplyStack *stack) {
 }
 
 static int stack_push(struct ApplyStack *stack) {
-    stack->top++;
     if (stack->top >= stack->capacity) {
         /* capacity 0 means stack_init()'s allocation failed; realloc() on the
            null pointer it left behind is the initial allocation retried */
-        int new_capacity = stack->capacity? stack->capacity * 2:
-                                            APPLY_STACK_INIT_SIZE;
-        struct ApplyStackFrame *new_frames = (struct ApplyStackFrame *)realloc(
-            stack->frames, sizeof(struct ApplyStackFrame) * new_capacity);
-        if (!new_frames) {
-            stack->top--;
-            return 0; /* allocation failed */
-        }
+        bddp new_capacity = stack->capacity? stack->capacity * 2:
+                                             APPLY_STACK_INIT_SIZE;
+        struct ApplyStackFrame *new_frames;
+        if (new_capacity < stack->capacity) return 0; /* wrapped around */
+        new_frames = B_REALLOC(stack->frames, struct ApplyStackFrame,
+                               new_capacity);
+        if (!new_frames) return 0; /* allocation failed */
         stack->frames = new_frames;
         stack->capacity = new_capacity;
     }
+    stack->top++;
     return 1; /* success */
 }
 
@@ -62,16 +65,16 @@ static int stack_push(struct ApplyStack *stack) {
 }
 
 static void stack_pop(struct ApplyStack *stack) {
-    if (stack->top >= 0) stack->top--;
+    if (stack->top > 0) stack->top--;
 }
 
 static struct ApplyStackFrame *stack_current(struct ApplyStack *stack) {
-    if (stack->top >= 0) return &stack->frames[stack->top];
+    if (stack->top > 0) return &stack->frames[stack->top - 1];
     return 0;
 }
 
 static struct ApplyStackFrame *stack_parent(struct ApplyStack *stack) {
-    if (stack->top >= 1) return &stack->frames[stack->top - 1];
+    if (stack->top > 1) return &stack->frames[stack->top - 2];
     return 0;
 }
 
@@ -167,7 +170,7 @@ static int check_terminal_binary(bddp *f, bddp *g, unsigned char op,
         break;
 
     default:
-        break;
+        err("apply_binary_iterative: unknown opcode", op, ExceptionType::InternalError);
     }
 
     return 0;
@@ -208,11 +211,14 @@ static int check_cache_binary(bddp f, bddp g, unsigned char op,
  * Store result in cache
  * An h of bddnull means out of memory; that is not a property of (op, f, g)
  * and bddgc() never clears such an entry, so it must not be cached.
+ * The slot is recomputed from (op, f, g): a getnode() run for a child frame
+ * may have enlarged the cache since key was taken, and the old key then
+ * names a slot the lookup never visits (see APPLY_CACHE_STORE).
  */
 static void store_cache(bddp key, unsigned char op, bddp f, bddp g, bddp h) {
     struct B_CacheTable *cachep;
     if(key != bddnull && h != bddnull) {
-        cachep = Cache + key;
+        cachep = Cache + B_CACHEKEY(op, f, g);
         cachep->op = op;
         B_SET_BDDP(cachep->f, f);
         B_SET_BDDP(cachep->g, g);
@@ -230,10 +236,10 @@ static void get_children_binary(bddp f, bddp g,
     bddvar flev, glev;
 
     *z = 0;
-    fp = B_NP(f);
-    flev = B_CST(f)? 0: Var[B_VAR_NP(fp)].lev;
-    gp = B_NP(g);
-    glev = B_CST(g)? 0: Var[B_VAR_NP(gp)].lev;
+    fp = B_CST(f)? 0: B_NP(f);
+    flev = fp? Var[B_VAR_NP(fp)].lev: 0;
+    gp = B_CST(g)? 0: B_NP(g);
+    glev = gp? Var[B_VAR_NP(gp)].lev: 0;
     *f0 = f; *f1 = f;
     *g0 = g; *g1 = g;
 
@@ -274,6 +280,18 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
     int need_negate;
     bddp final_result = bddnull;
 
+    /* A trivial case is answered before the stack exists: every root call
+       used to allocate APPLY_STACK_INIT_SIZE frames first, even for
+       bddand(f, bddfalse).  The check may normalize f and g (swap, XOR
+       negation); the root frame repeats it from the original operands, so
+       they are restored. */
+    {
+        bddp f_in = f, g_in = g;
+        if (check_terminal_binary(&f, &g, op, skip, &result, &need_negate))
+            return result;
+        f = f_in; g = g_in;
+    }
+
     stack_init(&stack);
 
     /* Push initial frame */
@@ -292,7 +310,7 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
     frame->result = bddnull;
 
     try {
-    while (stack.top >= 0) {
+    while (stack.top > 0) {
         frame = stack_current(&stack);
 
         switch (frame->state) {
@@ -454,7 +472,7 @@ bddp apply_binary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip
            exception.  The frames of the abandoned traversal own the node
            references in their h0/h1 fields; release them so the nodes do not
            stay pinned against bddgc() forever, then release the stack. */
-        for (int i = 0; i <= stack.top; i++) {
+        for (bddp i = 0; i < stack.top; i++) {
             bddfree(stack.frames[i].h1);
             bddfree(stack.frames[i].h0);
         }
@@ -531,9 +549,14 @@ static int check_terminal_unary(bddp *f, bddp g, unsigned char op,
         }
         fp = B_NP(*f); flev = Var[B_VAR_NP(fp)].lev;
         glev = Var[(bddvar)g].lev;
+        /* getnode() reports memory exhaustion by exception, and the
+           references taken below are local to this function -- the handler
+           of the caller only knows the h0/h1 of its frames -- so they are
+           released here, as the recursive version does. */
         if(flev < glev) {
             B_RFC_INC_NP(fp);
-            h = getzddp((bddvar)g, bddfalse, *f);
+            try { h = getzddp((bddvar)g, bddfalse, *f); }
+            catch(...) { bddfree(*f); throw; }
             if(h == bddnull) bddfree(*f);
             *result = h;
             return 1;
@@ -544,7 +567,8 @@ static int check_terminal_unary(bddp *f, bddp g, unsigned char op,
             if(B_NEG(*f)^B_NEG(h1)) h1 = B_NOT(h1);
             if(!B_CST(h0)) { fp = B_NP(h0); B_RFC_INC_NP(fp); }
             if(!B_CST(h1)) { fp = B_NP(h1); B_RFC_INC_NP(fp); }
-            h = getzddp((bddvar)g, h0, h1);
+            try { h = getzddp((bddvar)g, h0, h1); }
+            catch(...) { bddfree(h1); bddfree(h0); throw; }
             if(h == bddnull) { bddfree(h0); bddfree(h1); }
             *result = h;
             return 1;
@@ -561,7 +585,7 @@ static int check_terminal_unary(bddp *f, bddp g, unsigned char op,
         break;
 
     default:
-        break;
+        err("apply_unary_iterative: unknown opcode", op, ExceptionType::InternalError);
     }
 
     return 0;
@@ -575,6 +599,9 @@ static int check_cache_unary(bddp f, bddp g, unsigned char op,
     struct B_NodeTable *fp;
     struct B_CacheTable *cachep;
 
+    /* f is a node: the terminal check answers every constant, and a frame
+       with skip = 1 carries the node of a negation rule */
+    assert(!B_CST(f));
     fp = B_NP(f);
     if(B_RFC_ONE_NP(fp)) {
         *key = bddnull;
@@ -602,54 +629,25 @@ static int check_cache_unary(bddp f, bddp g, unsigned char op,
  * An h of bddnull means out of memory and must not be cached (see store_cache).
  */
 static void store_cache_unary(bddp key, unsigned char op, bddp f, bddp g, bddp h) {
-    struct B_CacheTable *cachep;
-    bddp key2;
-
     if(key == bddnull || h == bddnull) return;
 
-    cachep = Cache + key;
-    cachep->op = op;
-    B_SET_BDDP(cachep->f, f);
-    B_SET_BDDP(cachep->g, g);
-    B_SET_BDDP(cachep->h, h);
+    store_cache(key, op, f, g, h);
 
-    /* Additional cache entries for related operations */
+    /* Additional cache entries for related operations, see apply_unary() */
     if(h == f) switch(op) {
     case BC_AT0:
-        key2 = B_CACHEKEY(BC_AT1, f, g);
-        cachep = Cache + key2;
-        cachep->op = BC_AT1;
-        B_SET_BDDP(cachep->f, f);
-        B_SET_BDDP(cachep->g, g);
-        B_SET_BDDP(cachep->h, h);
+        store_cache(key, BC_AT1, f, g, h);
         break;
     case BC_AT1:
-        key2 = B_CACHEKEY(BC_AT0, f, g);
-        cachep = Cache + key2;
-        cachep->op = BC_AT0;
-        B_SET_BDDP(cachep->f, f);
-        B_SET_BDDP(cachep->g, g);
-        B_SET_BDDP(cachep->h, h);
+        store_cache(key, BC_AT0, f, g, h);
         break;
     case BC_OFFSET:
-        key2 = B_CACHEKEY(BC_ONSET, f, g);
-        cachep = Cache + key2;
-        cachep->op = BC_ONSET;
-        B_SET_BDDP(cachep->f, f);
-        B_SET_BDDP(cachep->g, g);
-        B_SET_BDDP(cachep->h, bddfalse);
+        store_cache(key, BC_ONSET, f, g, bddfalse);
         break;
     default:
         break;
     }
-    if(h == bddfalse && op == BC_ONSET) {
-        key2 = B_CACHEKEY(BC_OFFSET, f, g);
-        cachep = Cache + key2;
-        cachep->op = BC_OFFSET;
-        B_SET_BDDP(cachep->f, f);
-        B_SET_BDDP(cachep->g, g);
-        B_SET_BDDP(cachep->h, f);
-    }
+    if(h == bddfalse && op == BC_ONSET) store_cache(key, BC_OFFSET, f, g, f);
 }
 
 /*
@@ -678,6 +676,13 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     int term_result;
     bddp final_result = bddnull;
 
+    /* as apply_binary_iterative(): trivial cases before the stack exists */
+    {
+        bddp f_in = f;
+        if (check_terminal_unary(&f, g, op, skip, &result) == 1) return result;
+        f = f_in;
+    }
+
     stack_init(&stack);
 
     /* Push initial frame */
@@ -696,7 +701,7 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     frame->result = bddnull;
 
     try {
-    while (stack.top >= 0) {
+    while (stack.top > 0) {
         frame = stack_current(&stack);
 
         switch (frame->state) {
@@ -748,12 +753,12 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                 if (frame->op == BC_LSHIFT) {
                     newlev = flev + (bddvar)frame->g;
                     if (newlev > VarUsed || newlev < flev) {
-                        err("apply: Invalid shift", newlev, ExceptionType::OutOfRange);
+                        err("apply_unary_iterative: Invalid shift", newlev, ExceptionType::OutOfRange);
                     }
                 } else {
                     newlev = flev - (bddvar)frame->g;
                     if (newlev == 0 || newlev > flev) {
-                        err("apply: Invalid shift", newlev, ExceptionType::OutOfRange);
+                        err("apply_unary_iterative: Invalid shift", newlev, ExceptionType::OutOfRange);
                     }
                 }
                 frame->v = bddvaroflev(newlev);
@@ -865,7 +870,7 @@ bddp apply_unary_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
            exception.  The frames of the abandoned traversal own the node
            references in their h0/h1 fields; release them so the nodes do not
            stay pinned against bddgc() forever, then release the stack. */
-        for (int i = 0; i <= stack.top; i++) {
+        for (bddp i = 0; i < stack.top; i++) {
             bddfree(stack.frames[i].h1);
             bddfree(stack.frames[i].h0);
         }
@@ -919,7 +924,7 @@ static int check_terminal_count(bddp *f, unsigned char op,
         break;
 
     default:
-        break;
+        err("apply_count_iterative: unknown opcode", op, ExceptionType::InternalError);
     }
 
     return 0;
@@ -931,55 +936,43 @@ static int check_terminal_count(bddp *f, unsigned char op,
 static int check_cache_count(bddp f, unsigned char op, bddp *key, bddp *result) {
     struct B_NodeTable *fp;
     struct B_CacheTable *cachep;
+    /* BC_CARD2 shares the BC_CARD slot; every count entry is keyed under
+       bddfalse as its g */
     unsigned char cache_op = (op == BC_CARD2) ? BC_CARD : op;
-    (void)cache_op; /* Used below */
 
+    /* f is a node, see check_cache_unary() */
+    assert(!B_CST(f));
     fp = B_NP(f);
     if(B_RFC_ONE_NP(fp)) {
         *key = bddnull;
         return 0;
     }
 
-    if (op == BC_SUPPORT) {
-        *key = B_CACHEKEY(op, f, bddfalse);
-    } else {
-        *key = B_CACHEKEY(cache_op, f, bddfalse);
-    }
+    *key = B_CACHEKEY(cache_op, f, bddfalse);
     cachep = Cache + *key;
+    if(cachep->op != cache_op ||
+       f != B_GET_BDDP(cachep->f) ||
+       bddfalse != B_GET_BDDP(cachep->g)) return 0;
 
+    *result = B_GET_BDDP(cachep->h);
     if (op == BC_SUPPORT) {
-        if(cachep->op == op &&
-           f == B_GET_BDDP(cachep->f) &&
-           bddfalse == B_GET_BDDP(cachep->g)) {
-            *result = B_GET_BDDP(cachep->h);
-            if(!B_CST(*result) && *result != bddnull) {
-                fp = B_NP(*result);
-                B_RFC_INC_NP(fp);
-            }
-            return 1;
+        if(!B_CST(*result) && *result != bddnull) {
+            fp = B_NP(*result);
+            B_RFC_INC_NP(fp);
         }
-    } else if (op == BC_CARD2) {
-        if(cachep->op == BC_CARD &&
-           f == B_GET_BDDP(cachep->f) &&
-           bddfalse == B_GET_BDDP(cachep->g)) {
-            *result = B_GET_BDDP(cachep->h);
-            if(*result != bddnull) return 1;
-        }
-    } else {
-        if(cachep->op == op &&
-           f == B_GET_BDDP(cachep->f) &&
-           bddfalse == B_GET_BDDP(cachep->g)) {
-            *result = B_GET_BDDP(cachep->h);
-            /* BC_CARD2 shares this slot under op = BC_CARD, and its result can
-               be a reference into the multi-precision table, i.e. a value above
-               bddnull.  Such an entry is meaningless as a plain count, so
-               report it as saturated instead of handing the reference back. */
-            if(*result > bddnull) *result = bddnull;
-            return 1;
-        }
+        return 1;
     }
-
-    return 0;
+    if (op == BC_CARD2) {
+        /* a plain-count entry of bddnull is a saturated count, which the
+           multi-precision count has to recompute */
+        return (*result != bddnull);
+    }
+    /* BC_CARD2's result can be a reference into the multi-precision table,
+       i.e. a value above bddnull.  Such an entry is meaningless as a plain
+       count, so report it as saturated instead of handing the reference
+       back. */
+    if(*result > bddnull) *result = bddnull;
+    return 1;
 }
 
 /*
@@ -1011,6 +1004,13 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     int term_result;
     bddp final_result = bddnull;
 
+    /* as apply_binary_iterative(): trivial cases before the stack exists */
+    {
+        bddp f_in = f;
+        if (check_terminal_count(&f, op, skip, &result) == 1) return result;
+        f = f_in;
+    }
+
     stack_init(&stack);
 
     /* Push initial frame */
@@ -1029,7 +1029,7 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
     frame->result = bddnull;
 
     try {
-    while (stack.top >= 0) {
+    while (stack.top > 0) {
         frame = stack_current(&stack);
 
         switch (frame->state) {
@@ -1110,7 +1110,9 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                     frame->result = B_MP_NULL;
                     goto pop_frame;
                 }
-            } else if (frame->h0 == bddnull && frame->op != BC_LEN) {
+            } else if (frame->h0 == bddnull) {
+                /* a saturated count (BC_CARD/LIT/LEN) or a failed BC_SUPPORT
+                   allocation; either way the result is bddnull */
                 frame->result = bddnull;
                 goto pop_frame;
             }
@@ -1236,7 +1238,9 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                         size2 = mpt->size << 1;
                         /* Table index space exhausted: not an allocation
                            failure, so MPAllocFailSize is left untouched. */
-                        if(size2 > (B_CST_MASK>>B_MP_LWID)) {
+                        /* the last index of the widest table is kept out of
+                           use: its reference would coincide with B_MP_NULL */
+                        if(size2 >= (B_CST_MASK>>B_MP_LWID)) {
                             frame->result = B_MP_NULL;
                             break;
                         }
@@ -1269,28 +1273,33 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
                 break;
 
             case BC_LEN:
-                {
+                /* a saturated length stays saturated: bddnull + 1 is the
+                   constant bddfalse, which used to win the comparison */
+                if (frame->h1 >= bddnull) frame->result = bddnull;
+                else {
                     bddp h1_plus = frame->h1 + 1;
                     frame->result = (frame->h0 < h1_plus) ? h1_plus : frame->h0;
                 }
                 break;
 
             default:
-                frame->result = bddnull;
-                break;
+                err("apply_count_iterative: unknown opcode", frame->op, ExceptionType::InternalError);
             }
 
             /* Store in cache */
             /* A B_MP_NULL result of BC_CARD2 only means that the
-               multi-precision table could not be grown; it is not a property
-               of f, so it must not be cached. */
+               multi-precision table could not be grown, and a bddnull result
+               of BC_SUPPORT would be a failed allocation; neither is a
+               property of f, so neither is cached.  The slot is recomputed,
+               see store_cache(). */
             if (frame->key != bddnull &&
-                !(frame->op == BC_CARD2 && frame->result == B_MP_NULL)) {
-                struct B_CacheTable *cachep = Cache + frame->key;
-                if (frame->op == BC_CARD2)
-                    cachep->op = BC_CARD;
-                else
-                    cachep->op = frame->op;
+                !(frame->op == BC_CARD2 && frame->result == B_MP_NULL) &&
+                !(frame->op == BC_SUPPORT && frame->result == bddnull)) {
+                unsigned char cache_op =
+                    (frame->op == BC_CARD2)? BC_CARD: frame->op;
+                struct B_CacheTable *cachep =
+                    Cache + B_CACHEKEY(cache_op, frame->f, bddfalse);
+                cachep->op = cache_op;
                 B_SET_BDDP(cachep->f, frame->f);
                 B_SET_BDDP(cachep->g, bddfalse);
                 B_SET_BDDP(cachep->h, frame->result);
@@ -1330,7 +1339,7 @@ bddp apply_count_iterative(bddp f, bddp g, unsigned char op, unsigned char skip)
         /* As in the other iterative applies, but only the BC_SUPPORT frames
            hold node references in h0/h1; the other count operations keep
            plain numbers there, which must never reach bddfree(). */
-        for (int i = 0; i <= stack.top; i++) {
+        for (bddp i = 0; i < stack.top; i++) {
             if (stack.frames[i].op == BC_SUPPORT) {
                 bddfree(stack.frames[i].h1);
                 bddfree(stack.frames[i].h0);
@@ -1372,7 +1381,7 @@ static int check_terminal_special(bddp f, bddp *g, unsigned char op,
         break;
 
     default:
-        break;
+        err("apply_special_iterative: unknown opcode", op, ExceptionType::InternalError);
     }
 
     return 0;
@@ -1387,6 +1396,13 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
     struct ApplyStackFrame *frame, *parent;
     bddp result;
     bddp final_result = bddnull;
+
+    /* as apply_binary_iterative(): trivial cases before the stack exists */
+    {
+        bddp g_in = g;
+        if (check_terminal_special(f, &g, op, skip, &result)) return result;
+        g = g_in;
+    }
 
     stack_init(&stack);
 
@@ -1406,7 +1422,7 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
     frame->result = bddnull;
 
     try {
-    while (stack.top >= 0) {
+    while (stack.top > 0) {
         frame = stack_current(&stack);
 
         switch (frame->state) {
@@ -1429,6 +1445,9 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
             get_children_binary(frame->f, frame->g,
                                 &frame->f0, &frame->f1, &frame->g0, &frame->g1,
                                 &frame->v, &frame->z);
+            if (frame->z)
+                err("apply_special_iterative: ZDD node in a BDD operation",
+                    frame->f, ExceptionType::InternalError);
 
             /* For COFACTOR, check for single-side recursion */
             if (frame->op == BC_COFACTOR) {
@@ -1590,7 +1609,8 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
             store_cache(frame->key, frame->op, frame->f, frame->g, frame->result);
             goto pop_frame;
 
-        case 4: /* COFACTOR single recursion: result is direct */
+        case 4: /* single recursion of COFACTOR (one side) and UNIV
+                   (f0 == f1): the child's result is the result */
             frame->result = frame->h0;
             /* Store in cache */
             store_cache(frame->key, frame->op, frame->f, frame->g, frame->result);
@@ -1621,7 +1641,7 @@ bddp apply_special_iterative(bddp f, bddp g, unsigned char op, unsigned char ski
            exception.  The frames of the abandoned traversal own the node
            references in their h0/h1 fields; release them so the nodes do not
            stay pinned against bddgc() forever, then release the stack. */
-        for (int i = 0; i <= stack.top; i++) {
+        for (bddp i = 0; i < stack.top; i++) {
             bddfree(stack.frames[i].h1);
             bddfree(stack.frames[i].h0);
         }

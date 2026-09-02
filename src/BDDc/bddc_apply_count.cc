@@ -9,14 +9,35 @@
 namespace sapporobdd {
 
 bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
-/* Counting operations: BC_CARD, BC_CARD2, BC_LIT, BC_LEN, BC_SUPPORT */
-/* Returns numeric value or bddnull if overflow */
+/* Counting operations: BC_CARD, BC_CARD2, BC_LIT, BC_LEN, BC_SUPPORT.
+   BC_CARD, BC_LIT and BC_LEN return a number, with bddnull standing for a
+   count that does not fit (a saturated count is a property of f and is
+   cached).  BC_CARD2 returns a number or a reference into the
+   multi-precision table, with B_MP_NULL for a table that could not be
+   grown.  BC_SUPPORT returns a node; its memory exhaustion is reported by
+   BDDOutOfMemoryException like every node-producing operation.  skip = 1 is
+   the second half of the BC_CARD negation rule; f is then a node.
+   g is ignored: BC_SUPPORT is keyed under bddfalse whatever g arrives, so
+   that this version and the iterative one share their cache entries. */
 {
   struct B_NodeTable *fp;
   struct B_CacheTable *cachep;
   bddp key, f0, f1, h0, h1, h;
   bddvar v;
   char z;
+
+  (void)g;
+  switch(op)
+  {
+  case BC_CARD:
+    break;
+  case BC_SUPPORT: case BC_CARD2: case BC_LIT: case BC_LEN:
+    if(skip)
+      err("apply_count: skip is defined for BC_CARD only", op, ExceptionType::InternalError);
+    break;
+  default:
+    err("apply_count: unknown opcode", op, ExceptionType::InternalError);
+  }
 
   /* Check terminal case */
   if(!skip) switch(op)
@@ -30,7 +51,9 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
     if(B_CST(f)) return (f == bddfalse)? 0: 1;
     if(B_NEG(f))
     {
+      BDD_RECUR_INC;
       h = apply(B_NOT(f), bddfalse, op, 1);
+      BDD_RECUR_DEC;
       return (h >= bddnull)? bddnull: h+1;
     }
     break;
@@ -50,11 +73,12 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   default:
-    err("apply_count: unknown opcode", op, ExceptionType::InternalError);
     break;
   }
 
-  /* Non-trivial operations */
+  /* Non-trivial operations.  f is a node: the terminal cases answer every
+     constant, and skip = 1 only arrives with the node of the negation rule. */
+  assert(!B_CST(f));
   fp = B_NP(f);
 
   switch(op)
@@ -64,11 +88,11 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
     else
     {
       /* Checking Cache */
-      key = B_CACHEKEY(op, f, g);
+      key = B_CACHEKEY(op, f, bddfalse);
       cachep = Cache + key;
       if(cachep->op == op &&
          f == B_GET_BDDP(cachep->f) &&
-         g == B_GET_BDDP(cachep->g))
+         bddfalse == B_GET_BDDP(cachep->g))
       {
         /* Hit */
         h = B_GET_BDDP(cachep->h);
@@ -131,7 +155,7 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
     err("apply_count: unknown opcode", op, ExceptionType::InternalError);
   }
 
-  /* Stack overflow limitter */
+  /* Stack overflow limiter */
   BDD_RECUR_INC;
 
   /* Get result */
@@ -230,8 +254,10 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
       {
         size2 = mpt->size << 1;
         /* Table index space exhausted: not an allocation failure, so
-           MPAllocFailSize is left untouched. */
-        if(size2 > (B_CST_MASK>>B_MP_LWID)) { h = B_MP_NULL; break; }
+           MPAllocFailSize is left untouched.  The last index of the widest
+           table is kept out of use: its reference would coincide with
+           B_MP_NULL. */
+        if(size2 >= (B_CST_MASK>>B_MP_LWID)) { h = B_MP_NULL; break; }
         wp = B_MALLOC(bddp, mp.len * size2);
         if(!wp)
         {
@@ -260,35 +286,34 @@ bddp apply_count(bddp f, bddp g, unsigned char op, unsigned char skip)
     break;
 
   case BC_LEN:
+    /* a saturated length (bddnull) stays saturated: bddnull + 1 is the
+       constant bddfalse, which used to win the comparison as a length */
     h0 = apply(f0, bddfalse, op, 0);
-    h1 = apply(f1, bddfalse, op, 0) + 1;
+    h1 = apply(f1, bddfalse, op, 0);
+    if(h0 >= bddnull || h1 >= bddnull) { h = bddnull; break; }
+    h1 += 1;
     h = (h0 < h1)? h1: h0;
     break;
 
   default:
     err("apply_count: unknown opcode", op, ExceptionType::InternalError);
-    h = bddnull;
-    break;
   }
 
-  /* Stack overflow limitter */
+  /* Stack overflow limiter */
   BDD_RECUR_DEC;
 
-  /* Saving to Cache */
-  /* A B_MP_NULL result of BC_CARD2 only means that the multi-precision table
-     could not be grown; it is not a property of f, so it must not be cached. */
-  if(key != bddnull && !(op == BC_CARD2 && h == B_MP_NULL))
+  /* Saving to Cache.  A B_MP_NULL result of BC_CARD2 only means that the
+     multi-precision table could not be grown, and a bddnull result of
+     BC_SUPPORT would be a failed allocation: neither is a property of f, so
+     neither is cached.  The slot is recomputed, see APPLY_CACHE_STORE. */
+  if(key != bddnull && !(op == BC_CARD2 && h == B_MP_NULL)
+     && !(op == BC_SUPPORT && h == bddnull))
   {
-    cachep = Cache + key;
-    if(op == BC_CARD2)
-      cachep->op = BC_CARD;
-    else
-      cachep->op = op;
+    unsigned char cache_op = (op == BC_CARD2)? BC_CARD: op;
+    cachep = Cache + B_CACHEKEY(cache_op, f, bddfalse);
+    cachep->op = cache_op;
     B_SET_BDDP(cachep->f, f);
-    if(op == BC_SUPPORT)
-      B_SET_BDDP(cachep->g, g);
-    else
-      B_SET_BDDP(cachep->g, bddfalse);
+    B_SET_BDDP(cachep->g, bddfalse);
     B_SET_BDDP(cachep->h, h);
   }
 

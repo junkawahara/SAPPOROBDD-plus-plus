@@ -9,15 +9,32 @@
 namespace sapporobdd {
 
 bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
-/* Unary operations: BC_AT0, BC_AT1, BC_OFFSET, BC_ONSET, BC_CHANGE, BC_LSHIFT, BC_RSHIFT */
-/* g is typically a variable index, not a BDD */
-/* Returns bddnull if not enough memory */
+/* Unary operations: BC_AT0, BC_AT1, BC_OFFSET, BC_ONSET, BC_CHANGE,
+   BC_LSHIFT, BC_RSHIFT.  g is a variable index (or a shift count), not a
+   BDD.  Memory exhaustion is reported by BDDOutOfMemoryException from
+   getnode(); the function never returns bddnull (the bddnull tests below
+   are only a defence).  skip = 1 is the second half of a negation rule and
+   is defined for AT0/AT1/OFFSET and LSHIFT/RSHIFT only; f is then a node.
+   BC_AT0/BC_AT1 apply the BDD negative-edge rule (a negated f negates the
+   1-edge); bddat0()/bddat1() refuse ZDD nodes for that reason. */
 {
   struct B_NodeTable *fp;
   struct B_CacheTable *cachep;
   bddp key, f0, f1, h0, h1, h;
   bddvar v, flev, glev;
   char z;
+
+  switch(op)
+  {
+  case BC_AT0: case BC_AT1: case BC_OFFSET: case BC_LSHIFT: case BC_RSHIFT:
+    break;
+  case BC_ONSET: case BC_CHANGE:
+    if(skip)
+      err("apply_unary: skip is not defined for this opcode", op, ExceptionType::InternalError);
+    break;
+  default:
+    err("apply_unary: unknown opcode", op, ExceptionType::InternalError);
+  }
 
   /* Check terminal case */
   if(!skip) switch(op)
@@ -46,10 +63,13 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
       if(!B_CST(h)) { fp = B_NP(h); B_RFC_INC_NP(fp); }
       return h;
     }
-    /* Check negation */
+    /* Check negation.  The frame is counted while the positive operand is
+       computed, see apply_binary(). */
     if(B_NEG(f))
     {
+      BDD_RECUR_INC;
       h = apply(B_NOT(f), g, op, 1);
+      BDD_RECUR_DEC;
       if(h == bddnull) return bddnull;
       return B_NOT(h);
     }
@@ -111,18 +131,22 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
     /* Check negation */
     if(B_NEG(f))
     {
+      BDD_RECUR_INC;
       h = apply(B_NOT(f), g, op, 1);
+      BDD_RECUR_DEC;
       if(h == bddnull) return bddnull;
       return B_NOT(h);
     }
     break;
 
   default:
-    err("apply_unary: unknown opcode", op, ExceptionType::InternalError);
     break;
   }
 
-  /* Non-trivial operations */
+  /* Non-trivial operations.  f is a node here: the terminal cases above
+     answer every constant, and skip = 1 only arrives with the node of a
+     negation rule. */
+  assert(!B_CST(f));
   fp = B_NP(f);
   if(B_RFC_ONE_NP(fp)) key = bddnull;
   else
@@ -144,13 +168,14 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
   /* Get (f0, f1) */
   APPLY_GET_CHILDREN_UNARY(f, fp, f0, f1, v, z);
 
-  /* Stack overflow limitter */
+  /* Stack overflow limiter */
   BDD_RECUR_INC;
 
   /* Get result node.  The recursions and get{b,z}ddp() report memory
      exhaustion by exception, which would skip the bddfree() calls below;
      the references held in h0/h1 are released on the way out instead of
-     leaking and pinning their nodes against bddgc() forever. */
+     leaking and pinning their nodes against bddgc() forever.  See
+     apply_binary() for what this relies on. */
   h0 = bddnull;
   h1 = bddnull;
   try
@@ -181,13 +206,13 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
       {
         newlev = flev + (bddvar)g;
         if(newlev > VarUsed || newlev < flev)
-          err("apply: Invalid shift", newlev, ExceptionType::OutOfRange);
+          err("apply_unary: Invalid shift", newlev, ExceptionType::OutOfRange);
       }
       else
       {
         newlev = flev - (bddvar)g;
         if(newlev == 0 || newlev > flev)
-          err("apply: Invalid shift", newlev, ExceptionType::OutOfRange);
+          err("apply_unary: Invalid shift", newlev, ExceptionType::OutOfRange);
       }
       v = bddvaroflev(newlev);
     }
@@ -201,8 +226,6 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
 
   default:
     err("apply_unary: unknown opcode", op, ExceptionType::InternalError);
-    h = bddnull;
-    break;
   }
   }
   catch(...)
@@ -212,58 +235,32 @@ bddp apply_unary(bddp f, bddp g, unsigned char op, unsigned char skip)
     throw;
   }
 
-  /* Stack overflow limitter */
+  /* Stack overflow limiter */
   BDD_RECUR_DEC;
 
   /* Saving to Cache */
-  /* h == bddnull means out of memory; not a property of (op, f, g),
-     so it must not be cached (see APPLY_CACHE_STORE). */
+  APPLY_CACHE_STORE(key, op, f, g, h, cachep);
   if(key != bddnull && h != bddnull)
   {
-    cachep = Cache + key;
-    cachep->op = op;
-    B_SET_BDDP(cachep->f, f);
-    B_SET_BDDP(cachep->g, g);
-    B_SET_BDDP(cachep->h, h);
-    /* Additional cache entries for related operations */
+    /* Additional cache entries for related operations: at0(f, v) == f means
+       f does not depend on v, so at1(f, v) == f as well; offset(f, v) == f
+       means no set contains v, so onset(f, v) is empty, and the converse. */
     if(h == f) switch(op)
     {
     case BC_AT0:
-      key = B_CACHEKEY(BC_AT1, f, g);
-      cachep = Cache + key;
-      cachep->op = BC_AT1;
-      B_SET_BDDP(cachep->f, f);
-      B_SET_BDDP(cachep->g, g);
-      B_SET_BDDP(cachep->h, h);
+      APPLY_CACHE_STORE(key, BC_AT1, f, g, h, cachep);
       break;
     case BC_AT1:
-      key = B_CACHEKEY(BC_AT0, f, g);
-      cachep = Cache + key;
-      cachep->op = BC_AT0;
-      B_SET_BDDP(cachep->f, f);
-      B_SET_BDDP(cachep->g, g);
-      B_SET_BDDP(cachep->h, h);
+      APPLY_CACHE_STORE(key, BC_AT0, f, g, h, cachep);
       break;
     case BC_OFFSET:
-      key = B_CACHEKEY(BC_ONSET, f, g);
-      cachep = Cache + key;
-      cachep->op = BC_ONSET;
-      B_SET_BDDP(cachep->f, f);
-      B_SET_BDDP(cachep->g, g);
-      B_SET_BDDP(cachep->h, bddfalse);
+      APPLY_CACHE_STORE(key, BC_ONSET, f, g, bddfalse, cachep);
       break;
     default:
       break;
     }
     if(h == bddfalse && op == BC_ONSET)
-    {
-      key = B_CACHEKEY(BC_OFFSET, f, g);
-      cachep = Cache + key;
-      cachep->op = BC_OFFSET;
-      B_SET_BDDP(cachep->f, f);
-      B_SET_BDDP(cachep->g, g);
-      B_SET_BDDP(cachep->h, f);
-    }
+      APPLY_CACHE_STORE(key, BC_OFFSET, f, g, f, cachep);
   }
 
   return h;
