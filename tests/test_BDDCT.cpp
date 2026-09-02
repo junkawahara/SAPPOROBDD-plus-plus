@@ -1443,8 +1443,8 @@ static void test_stress_fixed_seed(void)
 /* ---- the stack overflow limitter in the cost recursions ----
    CLE/CLE0/MinC/MaxC recurse once per ZDD level; without BDD_RECUR_INC a
    diagram deeper than the stack crashed the process instead of raising the
-   usual limit error.  The recursion counter stays raised when the guard
-   throws, so it is reset by hand here, as test_mp_oom.cpp does. */
+   usual limit error.  BDDerr() resets the recursion counter when the guard
+   throws; the resets below only make the tests independent of that. */
 
 static void test_deep_recursion_guard(void)
 {

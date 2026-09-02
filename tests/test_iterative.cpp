@@ -76,11 +76,11 @@ void test_init() {
 
     // Memory allocation for tests
 #ifdef B_EXTEND
-    size_t memory_bytes = (size_t)512 * 1024 * 1024; // 512MB for B_EXTEND mode
-    BDD_Init(1024, memory_bytes, 1.0);
+    size_t node_limit = (size_t)512 * 1024 * 1024; // node limit for B_EXTEND mode
+    BDD_Init(1024, node_limit, 1.0);
 #else
-    size_t memory_bytes = (size_t)256 * 1024 * 1024; // 256MB for standard mode
-    BDD_Init(512, memory_bytes, 1.0);
+    size_t node_limit = (size_t)256 * 1024 * 1024; // node limit for standard mode
+    BDD_Init(512, node_limit, 1.0);
 #endif
 
     std::cout << "BDD system initialized" << endl;
@@ -144,14 +144,14 @@ void test_deep_recursion_no_overflow() {
         for (int i = 1; i <= DEEP_SIZE; ++i) {
             deep_z = deep_z.Change(i);
             if (i % 2000 == 0) {
-                // Note: Cannot call Size() here as it uses recursion with BDD_RECUR_INC
                 std::cout << "  Progress: " << i << " variables added" << endl;
             }
         }
         end = clock();
         std::cout << "  Deep ZDD built in " << double(end - start) / CLOCKS_PER_SEC << " seconds" << endl;
-        // Note: Size() and Len() use recursive functions with BDD_RECUR_INC limit,
-        // so we cannot call them on very deep ZDDs
+        // Size() (and the counting operations) walk the graph iteratively
+        // when the recursive walk would not fit into the recursion budget,
+        // so they can be called on a ZDD this deep.
 
         test_result("Built deep ZDD with 10000 variables using iterative Change()", true);
 
@@ -668,7 +668,7 @@ void test_stress_high_variables() {
             big_union = big_union + zdds[i];
         }
 
-        // Perform many intersection operations
+        // Union a few more, then intersect with the big union
         ZDD big_intersect = zdds[0];
         for (size_t i = 1; i < min((size_t)5, zdds.size()); ++i) {
             big_intersect = big_intersect + zdds[i];

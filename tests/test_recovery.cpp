@@ -57,9 +57,9 @@ static void test_no_leak_after_oom(void)
 static void test_recursion_counter_recovers(void)
 {
   BDD_Init(256, 40000000);
-  /* 8600 variables keep count()/apply() recursive in this build only up to
-     the recursion limit of 8192, so a conjunction chain this deep makes the
-     BDD+ recursion of Smooth() hit the limit and throw. */
+  /* With 8600 variables the C core walks and applies iteratively, but the
+     BDD+ recursion of Smooth() has no iterative form, so a conjunction chain
+     this deep makes it hit the recursion limit of 8192 and throw. */
   const int n = 8600;
   for(int i=0; i<n; i++) BDD_NewVar();
   int caught = 0;

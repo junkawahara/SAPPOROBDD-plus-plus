@@ -36,7 +36,7 @@ endif
 
 SOURCES = test_ZBDD.cpp test_ZBDD_Hash.cpp ../src/BDD+/BDD.cc $(BDDC_SRCS) $(ZDD_SRC)
 
-HEADERS = ../include/BDD.h ../include/bddc.h
+HEADERS = ../include/BDD.h ../include/bddc.h ../include/BDDException.h
 # Dynamically add the appropriate ZDD source file
 ifneq ($(wildcard ../include/ZDD.h),)
     HEADERS += ../include/ZDD.h
@@ -362,7 +362,7 @@ test_iterative: $(TARGETS_ITERATIVE)
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_ZBDD_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator test_iterative_deep test_iterative_deep_extend
+	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_zdd_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator test_iterative_deep test_iterative_deep_extend
 	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_apply_iterative.o bddc_operations.o bddc_io.o bddc_util.o
 	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_apply_iterative_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
 	rm -f bddc_init_iterative.o bddc_node_iterative.o bddc_gc_iterative.o bddc_apply_iterative_forced.o bddc_apply_binary_iterative.o bddc_apply_unary_iterative.o bddc_apply_count_iterative.o bddc_apply_special_iterative.o bddc_apply_iterative_impl.o bddc_operations_iterative.o bddc_io_iterative.o bddc_util_iterative.o

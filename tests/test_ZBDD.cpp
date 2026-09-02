@@ -691,8 +691,8 @@ void test_query_functions() {
     test_result("Card() for unit set returns 1", unit.Card() == 1);
     test_result("Card() for null set returns 0", null.Card() == 0);
 
-    // CardMP16
-    char buffer[256];
+    // CardMP16: 16 words of hexadecimal digits and the null, see bddc.h
+    char buffer[16 * sizeof(bddword) * 2 + 1];
     char* resultCardMP16 = zdd1.CardMP16(buffer);
     test_result("CardMP16() returns string of 4", std::string(resultCardMP16) == "4");
     test_result("CardMP16() for empty set returns string of 0", ZDD(0).CardMP16(buffer) == std::string("0"));
@@ -771,7 +771,7 @@ void test_set_operations() {
     ZDD expectedOnSet0 = buildZDDFromSets({{3}, {1, 5}});
     test_result("OnSet0() keeps sets without variable", z4 == expectedOnSet0);
     test_result("OnSet0() on empty set returns empty", empty.OnSet0(1) == empty);
-    test_result("OnSet0() on unit set returns unit", unit.OnSet0(1) == empty);
+    test_result("OnSet0() on unit set returns empty", unit.OnSet0(1) == empty);
     
     // Change() tests
     ZDD z5 = z1.Change(4);
@@ -1045,6 +1045,81 @@ void test_io_operations() {
     std::cout << endl;
 }
 
+#ifdef ZDD_TEST_HAS_FMEMOPEN
+// Imports a hand-written file through the C-layer importer that ZDD_Import()
+// and BDD_Import() use; returns 1 when it threw a BDDFileFormatException,
+// 2 when it threw anything else, 0 when it succeeded (with the result in z).
+static int import_text(const char* text, bool as_zdd, ZDD* z, BDD* b) {
+    FILE* fp = fmemopen((void*)text, strlen(text), "r");
+    if (!fp) return 2;
+    int r = 0;
+    try {
+        if (as_zdd) *z = ZDD_Import(fp);
+        else *b = BDD_Import(fp);
+    }
+    catch (const BDDFileFormatException&) { r = 1; }
+    catch (const BDDException&) { r = 2; }
+    fclose(fp);
+    return r;
+}
+
+// The importer used to accept files that no exporter writes and build
+// diagrams from them that the operations cannot read correctly.
+static void test_import_validation() {
+    std::cout << "=== Testing import validation ===" << endl;
+    ZDD z;
+    BDD b;
+    char text[256];
+
+    // A node whose child sits at a higher level than the node breaks the
+    // canonical form: two BDDs of one function no longer compare equal.
+    test_result("a 0-edge above its node is a format error",
+                import_text("_i 2\n_o 1\n_n 2\n2 2 F T\n4 1 F 2\n4\n", false, &z, &b) == 1);
+    test_result("a 1-edge above its node is a format error",
+                import_text("_i 2\n_o 1\n_n 2\n2 2 F T\n4 1 2 T\n4\n", true, &z, &b) == 1);
+    test_result("a child at the level of its node is a format error",
+                import_text("_i 2\n_o 1\n_n 2\n2 1 F T\n4 1 F 2\n4\n", false, &z, &b) == 1);
+
+    // The empty-slot mark of the importer's hash table used to double as a
+    // node ID: a reference to it resolved to an uninitialized slot.
+    snprintf(text, sizeof(text), "_i 1\n_o 1\n_n 2\n2 1 F T\n4 1 %llu T\n4\n",
+             (unsigned long long)bddnull);
+    test_result("a reference to the hash sentinel is a format error",
+                import_text(text, false, &z, &b) == 1);
+    snprintf(text, sizeof(text), "_i 1\n_o 1\n_n 1\n%llu 1 F T\nT\n",
+             (unsigned long long)bddnull);
+    test_result("a definition of the hash sentinel is a format error",
+                import_text(text, false, &z, &b) == 1);
+
+    // Odd IDs mean "inverted" in a reference and are never written as a
+    // definition or a 0-edge.
+    test_result("an odd node ID is a format error",
+                import_text("_i 2\n_o 1\n_n 2\n2 1 F T\n3 2 F 2\n3\n", false, &z, &b) == 1);
+    test_result("an odd 0-edge is a format error",
+                import_text("_i 2\n_o 1\n_n 2\n2 1 F T\n4 2 3 T\n4\n", false, &z, &b) == 1);
+    test_result("a reference to an undefined node is a format error",
+                import_text("_i 1\n_o 1\n_n 1\n2 1 F 8\n2\n", false, &z, &b) == 1);
+    test_result("a node defined twice is a format error",
+                import_text("_i 1\n_o 1\n_n 2\n2 1 F T\n2 1 T F\n2\n", false, &z, &b) == 1);
+    snprintf(text, sizeof(text), "_i 1\n_o 1\n_n 1\n2 %d F T\n2\n", BDD_VarUsed() + 5);
+    test_result("a level above the variables in use is a format error",
+                import_text(text, false, &z, &b) == 1);
+    test_result("a truncated file is a format error",
+                import_text("_i 1\n_o 1\n_n 2\n2 1 F T\n", false, &z, &b) == 1);
+
+    // A well-formed file still imports, and a file with more outputs than
+    // the caller asked for yields the first ones.
+    int r = import_text("_i 2\n_o 2\n_n 2\n2 1 F T\n4 2 F 2\n4\n3\n", false, &z, &b);
+    BDD x = BDDvar(BDD_VarOfLev(1)), y = BDDvar(BDD_VarOfLev(2));
+    test_result("a well-formed two-output file imports its first output",
+                r == 0 && b == (x & y));
+    r = import_text("_i 2\n_o 1\n_n 2\n2 1 F T\n4 2 2 T\n4\n", true, &z, &b);
+    test_result("a well-formed ZDD file imports",
+                r == 0 && z == ZDD(1).Change(BDD_VarOfLev(2)) + ZDD(1).Change(BDD_VarOfLev(1)));
+    std::cout << endl;
+}
+#endif
+
 // count() and export_static() borrow the nx field -- the node hash chain
 // pointer -- as a visit flag and rely on reset() to put it back.  If an
 // exception escapes while the flags are still set, Size() silently answers 0,
@@ -1281,6 +1356,76 @@ void test_argument_validation() {
     test_result("BDD_MaxVar is a usable positive VarID bound",
                 BDD_MaxVar > 0 && BDD_VarUsed() <= BDD_MaxVar);
 
+    // The BDD operations refuse a ZDD node instead of applying the BDD
+    // negative-edge rule to it (bddat1() used to answer a set that
+    // OnSet0() disagrees with), and the reverse.
+    threw = false;
+    try { bddfree(bddat0(f.GetID(), v1)); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("bddat0() refuses a ZDD node", threw);
+    threw = false;
+    try { bddfree(bddat1(f.GetID(), v1)); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("bddat1() refuses a ZDD node", threw);
+    threw = false;
+    try { bddfree(bddnot(f.GetID())); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("bddnot() refuses a ZDD node", threw);
+    BDD x = BDDvar(v1), y = BDDvar(v2);
+    threw = false;
+    try { bddfree(bddpush((x & y).GetID(), v1)); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("bddpush() refuses a BDD node", threw);
+    threw = false;
+    try { bddfree(bddoffset((x & y).GetID(), v1)); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("bddoffset() refuses a BDD node", threw);
+
+    // A value-carrying constant is not a diagram.
+    threw = false;
+    try { bddfree(bddchange(bddconst(5), v1)); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("bddchange() refuses a value constant", threw);
+
+    // Univ()/Exist() quantify over a set of variables written as x | y | ...;
+    // a cube x & y used to be quantified over its top variable alone.
+    BDD g = x & y;
+    threw = false;
+    try { g.Univ(x & y); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("Univ() refuses a cube as its variable set", threw);
+    test_result("Univ() over x | y of x & y is 0", g.Univ(x | y) == BDD(0));
+    test_result("Exist() over x | y of x & y is 1", g.Exist(x | y) == BDD(1));
+    test_result("Exist() over x of x & y is y", g.Exist(x) == y);
+    test_result("Univ() over the support is the same as over x | y",
+                g.Univ(g.Support()) == g.Univ(x | y));
+
+    // An int has no error value: Imply() refuses the error BDD instead of
+    // answering 0 for it.
+    threw = false;
+    try { BDD_Imply(BDD(-1), x); } catch (const BDDInvalidBDDValueException&) { threw = true; }
+    test_result("BDD_Imply() refuses the error BDD", threw);
+    test_result("BDD_Imply() still answers for real operands",
+                BDD_Imply(g, x) == 1 && BDD_Imply(x, g) == 0);
+
+    // The user cache refuses the opcodes of the library's own operations.
+    threw = false;
+    try { BDD_CacheInt(1, x.GetID(), y.GetID()); } catch (const BDDOutOfRangeException&) { threw = true; }
+    test_result("BDD_CacheInt() refuses an internal opcode", threw);
+    BDD_CacheEnt(CACHE_OP_USER_START, x.GetID(), y.GetID(), g.GetID());
+    test_result("a user cache entry is read back",
+                BDD_CacheBDD(CACHE_OP_USER_START, x.GetID(), y.GetID()) == g);
+
+    // BDDV::Part() range checks: a negative length or an end past the
+    // vector used to reach the recursion and overflow the stack.
+    BDDV xv(x);
+    threw = false;
+    try { xv.Part(0, -1); } catch (const BDDOutOfRangeException&) { threw = true; }
+    test_result("BDDV::Part() refuses a negative length", threw);
+    threw = false;
+    try { xv.Part(1, 1); } catch (const BDDOutOfRangeException&) { threw = true; }
+    test_result("BDDV::Part() refuses a range past the end", threw);
+    test_result("BDDV::Part() still returns the vector itself",
+                xv.Part(0, 1).GetBDD(0) == x);
+
+    // The error BDD prints as such
+    threw = false;
+    try { BDD(-1).Print(); } catch (const BDDException&) { threw = true; }
+    test_result("BDD(-1).Print() prints without throwing", !threw);
+
     std::cout << endl;
 }
 
@@ -1374,7 +1519,7 @@ void test_gc_threshold() {
         // Garbage collection occurs, and 500 nodes are collected,
         // so it should not throw an exception.
     } catch (const BDDOutOfMemoryException& e) {
-        test_result("Garbage collection unexpectedly worked", false);
+        test_result("Garbage collection unexpectedly failed", false);
         return;
     }
 
@@ -1404,7 +1549,7 @@ void test_gc_threshold() {
         // Garbage collection occurs, and 500 nodes are collected,
         // so it should not throw an exception.
     } catch (const BDDOutOfMemoryException& e) {
-        test_result("Garbage collection unexpectedly worked", false);
+        test_result("Garbage collection unexpectedly failed", false);
         return;
     }
 
@@ -1494,8 +1639,8 @@ void test_b_extend_mode() {
     
 #else
     std::cout << "B_EXTEND mode is DISABLED (standard mode)" << endl;
-    std::cout << "Variable ID width: 16 bits" << endl;
-    std::cout << "Reference counter width: 16 bits" << endl;
+    std::cout << "Variable ID width: 20 bits" << endl;
+    std::cout << "Reference counter width: 12 bits" << endl;
     std::cout << "BDD pointer width: 40 bits (64-bit mode)" << endl;
     //std::cout << "Node structure size: " << sizeof(struct B_NodeTable) << " bytes" << endl;
     test_result("Standard mode is active", true);
@@ -1522,6 +1667,9 @@ int main() {
     test_symmetry_operations();
     test_implication_operations();
     test_io_operations();
+#ifdef ZDD_TEST_HAS_FMEMOPEN
+    test_import_validation();
+#endif
     test_aborted_traversal();
     test_external_functions();
     test_edge_cases();
@@ -1545,5 +1693,7 @@ int main() {
     cout << "Passed: " << pass_count << endl;
     cout << "Failed: " << fail_count << endl;
     
-    return 0;
+    /* the other test programs report a failure through the exit status, and
+       "make test" stops on it; this one used to answer 0 whatever happened */
+    return (fail_count > 0)? 1: 0;
 }

@@ -336,6 +336,10 @@ void test_allocatecache() {
                       << ", new CacheSpc: " << CacheSpc << endl;
         }
     }
+    /* The loop above set NodeSpc without touching the node table it
+       describes; put the manager back into a consistent state so that a
+       test added after this one does not write past the real table. */
+    bddinit(1000, 10000);
 }
 
 // Main test function
@@ -344,8 +348,11 @@ int main() {
     std::cout << "Testing setcacheratiovalue and allocatecache functions" << endl;
     
     // Initialize BDD system
-    if (bddinit(1000, 10000)) {
-        std::cerr << "BDD initialization failed" << endl;
+    /* bddinit() reports a failure by exception; its return value is
+       always 0 */
+    try { bddinit(1000, 10000); }
+    catch (const BDDException& e) {
+        std::cerr << "BDD initialization failed: " << e.what() << endl;
         return 1;
     }
     

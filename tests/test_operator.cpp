@@ -201,8 +201,8 @@ void test_b_extend_mode() {
     
 #else
     std::cout << "B_EXTEND mode is DISABLED (standard mode)" << endl;
-    std::cout << "Variable ID width: 16 bits" << endl;
-    std::cout << "Reference counter width: 16 bits" << endl;
+    std::cout << "Variable ID width: 20 bits" << endl;
+    std::cout << "Reference counter width: 12 bits" << endl;
     std::cout << "BDD pointer width: 40 bits (64-bit mode)" << endl;
     //std::cout << "Node structure size: " << sizeof(struct B_NodeTable) << " bytes" << endl;
     test_result("Standard mode is active", true);
@@ -219,11 +219,11 @@ void test_init(double cache_ratio) {
 
     // Initialize BDD package first
 #ifdef B_EXTEND
-    size_t memory_bytes = (size_t)2048 * 1024 * 1024; // 2GB for B_EXTEND mode
-    BDD_Init(1024, memory_bytes, cache_ratio);
+    size_t node_limit = (size_t)2048 * 1024 * 1024; // node limit for B_EXTEND mode
+    BDD_Init(1024, node_limit, cache_ratio);
 #else
-    size_t memory_bytes = (size_t)1024 * 1024 * 1024;
-    BDD_Init(256, memory_bytes, cache_ratio);
+    size_t node_limit = (size_t)1024 * 1024 * 1024; // node limit
+    BDD_Init(256, node_limit, cache_ratio);
 #endif
 
     // Test B_EXTEND mode after initialization
@@ -598,7 +598,7 @@ void test_operator_plus_mixed_sizes() {
     
     // Small ZDD
     vector<vector<int> > smallSets;
-    smallSets.push_back(vector<int>()); // empty set first
+    smallSets.push_back(vector<int>()); // {1, 2} first
     smallSets[0].push_back(1); smallSets[0].push_back(2);
     smallSets.push_back(vector<int>());
     smallSets[1].push_back(3); smallSets[1].push_back(4);
