@@ -46,9 +46,11 @@ int MPCountOverflowed = 0;
 /* ------------------ External functions ------------------ */
 int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
 /* Throws BDDOutOfMemoryException when a table cannot be allocated and
-   BDDOutOfRangeException for an illegal cacheRatio.  The return value is
-   always 0; it only remains for source compatibility with the old interface,
-   which returned 1 instead of throwing. */
+   BDDOutOfRangeException for an illegal cacheRatio: a positive value that is
+   not a power of 2, one outside 1/CACHE_RATIO_MAX..CACHE_RATIO_MAX, or NaN.
+   A cacheRatio of 0 or below selects the default ratio of 0.5.  The return
+   value is always 0; it only remains for source compatibility with the old
+   interface, which returned 1 instead of throwing. */
 {
   bddp   ix;
   bddvar i;
@@ -56,8 +58,10 @@ int bddinit(bddp initsize, bddp limitsize, double cacheRatio)
 
   /* Set cache ratio if specified.  This validates its argument and throws for
      an illegal one, so it runs before any global is touched: a rejected ratio
-     has to leave the running environment exactly as it was. */
-  if(cacheRatio > 0.0) {
+     has to leave the running environment exactly as it was.  NaN compares
+     false with 0.0 and used to slip through to the default as if it were a
+     request for it; setcacheratiovalue() rejects it. */
+  if(cacheRatio > 0.0 || isnan(cacheRatio)) {
     setcacheratiovalue(cacheRatio, "bddinit");
   } else {
     CacheRatio = 0.5; /* Default cache ratio */
@@ -248,7 +252,8 @@ void setcacheratiovalue(double ratio, const char *caller)
 
 /* Sizes the operation cache at CacheRatio times the node table size, rounded
    up to a power of 2, and moves the current entries over.  The cache never
-   grows past B_NODE_MAX/2 entries, so a large node table combined with a
+   grows past 2^37 entries (the smallest power of 2 not below B_NODE_MAX/2,
+   where the search below stops), so a large node table combined with a
    large ratio silently gets a smaller cache than asked for.
    Returns true if the cache is allocated successfully. */
 bool allocatecache()

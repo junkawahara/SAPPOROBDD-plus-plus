@@ -40,52 +40,62 @@ namespace sapporobdd {
 #define BC_LIT        17
 #define BC_LEN        18
 #define BC_CARD2      19
+/* Every internal operation code is below this value.  bddrcache() and
+   bddwcache() refuse smaller codes, so a user-defined operation can never
+   read or overwrite an internal entry; the assertion keeps the two in step
+   when a code is added.  CACHE_OP_USER_START (bddc.h) is the recommended
+   first user code: the codes from BC_OP_LIMIT up to it are accepted for
+   compatibility with programs written against the original SAPPOROBDD
+   documentation, but they may be taken by internal operations one day. */
+#define BC_OP_LIMIT   20
+static_assert(BC_CARD2 < BC_OP_LIMIT, "an internal opcode reached BC_OP_LIMIT");
 
 /* Allocation helpers behind B_MALLOC / B_REALLOC.  They return a null pointer
    when sizeof(type) * count would wrap around size_t, so an implausible
-   element count cannot produce a buffer shorter than the caller asked for. */
-inline void *b_alloc_checked(size_t elemsize, size_t count)
+   element count cannot produce a buffer shorter than the caller asked for.
+   The count is taken as unsigned long long and compared against SIZE_MAX
+   before it is narrowed: the macros used to cast it to size_t first, so on a
+   host where size_t is narrower than bddp (an ILP32 build of the 64bit
+   variant) a count above 2^32 was truncated before the check ever saw it.
+   A count of 0 is rounded up to 1: malloc(0) may return null, which every
+   caller reads as an allocation failure, and realloc(p, 0) may free p. */
+inline void *b_alloc_checked(size_t elemsize, unsigned long long count)
 {
-  if(elemsize != 0 && count > ((size_t)-1) / elemsize) return 0;
-  return malloc(elemsize * count);
+  if(count == 0) count = 1;
+  if(count > (unsigned long long)((size_t)-1)) return 0;
+  if(elemsize != 0 && (size_t)count > ((size_t)-1) / elemsize) return 0;
+  return malloc(elemsize * (size_t)count);
 }
 
-inline void *b_realloc_checked(void *ptr, size_t elemsize, size_t count)
+inline void *b_realloc_checked(void *ptr, size_t elemsize,
+                               unsigned long long count)
 {
-  if(elemsize != 0 && count > ((size_t)-1) / elemsize) return 0;
-  return realloc(ptr, elemsize * count);
+  if(count == 0) count = 1;
+  if(count > (unsigned long long)((size_t)-1)) return 0;
+  if(elemsize != 0 && (size_t)count > ((size_t)-1) / elemsize) return 0;
+  return realloc(ptr, elemsize * (size_t)count);
 }
 
 /* Macros for malloc, realloc.  The element count has to be parenthesised:
    B_MALLOC(char, n*2+1) would otherwise expand to sizeof(char)*n*2+1, which
-   only happens to be right because sizeof(char) is 1. */
+   only happens to be right because sizeof(char) is 1.  B_REALLOC keeps the
+   old block when it fails, so the caller's state stays valid. */
 #define B_MALLOC(type, size) \
-  ((type *)b_alloc_checked(sizeof(type), (size_t)(size)))
+  ((type *)b_alloc_checked(sizeof(type), (unsigned long long)(size)))
 #define B_REALLOC(ptr, type, size) \
-  ((type *)b_realloc_checked((void *)(ptr), sizeof(type), (size_t)(size)))
+  ((type *)b_realloc_checked((void *)(ptr), sizeof(type), \
+                             (unsigned long long)(size)))
 
 /* Printf format of bddp.  bddp is an unsigned type, so the conversions have
    to be unsigned as well: a signed conversion would print node numbers close
    to the top of the range as negative values, which bddimport() could not
-   read back. */
+   read back.  (The B_EXTEND and the default build share the 64bit type.) */
 #ifdef B_32
 #  define B_BDDP_FD "%u"
 #  define B_BDDP_FX "0x%X"
-#elif defined(B_EXTEND)
-#  define B_BDDP_FD "%llu"
-#  define B_BDDP_FX "0x%llX"
 #else
 #  define B_BDDP_FD "%llu"
 #  define B_BDDP_FX "0x%llX"
-#endif
-
-/* strtoul or strtoull (unsigned, to match bddp and B_BDDP_FD) */
-#ifdef B_32
-#  define B_STRTOI strtoul
-#elif defined(B_EXTEND)
-#  define B_STRTOI strtoull
-#else
-#  define B_STRTOI strtoull
 #endif
 
 /* Table spaces */
@@ -109,12 +119,24 @@ static_assert((B_NODE_SPC0 & (B_NODE_SPC0 - 1)) == 0,
 #define B_CST(f)  ((f) & B_CST_MASK)
 #define B_VAL(f)  ((f) & B_VAL_MASK)
 
-/* Conversion of bddp and node index/pointer  */
+/* Conversion of bddp and node index/pointer.  B_NP() is only defined for a
+   non-constant bddp that names a slot of the node table: computing Node +
+   index for an index past the table is undefined pointer arithmetic, and
+   with B_32 the product can wrap around the address space back into the
+   table, so a validity check has to compare indices, not pointers. */
 #define B_NP(f)       (Node+(B_ABS(f)>>1U))
 #define B_NDX(f)      (B_ABS(f)>>1U)
 #define B_BDDP_NP(p)  ((bddp)((p)-Node) << 1U)
+/* True when the non-constant bddp f does not name a live node: its index is
+   outside the node table or the slot is free.  This is the check every API
+   entry point runs on its operands before touching the node. */
+#define B_BAD_NODE(f) (B_NDX(f) >= NodeSpc || Node[B_NDX(f)].varrfc == 0)
 
-/* Read & Write of bddp field in the tables */
+/* Read & Write of bddp field in the tables.  The arguments are evaluated
+   more than once (the default build splits a bddp into a 32bit and an 8bit
+   field), and B_SET_BDDP writes the first half before it reads g again, so
+   the arguments must be plain variables or constants without side effects,
+   and g must not be an expression over the field being assigned. */
 #ifdef B_EXTEND
 #  define B_SET_NXP(p, f, i) (p ## _64 = f ## _64 + i)
 #  define B_GET_BDDP(f) (f ## _64)
@@ -171,25 +193,34 @@ static_assert((B_NODE_SPC0 & (B_NODE_SPC0 - 1)) == 0,
     ((p)->varrfc -= B_RFC_UNIT, 0))
 #endif /* B_EXTEND */
 
-/* ----------- Stack overflow limitter ------------ */
-extern const int BDD_RecurLimit;
-extern int BDD_RecurCount;
-
+/* ----------- Stack overflow limiter ------------ */
+/* BDD_RecurLimit and BDD_RecurCount are declared in bddc.h.  BDD.h carries
+   a copy of these two macros for the BDD+ layer (it cannot include this
+   header, and it reports through BDDerr() instead of err()); the two copies
+   have to be changed together.  The counter is shared by every recursion in
+   the library, so what is left of the budget depends on the caller's depth;
+   b_recursion_fits() below is how the dispatchers take that into account. */
 #define BDD_RECUR_INC \
-  {if(++BDD_RecurCount >= BDD_RecurLimit) \
-    err("BDD_RECUR_INC: Recursion Limit", BDD_RecurCount, ExceptionType::InternalError);}
+  do { if(++BDD_RecurCount >= BDD_RecurLimit) \
+    err("BDD_RECUR_INC: Recursion Limit", BDD_RecurCount, \
+        ExceptionType::InternalError); } while(0)
 #define BDD_RECUR_DEC BDD_RecurCount--
 
-/* Conversion of ZDD node flag */
+/* Conversion of ZDD node flag: a ZDD node stores its 0-edge with the
+   inverter bit set (the negation of a ZDD edge is carried by the parent's
+   edge instead), a BDD node never does. */
 #ifdef B_EXTEND
 #define B_Z_NP(p) ((p)->f0_64 & (bddp_64)B_INV_MASK)
-#elif defined(B_32)
-#define B_Z_NP(p) ((p)->f0_32 & (bddp_32)B_INV_MASK)
 #else
 #define B_Z_NP(p) ((p)->f0_32 & (bddp_32)B_INV_MASK)
 #endif
 
-/* Hash Functions */
+/* Hash Functions.  The reduction "& (size-1U)" is a modulo only while the
+   table size is a non-zero power of 2; the allocators keep every hash table
+   and the operation cache that way (B_HASH_SPC0 doubled, B_NODE_SPC0
+   doubled), and B_CACHEKEY must not be evaluated before the cache exists.
+   The arguments are evaluated several times, so they have to be plain
+   variables or constants. */
 #define B_HASHKEY(f0, f1, hashSpc) \
   (((B_CST(f0)? (f0): ((f0)+2U)) \
    ^(B_NEG(f0)? ~((f0)>>1U): ((f0)>>1U))\
@@ -203,6 +234,18 @@ extern int BDD_RecurCount;
    ^((B_CST(g)? (g):((g)+2U))) \
    ^((B_NEG(g)? ~((g)>>1U):((g)>>1U))*4369U) )\
    & (CacheSpc-1U))
+
+/* The widest count the rfc field of an RFC-table entry can hold: 32 bits
+   with B_32, the 40 bits of the split field in the default build, 64 bits
+   with B_EXTEND.  rfc_inc_ovf() refuses to go past it instead of wrapping
+   the count to 0. */
+#ifdef B_32
+#  define B_RFCT_MAX 0xFFFFFFFFU
+#elif defined(B_EXTEND)
+#  define B_RFCT_MAX (~0ULL)
+#else
+#  define B_RFCT_MAX ((1ULL << 40U) - 1ULL)
+#endif
 
 /* Multi-Precision Count */
 #define B_MP_LWID 4U
@@ -278,9 +321,9 @@ struct B_CacheTable
   bddp_32       f_32; /* an operand BDD */
   bddp_32       g_32; /* an operand BDD */
   bddp_32       h_32; /* Result BDD */
-  bddp_h8       f_h8; /* Extention of an operand BDD */
-  bddp_h8       g_h8; /* Extention of an operand BDD */
-  bddp_h8       h_h8; /* Extention of result BDD */
+  bddp_h8       f_h8; /* Extension of an operand BDD */
+  bddp_h8       g_h8; /* Extension of an operand BDD */
+  bddp_h8       h_h8; /* Extension of result BDD */
 #endif
   unsigned char op;   /* Operation code */
 };
@@ -328,7 +371,7 @@ extern bddvar *VarID;             /* VarID reverse table */
 extern bddvar VarUsed;            /* Number of used Var */
 extern bddvar VarSpc;             /* Current Var-table size */
 
-extern struct B_CacheTable *Cache; /* Opeartion cache */
+extern struct B_CacheTable *Cache; /* Operation cache */
 extern bddp CacheSpc;              /* Current cache size */
 extern double CacheRatio;          /* Cache size ratio to node table size */
 extern bddp GCThreshold;           /* GC threshold - minimum freed nodes for successful GC */
@@ -354,6 +397,19 @@ extern bddp MPAllocFailSize;
    through B_MP_NULL and bddcardmp16() reports it at the API boundary. */
 extern int MPCountOverflowed;
 
+/* True when a recursion that descends at most one level per call and starts
+   now fits into what is left of the recursion budget.  The recursive apply
+   and traversal routines are used only when this holds; otherwise the
+   iterative versions, which keep their stack on the heap, take over.  Testing
+   VarUsed alone against the limit used to leave no headroom: an apply started
+   from inside a BDD+ recursion, or the AND nested inside BC_UNIV, ran out of
+   budget on inputs the iterative version handles.  Every threshold in the
+   library is derived from BDD_RecurLimit through this one test. */
+inline int b_recursion_fits(void)
+{
+  return (long long)BDD_RecurCount + (long long)VarUsed < (long long)BDD_RecurLimit;
+}
+
 /* ----- Declaration of internal functions ------ */
 /* Error handling.  err() never returns: it always throws the BDDException
    subclass that corresponds to exType.  The int return type is kept only so
@@ -365,12 +421,20 @@ extern int MPCountOverflowed;
 int  rfc_inc_ovf(struct B_NodeTable *np);
 int  rfc_dec_ovf(struct B_NodeTable *np);
 
-/* Table management */
+/* Table management.  var_enlarge() and hash_enlarge() throw
+   BDDOutOfMemoryException when they cannot grow their table and leave it as
+   it was; node_enlarge() returns 1 instead, because getnode() then falls
+   back to a garbage collection. */
 void var_enlarge(void);
 int  node_enlarge(void);
-int  hash_enlarge(bddvar v);
+void hash_enlarge(bddvar v);
 
-/* Node creation */
+/* Node creation.  v is a variable in use (1..VarUsed); f0 and f1 are valid
+   bddp values, never bddnull, each carrying one reference that the call
+   consumes (a shared node hands them back, a new node keeps them).  The
+   functions never return bddnull: memory exhaustion is reported by
+   BDDOutOfMemoryException, thrown before any reference is consumed, so the
+   caller still owns f0 and f1 and releases them itself. */
 bddp getnode(bddvar v, bddp f0, bddp f1);
 bddp getbddp(bddvar v, bddp f0, bddp f1);
 bddp getzddp(bddvar v, bddp f0, bddp f1);
@@ -381,8 +445,11 @@ bddp apply(bddp f, bddp g, unsigned char op, unsigned char skip);
 /* Garbage collection helper */
 void gc1(struct B_NodeTable *np);
 
-/* Graph traversal */
+/* Graph traversal.  traverse_postorder() calls visit(f, ctx) once for every
+   node reachable from f, children before parents, and leaves the visit flags
+   set; count() also leaves them set.  reset() clears them again. */
 bddp count(bddp f);
+void traverse_postorder(bddp f, void (*visit)(bddp, void *), void *ctx);
 void dump(bddp f);
 void reset(bddp f);
 void reset_aborted(bddp *p, int n, int recur_count);
@@ -402,7 +469,14 @@ int mp_add(struct B_MP *p, bddp ix);
 void setcacheratiovalue(double cacheRatio,
                         const char *caller = "bddsetcacheratio");
 bool allocatecache();
-void fprintf_check(FILE *strm, const char *format, ...);
+/* fprintf() that throws on a write error.  The format attribute lets the
+   compiler check the B_BDDP_FD conversions against their arguments, which
+   change type with the build variant. */
+void fprintf_check(FILE *strm, const char *format, ...)
+#if defined(__GNUC__) || defined(__clang__)
+  __attribute__((format(printf, 2, 3)))
+#endif
+  ;
 
 } // namespace sapporobdd
 

@@ -8,11 +8,21 @@
 
 namespace sapporobdd {
 
+/* The three enlargements below grow their tables with B_REALLOC rather than
+   with a fresh allocation and a copy.  realloc() extends the block in place
+   when it can, and otherwise copies it itself; either way the old and the
+   new table are never both needed at once, which the copy loops required
+   (three times the old node table for a doubling), and that at exactly the
+   moment the tables are enlarged because memory is running short.  A failed
+   realloc() leaves the old block untouched, so every table stays valid when
+   the enlargement is refused.  The error value reported with an enlargement
+   failure is the number of entries the table was to have. */
+
 void var_enlarge()
 {
   bddvar i, newSpc;
   struct B_VarTable *newVar;
-  unsigned int *newVarID;
+  bddvar *newVarID;
 
   /* Get new size */
   if(VarSpc == bddvarmax+1U)
@@ -28,39 +38,17 @@ void var_enlarge()
   if(newSpc > bddvarmax+1) newSpc = bddvarmax+1U;
 #endif
 
-  /* Enlarge space */
-  newVar = 0;
-  newVarID = 0;
-  newVar = B_MALLOC(struct B_VarTable, newSpc);
-  newVarID = B_MALLOC(unsigned int, newSpc);
-  if(newVar && newVarID)
-  {
-    for(i=0; i<VarSpc; i++)
-    {
-      newVar[i].hashSpc = Var[i].hashSpc;
-      newVar[i].hashUsed = Var[i].hashUsed;
-      newVar[i].lev = Var[i].lev;
-      newVarID[i] = VarID[i];
-#ifdef B_EXTEND
-      newVar[i].hash_64 = Var[i].hash_64;
-#elif defined(B_32)
-      newVar[i].hash_32 = Var[i].hash_32;
-#else
-      newVar[i].hash_32 = Var[i].hash_32;
-      newVar[i].hash_h8 = Var[i].hash_h8;
-#endif
-    }
-    free(Var);
-    free(VarID);
-    Var = newVar;
-    VarID = newVarID;
-  }
-  else
-  {
-    if(newVar) free(newVar);
-    if(newVarID) free(newVarID);
-    err("var_enlarge: memory allocation failed", VarSpc, ExceptionType::OutOfMemory);
-  }
+  /* Enlarge space.  If the second table cannot be grown after the first
+     one was, the first keeps its extra capacity: VarSpc still describes the
+     smaller size and the next attempt simply grows both again. */
+  newVar = B_REALLOC(Var, struct B_VarTable, newSpc);
+  if(!newVar)
+    err("var_enlarge: memory allocation failed", newSpc, ExceptionType::OutOfMemory);
+  Var = newVar;
+  newVarID = B_REALLOC(VarID, bddvar, newSpc);
+  if(!newVarID)
+    err("var_enlarge: memory allocation failed", newSpc, ExceptionType::OutOfMemory);
+  VarID = newVarID;
 
   /* Initialize new space */
   for(i=VarSpc; i<newSpc; i++)
@@ -92,37 +80,13 @@ int node_enlarge()
   newSpc = NodeSpc << 1U;
   if(newSpc > NodeLimit) newSpc = NodeLimit;
 
-  /* Enlarge space */
-  newNode = 0;
-  newNode = B_MALLOC(struct B_NodeTable, newSpc);
-  if(newNode)
-  {
-    for(i=0; i<NodeSpc; i++)
-    {
-#ifdef B_EXTEND
-      newNode[i].f0_64 = Node[i].f0_64;
-      newNode[i].f1_64 = Node[i].f1_64;
-      newNode[i].nx_64 = Node[i].nx_64;
-      newNode[i].varrfc = Node[i].varrfc;
-#elif defined(B_32)
-      newNode[i].varrfc = Node[i].varrfc;
-      newNode[i].f0_32 = Node[i].f0_32;
-      newNode[i].f1_32 = Node[i].f1_32;
-      newNode[i].nx_32 = Node[i].nx_32;
-#else
-      newNode[i].varrfc = Node[i].varrfc;
-      newNode[i].f0_32 = Node[i].f0_32;
-      newNode[i].f1_32 = Node[i].f1_32;
-      newNode[i].nx_32 = Node[i].nx_32;
-      newNode[i].f0_h8 = Node[i].f0_h8;
-      newNode[i].f1_h8 = Node[i].f1_h8;
-      newNode[i].nx_h8 = Node[i].nx_h8;
-#endif
-    }
-    free(Node);
-    Node = newNode;
-  }
-  else return 1; /* Not enough memory */
+  /* Enlarge space.  The free slots carry indeterminate f0/f1 fields (only
+     varrfc and nx are initialized); realloc() moves the bytes as they are,
+     which is well defined, whereas the field-by-field copy this replaces
+     read those indeterminate values. */
+  newNode = B_REALLOC(Node, struct B_NodeTable, newSpc);
+  if(!newNode) return 1; /* Not enough memory */
+  Node = newNode;
 
   /* Initialize new space */
   Node[newSpc-1U].varrfc = 0;
@@ -141,8 +105,10 @@ int node_enlarge()
   return 0;
 }
 
-int hash_enlarge(bddvar v)
-/* Throws an exception if not enough memory */
+void hash_enlarge(bddvar v)
+/* Doubles the hash table of variable v and rehashes its chains.  Throws
+   BDDOutOfMemoryException, with the table unchanged, if the new table cannot
+   be allocated; a table that has reached the largest size is left alone. */
 {
   struct B_NodeTable *np, *np0;
   struct B_VarTable *varp;
@@ -160,68 +126,31 @@ int hash_enlarge(bddvar v)
   /* Get new size */
   oldSpc = varp->hashSpc;
   if(oldSpc == B_NODE_MAX + 1U)
-    return 0; /*  Cancel enlarging */
+    return; /*  Cancel enlarging */
   newSpc = oldSpc << 1U;
 
   /* Enlarge space */
 #ifdef B_EXTEND
-  newhash_64 = 0;
-  newhash_64 = B_MALLOC(bddp_64, newSpc);
-  if(newhash_64)
-  {
-    for(i=0; i<varp->hashSpc; i++) newhash_64[i] = varp->hash_64[i];
-    free(varp->hash_64);
-    varp->hash_64 = newhash_64;
-  }
-  else {
-    bddp memsize = sizeof(bddp_64) * newSpc;
-    err("hash_enlarge: not enough memory for hash table", memsize, ExceptionType::OutOfMemory);
-  }
+  newhash_64 = B_REALLOC(varp->hash_64, bddp_64, newSpc);
+  if(!newhash_64)
+    err("hash_enlarge: not enough memory for hash table", newSpc, ExceptionType::OutOfMemory);
+  varp->hash_64 = newhash_64;
 #elif defined(B_32)
-  newhash_32 = 0;
-  newhash_32 = B_MALLOC(bddp_32, newSpc);
-  if(newhash_32)
-  {
-    for(i=0; i<varp->hashSpc; i++) newhash_32[i] = varp->hash_32[i];
-    free(varp->hash_32);
-    varp->hash_32 = newhash_32;
-  }
-  else {
-    bddp memsize = sizeof(bddp_32) * newSpc;
-    err("hash_enlarge: not enough memory for hash table", memsize, ExceptionType::OutOfMemory);
-  }
+  newhash_32 = B_REALLOC(varp->hash_32, bddp_32, newSpc);
+  if(!newhash_32)
+    err("hash_enlarge: not enough memory for hash table", newSpc, ExceptionType::OutOfMemory);
+  varp->hash_32 = newhash_32;
 #else
-  newhash_32 = 0;
-  newhash_h8 = 0;
-  newhash_32 = B_MALLOC(bddp_32, newSpc);
-  newhash_h8 = B_MALLOC(bddp_h8, newSpc);
-  if(newhash_32 && newhash_h8)
-  {
-    for(i=0; i<varp->hashSpc; i++)
-    {
-      newhash_32[i] = varp->hash_32[i];
-      newhash_h8[i] = varp->hash_h8[i];
-    }
-    free(varp->hash_32);
-    free(varp->hash_h8);
-    varp->hash_32 = newhash_32;
-    varp->hash_h8 = newhash_h8;
-  }
-  else
-  {
-    bddp memsize = 0;
-    if(newhash_32) {
-      free(newhash_32);
-    } else {
-      memsize += sizeof(bddp_32) * newSpc;
-    }
-    if(newhash_h8) {
-      free(newhash_h8);
-    } else {
-      memsize += sizeof(bddp_h8) * newSpc;
-    }
-    err("hash_enlarge: not enough memory for hash table", memsize, ExceptionType::OutOfMemory);
-  }
+  /* as in var_enlarge(): a first table grown ahead of a failed second one
+     keeps its capacity, hashSpc still describes the smaller size */
+  newhash_32 = B_REALLOC(varp->hash_32, bddp_32, newSpc);
+  if(!newhash_32)
+    err("hash_enlarge: not enough memory for hash table", newSpc, ExceptionType::OutOfMemory);
+  varp->hash_32 = newhash_32;
+  newhash_h8 = B_REALLOC(varp->hash_h8, bddp_h8, newSpc);
+  if(!newhash_h8)
+    err("hash_enlarge: not enough memory for hash table", newSpc, ExceptionType::OutOfMemory);
+  varp->hash_h8 = newhash_h8;
 #endif
   varp->hashSpc = newSpc;
 
@@ -257,13 +186,17 @@ int hash_enlarge(bddvar v)
       else { B_SET_NXP(p, varp->hash, i); nx = B_GET_BDDP(*p); }
     }
   }
-  return 0;
 }
 
 bddp getnode(bddvar v, bddp f0, bddp f1)
-/* Throws an exception if not enough memory */
+/* Returns the node (v, f0, f1), shared with an existing one when there is
+   one.  Throws BDDOutOfMemoryException if neither a hash table nor a node
+   can be secured.  Preconditions (see bddc_internal.h): v is a variable in
+   use and f0/f1 are valid bddp values carrying one reference each; the
+   elimination and negative-edge rules have been applied by the caller.  The
+   levels of f0 and f1 are not checked here: bddpush() builds SeqBDD nodes,
+   whose children may carry the same or a higher variable. */
 {
-  /* After checking elimination rule & negative edge rule */
   struct B_NodeTable *np, *fp;
   struct B_VarTable *varp;
   bddp ix, nx, key;
@@ -276,28 +209,34 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
   bddp_h8 *p_h8;
 #endif
 
+  assert(v != 0 && v <= VarUsed);
+  assert(f0 != bddnull && f1 != bddnull);
+  assert(B_CST(f0) || !B_BAD_NODE(f0));
+  assert(B_CST(f1) || !B_BAD_NODE(f1));
+
   varp = &Var[v];
   if(varp->hashSpc == 0)
   /* Create hash-table */
   {
 #ifdef B_EXTEND
-    varp->hash_64 = 0;
     varp->hash_64 = B_MALLOC(bddp_64, B_HASH_SPC0);
-    if(!varp->hash_64) err("getnode: not enough memory for hash table", sizeof(bddp_64) * B_HASH_SPC0, ExceptionType::OutOfMemory);
+    if(!varp->hash_64) err("getnode: not enough memory for hash table", B_HASH_SPC0, ExceptionType::OutOfMemory);
 #elif defined(B_32)
-    varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
-    if(!varp->hash_32) err("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0, ExceptionType::OutOfMemory);
+    if(!varp->hash_32) err("getnode: not enough memory for hash table", B_HASH_SPC0, ExceptionType::OutOfMemory);
 #else
-    varp->hash_32 = 0;
     varp->hash_32 = B_MALLOC(bddp_32, B_HASH_SPC0);
-    if(!varp->hash_32) err("getnode: not enough memory for hash table", sizeof(bddp_32) * B_HASH_SPC0, ExceptionType::OutOfMemory);
-    varp->hash_h8 = 0;
+    if(!varp->hash_32) err("getnode: not enough memory for hash table", B_HASH_SPC0, ExceptionType::OutOfMemory);
     varp->hash_h8 = B_MALLOC(bddp_h8, B_HASH_SPC0);
     if(!varp->hash_h8)
     {
+      /* The pointer has to be cleared along with the block: bddinit() frees
+         every non-null hash pointer when it starts over, which is the
+         documented way to recover from this exception, and a dangling one
+         was freed a second time there. */
       free(varp->hash_32);
-      err("getnode: not enough memory for hash table", sizeof(bddp_h8) * B_HASH_SPC0, ExceptionType::OutOfMemory);
+      varp->hash_32 = 0;
+      err("getnode: not enough memory for hash table", B_HASH_SPC0, ExceptionType::OutOfMemory);
     }
 #endif
     for(ix=0; ix<B_HASH_SPC0; ix++)
@@ -320,10 +259,15 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
       if(f0 == B_GET_BDDP(np->f0) &&
          f1 == B_GET_BDDP(np->f1) )
       {
-        /* Sharing equivalent node */
+        /* Sharing equivalent node.  The new reference to np is taken
+           before the references to f0 and f1 are handed back: taking it can
+           throw (a saturated counter needs an RFC-table entry, and the table
+           may fail to grow), and the caller then releases f0 and f1 itself,
+           so they must not have been released here already.  Releasing a
+           valid reference cannot throw. */
+        B_RFC_INC_NP(np);
         if(!B_CST(f0)) { fp = B_NP(f0); B_RFC_DEC_NP(fp); }
         if(!B_CST(f1)) { fp = B_NP(f1); B_RFC_DEC_NP(fp); }
-        B_RFC_INC_NP(np);
         return B_BDDP_NP(np);
       }
       nx = B_GET_BDDP(np->nx);
@@ -336,10 +280,8 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
      otherwise leave the counter permanently too high. */
   if(varp->hashUsed + 1U >= varp->hashSpc)
   {
-    if(hash_enlarge(v)) err("getnode: "
-      "not enough memory for hash table", sizeof(bddp_32) * varp->hashSpc,
-      ExceptionType::OutOfMemory); /* Hash-table overflow */
-    key = B_HASHKEY(f0, f1, varp->hashSpc); /* Enlarge success */
+    hash_enlarge(v); /* throws when it cannot grow the table */
+    key = B_HASHKEY(f0, f1, varp->hashSpc);
   }
 
   /* Check node-table overflow */
@@ -347,9 +289,16 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
   {
     if(node_enlarge())
     {
-      if(bddgc()) err("getnode: "
-        "not enough memory for node table", 0,
-        ExceptionType::OutOfMemory); /* Node-table overflow */
+      /* The table cannot grow, so collect garbage.  bddgc() answers 1 when
+         nothing was freed -- and also when fewer nodes than the GC threshold
+         were freed, although those are free now.  The threshold is the
+         caller's instruction (bddsetgcthreshold()) to give up at that point
+         rather than to go on at the limit with a full sweep of the tables
+         for every handful of nodes, so a collection below it is reported as
+         out of memory even though a slot is available. */
+      if(bddgc())
+        err("getnode: not enough memory for node table", NodeLimit,
+            ExceptionType::OutOfMemory); /* Node-table overflow */
       key = B_HASHKEY(f0, f1, varp->hashSpc);
     }
     /* Node-table enlarged or GC succeeded */
@@ -372,7 +321,8 @@ bddp getnode(bddvar v, bddp f0, bddp f1)
 }
 
 bddp getbddp(bddvar v, bddp f0, bddp f1)
-/* Returns bddnull if not enough memory */
+/* BDD node (v, f0, f1) after the elimination rule and the negative-edge
+   rule.  Never returns bddnull: memory exhaustion is thrown by getnode(). */
 {
   struct B_NodeTable *fp;
 
@@ -384,32 +334,19 @@ bddp getbddp(bddvar v, bddp f0, bddp f1)
   }
 
   /* Negative edge constraint */
-  if(B_NEG(f0))
-  {
-    bddp h;
-
-    h = getnode(v, B_NOT(f0), B_NOT(f1));
-    if(h == bddnull) return bddnull;
-    return B_NOT(h);
-  }
+  if(B_NEG(f0)) return B_NOT(getnode(v, B_NOT(f0), B_NOT(f1)));
   return getnode(v, f0, f1);
 }
 
 bddp getzddp(bddvar v, bddp f0, bddp f1)
-/* Returns bddnull if not enough memory */
+/* ZDD node (v, f0, f1) after the elimination rule and the negative-edge
+   rule.  Never returns bddnull: memory exhaustion is thrown by getnode(). */
 {
   /* Check elimination rule */
   if(f1 == bddfalse) return f0;
 
   /* Negative edge constraint */
-  if(B_NEG(f0))
-  {
-    bddp h;
-
-    h = getnode(v, f0, f1);
-    if(h == bddnull) return bddnull;
-    return B_NOT(h);
-  }
+  if(B_NEG(f0)) return B_NOT(getnode(v, f0, f1));
   return getnode(v, B_NOT(f0), f1);
 }
 
