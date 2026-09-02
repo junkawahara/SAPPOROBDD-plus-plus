@@ -43,10 +43,15 @@ extern const int BDDV_MaxLen;
    compiles. */
 extern const int BDDV_MaxLenImport;
 
-//--------- Stack overflow limitter ---------
+//--------- Stack overflow limiter ---------
+/* The BDD+ copy of the two macros of src/BDDc/bddc_internal.h (which this
+   header cannot include): the same counter and limit, reported through
+   BDDerr() instead of the core's err().  The two copies have to be changed
+   together. */
 #define BDD_RECUR_INC \
-  {if(++BDD_RecurCount >= BDD_RecurLimit) \
-  BDDerr("BDD_RECUR_INC:Stack overflow ", (bddword) BDD_RecurCount, ExceptionType::InternalError);}
+  do { if(++BDD_RecurCount >= BDD_RecurLimit) \
+    BDDerr("BDD_RECUR_INC:Stack overflow ", (bddword) BDD_RecurCount, \
+           ExceptionType::InternalError); } while(0)
 #define BDD_RECUR_DEC BDD_RecurCount--
 
 class BDD

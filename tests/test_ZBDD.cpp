@@ -1121,15 +1121,21 @@ void test_aborted_traversal() {
         test_result("the chain and its subgraph are built",
                     deep_size == (bddword)DEPTH && mid_size == (bddword)(DEPTH - 5));
 
-        // Push the recursion counter close to its limit so that the traversal
-        // of deep is aborted below the level where mid's nodes have already
-        // been marked with the visit flag.
+        // Push the recursion counter close to its limit.  The recursive
+        // traversal would be aborted below the level where mid's nodes have
+        // already been marked; the library notices that the remaining budget
+        // does not cover the variables in use and takes the iterative
+        // traversal instead, which needs no budget.  (The recovery from an
+        // aborted traversal is exercised by test_export_write_error().)
         int saved = BDD_RecurCount;
         BDD_RecurCount = BDD_RecurLimit - 10;
         bool threw = false;
-        try { deep.Size(); } catch (const BDDException&) { threw = true; }
-        test_result("Size() throws when it reaches the recursion limit", threw);
-        test_result("the recursion counter is restored after the failure",
+        bddword size_under_pressure = 0;
+        try { size_under_pressure = deep.Size(); }
+        catch (const BDDException&) { threw = true; }
+        test_result("Size() succeeds when the recursion budget is nearly used up",
+                    !threw && size_under_pressure == deep_size);
+        test_result("the recursion counter is left as it was",
                     BDD_RecurCount == BDD_RecurLimit - 10);
         BDD_RecurCount = saved;
 

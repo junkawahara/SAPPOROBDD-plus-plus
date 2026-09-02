@@ -6,19 +6,22 @@
 
 #include "bddc_internal.h"
 #include <string>
+#include <new>
 
 namespace sapporobdd {
 
 /* ============================================================
- * Threshold for switching to iterative versions
- * Same as APPLY_RECURSION_THRESHOLD in bddc_apply_common.h
+ * Choice between the recursive and the iterative traversals
  *
- * The switch tests VarUsed >= threshold: the recursion limiter throws when
- * the depth counter reaches BDD_RecurLimit (8192), and a graph over exactly
- * 8192 variables legitimately reaches depth 8192, so "VarUsed > 8192" left
- * that one variable count failing on inputs both neighbours handled.
+ * The recursive versions descend one machine frame per level of the graph,
+ * so they are used only while the remaining recursion budget covers the
+ * number of variables -- b_recursion_fits() -- which with an untouched
+ * budget is VarUsed < BDD_RecurLimit.  (The threshold used to be a second
+ * copy of the limit's value, compared against VarUsed alone.)  The public
+ * entry points bddsize(), bdddump() and bddexport() are called from the
+ * top level, but the test holds wherever they are called from.
  * ============================================================ */
-#define UTIL_RECURSION_THRESHOLD 8192
+#define UTIL_USE_ITERATIVE() (!b_recursion_fits())
 
 /* ============================================================
  * Stack structure for iterative traversal
@@ -27,23 +30,25 @@ namespace sapporobdd {
 
 struct UtilStackFrame {
     bddp f;           /* Current node */
-    unsigned char state;  /* 0: init, 1: after f0, 2: after f1 */
     bddp c0;          /* Count from f0 (for count_iterative) */
+    unsigned char state;  /* 0: init, 1: after f0, 2: after f1 */
 };
 
+/* top counts the frames in use; the sizes are bddp so that the doubling
+   below cannot overflow a signed int on a graph over 2^31 levels, and the
+   allocations go through the overflow-checked B_MALLOC/B_REALLOC. */
 struct UtilStack {
     struct UtilStackFrame *frames;
-    int top;
-    int capacity;
+    bddp top;
+    bddp capacity;
 };
 
 static int util_stack_init(struct UtilStack *stack) {
     /* the malloc used to go unchecked, and the first frame write after a
        failure dereferenced the null pointer */
-    stack->frames = (struct UtilStackFrame *)malloc(
-        sizeof(struct UtilStackFrame) * UTIL_STACK_INIT_SIZE);
-    stack->top = -1;
-    stack->capacity = UTIL_STACK_INIT_SIZE;
+    stack->frames = B_MALLOC(struct UtilStackFrame, UTIL_STACK_INIT_SIZE);
+    stack->top = 0;
+    stack->capacity = stack->frames? UTIL_STACK_INIT_SIZE: 0;
     return stack->frames != 0;
 }
 
@@ -55,32 +60,32 @@ static void util_stack_free(struct UtilStack *stack) {
 }
 
 static int util_stack_push(struct UtilStack *stack) {
-    stack->top++;
     if (stack->top >= stack->capacity) {
-        int new_capacity = stack->capacity * 2;
-        struct UtilStackFrame *new_frames = (struct UtilStackFrame *)realloc(
-            stack->frames, sizeof(struct UtilStackFrame) * new_capacity);
-        if (!new_frames) {
-            stack->top--;
-            return 0;
-        }
+        bddp new_capacity = stack->capacity? stack->capacity * 2:
+                                             UTIL_STACK_INIT_SIZE;
+        struct UtilStackFrame *new_frames;
+        if (new_capacity < stack->capacity) return 0; /* wrapped around */
+        new_frames = B_REALLOC(stack->frames, struct UtilStackFrame,
+                               new_capacity);
+        if (!new_frames) return 0;
         stack->frames = new_frames;
         stack->capacity = new_capacity;
     }
+    stack->top++;
     return 1;
 }
 
 static void util_stack_pop(struct UtilStack *stack) {
-    if (stack->top >= 0) stack->top--;
+    if (stack->top > 0) stack->top--;
 }
 
 static struct UtilStackFrame *util_stack_current(struct UtilStack *stack) {
-    if (stack->top >= 0) return &stack->frames[stack->top];
+    if (stack->top > 0) return &stack->frames[stack->top - 1];
     return 0;
 }
 
 static struct UtilStackFrame *util_stack_parent(struct UtilStack *stack) {
-    if (stack->top >= 1) return &stack->frames[stack->top - 1];
+    if (stack->top > 1) return &stack->frames[stack->top - 2];
     return 0;
 }
 
@@ -110,7 +115,7 @@ static bddp count_iterative(bddp f)
     frame->state = 0;
     frame->c0 = 0;
 
-    while (stack.top >= 0) {
+    while (stack.top > 0) {
         frame = util_stack_current(&stack);
         fp = B_NP(frame->f);
 
@@ -126,16 +131,12 @@ static bddp count_iterative(bddp f)
             /* Set visit flag */
             B_SET_BDDP(fp->nx, nx | B_CST_MASK);
 
-            /* Get f0 */
+            /* Get f0.  c0 is 0 from the frame's creation and stays so until
+               the child for f0 reports its count. */
             f0 = B_GET_BDDP(fp->f0);
-            if (B_CST(f0)) {
-                /* f0 is constant, count is 0 */
-                frame->c0 = 0;
-                frame->state = 1;
-                /* Fall through to state 1 */
-            } else {
+            frame->state = 1;
+            if (!B_CST(f0)) {
                 /* Push frame for f0 */
-                frame->state = 1;
                 if (!util_stack_push(&stack)) {
                     util_stack_free(&stack);
                     err("count_iterative: memory allocation failed", 0,
@@ -149,14 +150,14 @@ static bddp count_iterative(bddp f)
                 }
                 break;
             }
-            /* Fall through */
+            /* f0 is constant: nothing to count */
+            /* fall through */
 
         case 1: /* After f0 */
             /* Get f1 */
             f1 = B_GET_BDDP(fp->f1);
             if (B_CST(f1)) {
-                /* f1 is constant, count is 0 */
-                /* Result = c0 + 0 + 1 */
+                /* f1 is constant, count is 0: result = c0 + 0 + 1 */
                 goto return_result;
             } else {
                 /* Push frame for f1 */
@@ -181,36 +182,20 @@ static bddp count_iterative(bddp f)
         continue;
 
     return_zero:
-        /* Return 0 to parent */
-        parent = util_stack_parent(&stack);
-        if (parent) {
-            if (parent->state == 1) {
-                parent->c0 = 0;
-            }
-            /* For state 2, we add 0 to result which is handled in return_result */
-        } else {
-            final_result = 0;
-        }
+        /* An already visited node contributes 0, which is what the parent's
+           accumulator holds for this child anyway; nothing to add. */
+        if (stack.top == 1) final_result = 0;
         util_stack_pop(&stack);
         continue;
 
     return_result:
-        /* Return c0 + c1 + 1 to parent */
-        /* c1 is in the child's return value (already added to parent->c0 or handled) */
+        /* This node's count is c0 (the f0 subtree, added by that child) plus
+           the f1 subtree (added into c0 by that child) plus 1 for itself.
+           A parent in state 1 is waiting for its f0 count, one in state 2
+           for its f1 count; both accumulate into the parent's c0. */
         parent = util_stack_parent(&stack);
         if (parent) {
-            if (parent->state == 1) {
-                /* Parent was waiting for f0 result */
-                parent->c0 = frame->c0 + 1;  /* This node's contribution */
-            } else if (parent->state == 2) {
-                /* Parent was waiting for f1 result */
-                /* Add f1's count to final result: parent->c0 already has f0's count */
-                /* We need to add c1 + 1 (this node) to parent's accumulated count */
-                /* Actually, the current frame IS the child for f1 */
-                /* parent->c0 has count from f0, we need to add count from f1 */
-                /* But we're returning from f1, so we add to parent's c0 */
-                parent->c0 += frame->c0 + 1;
-            }
+            parent->c0 += frame->c0 + 1;
         } else {
             /* Root frame */
             final_result = frame->c0 + 1;
@@ -226,24 +211,28 @@ static bddp count_iterative(bddp f)
  * Iterative version of reset()
  * ============================================================ */
 
-/* Last-resort recursive clear of the visit flags, used only when the heap
-   stack of reset_iterative() cannot be (re)allocated.  Clearing the flags
-   must not fail -- a flag left behind corrupts the node hash chains -- and
-   it cannot allocate either, since it runs exactly when allocation fails;
-   the machine stack is all that is left.  There is no recursion limiter
-   here for the same reason: throwing would abandon the remaining flags. */
-static void reset_fallback(bddp f)
+/* Last-resort clearing of the visit flags, used only when the heap stack of
+   reset_iterative() cannot be (re)allocated.  Clearing the flags must not
+   fail -- a flag left behind corrupts the node hash chains -- and it cannot
+   allocate either, since it runs exactly when allocation fails.  It clears
+   the flag of every node in the table: the flags are only ever set by one
+   traversal at a time (count(), dump() or export), the whole of which is
+   being reset, so no flag is lost that had to survive.  This replaces a
+   recursion on the machine stack, whose depth was the length of the longest
+   path and which crashed the process on a deep graph or a small stack. */
+static void reset_fallback(void)
 {
-    bddp nx;
     struct B_NodeTable *fp;
+    bddp nx;
 
-    if (B_CST(f)) return;
-    fp = B_NP(f);
-    nx = B_GET_BDDP(fp->nx);
-    if (!(nx & B_CST_MASK)) return;
-    B_SET_BDDP(fp->nx, nx & ~B_CST_MASK);
-    reset_fallback(B_GET_BDDP(fp->f0));
-    reset_fallback(B_GET_BDDP(fp->f1));
+    for (fp = Node; fp < Node + NodeSpc; fp++) {
+        if (fp->varrfc == 0) continue;
+        nx = B_GET_BDDP(fp->nx);
+        if (nx & B_CST_MASK) {
+            nx &= ~B_CST_MASK;
+            B_SET_BDDP(fp->nx, nx);
+        }
+    }
 }
 
 static void reset_iterative(bddp f)
@@ -258,7 +247,7 @@ static void reset_iterative(bddp f)
     /* the failure used to be ignored (the malloc was not even checked), and
        the traversal silently stopped with flags still set */
     if (!util_stack_init(&stack)) {
-        reset_fallback(f);
+        reset_fallback();
         return;
     }
     util_stack_push(&stack); /* capacity is fresh; cannot fail */
@@ -266,7 +255,7 @@ static void reset_iterative(bddp f)
     frame->f = f;
     frame->state = 0;
 
-    while (stack.top >= 0) {
+    while (stack.top > 0) {
         frame = util_stack_current(&stack);
         fp = B_NP(frame->f);
 
@@ -291,11 +280,11 @@ static void reset_iterative(bddp f)
                 /* Push frame for f0 */
                 frame->state = 1;
                 if (!util_stack_push(&stack)) {
-                    /* the stack cannot grow: clear the child's subtree with
-                       the last-resort recursion and go on with this frame
-                       (its state is already advanced) */
-                    reset_fallback(f0);
-                    break;
+                    /* the stack cannot grow: clear everything that is left
+                       with the last resort and stop */
+                    util_stack_free(&stack);
+                    reset_fallback();
+                    return;
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -315,8 +304,9 @@ static void reset_iterative(bddp f)
                 /* Push frame for f1 */
                 frame->state = 2;
                 if (!util_stack_push(&stack)) {
-                    reset_fallback(f1);
-                    break;
+                    util_stack_free(&stack);
+                    reset_fallback();
+                    return;
                 }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
@@ -339,29 +329,36 @@ static void reset_iterative(bddp f)
 }
 
 /* ============================================================
- * Iterative version of dump()
+ * Post-order traversal: visit(f, ctx) for every node reachable from f,
+ * children first, each node once.  The visit flags are left set for the
+ * caller to reset(); a visit that throws leaves them set as well, and
+ * reset_aborted() clears them.  dump() and export_static() are the two
+ * users; they used to be two copies of the same traversal, of which only
+ * dump() had an iterative form, so a graph deeper than the recursion limit
+ * could be counted and dumped but not exported.
  * ============================================================ */
-static void dump_iterative(bddp f)
+static void traverse_postorder_iterative(bddp f, void (*visit)(bddp, void *),
+                                         void *ctx)
 {
     struct UtilStack stack;
     struct UtilStackFrame *frame;
     struct B_NodeTable *fp;
     bddp nx, f0, f1;
-    bddvar v;
 
     if (B_CST(f)) return;
 
-    /* as count_iterative(): a failure used to be silent, leaving a partial
-       dump and, for the pushes below, visit flags still set */
+    /* a failure used to be silent, leaving a partial dump and, for the
+       pushes below, visit flags still set */
     if (!util_stack_init(&stack))
-        err("dump_iterative: memory allocation failed", 0,
+        err("traverse_postorder: memory allocation failed", 0,
             ExceptionType::OutOfMemory);
     util_stack_push(&stack); /* capacity is fresh; cannot fail */
     frame = util_stack_current(&stack);
     frame->f = f;
     frame->state = 0;
 
-    while (stack.top >= 0) {
+    try {
+    while (stack.top > 0) {
         frame = util_stack_current(&stack);
         fp = B_NP(frame->f);
 
@@ -377,20 +374,18 @@ static void dump_iterative(bddp f)
             /* Set visit flag */
             B_SET_BDDP(fp->nx, nx | B_CST_MASK);
 
-            /* Get f0 (absolute value for dump) */
-            f0 = B_GET_BDDP(fp->f0);
-            f0 = B_ABS(f0);
+            /* Get f0 (absolute value: the inverter bit of a stored 0-edge
+               is the ZDD flag, not an edge to a different node) */
+            f0 = B_ABS(B_GET_BDDP(fp->f0));
             if (B_CST(f0)) {
                 frame->state = 1;
                 /* Fall through to state 1 */
             } else {
                 /* Push frame for f0 */
                 frame->state = 1;
-                if (!util_stack_push(&stack)) {
-                    util_stack_free(&stack);
-                    err("dump_iterative: memory allocation failed", 0,
+                if (!util_stack_push(&stack))
+                    err("traverse_postorder: memory allocation failed", 0,
                         ExceptionType::OutOfMemory);
-                }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
                     child->f = f0;
@@ -409,11 +404,9 @@ static void dump_iterative(bddp f)
             } else {
                 /* Push frame for f1 */
                 frame->state = 2;
-                if (!util_stack_push(&stack)) {
-                    util_stack_free(&stack);
-                    err("dump_iterative: memory allocation failed", 0,
+                if (!util_stack_push(&stack))
+                    err("traverse_postorder: memory allocation failed", 0,
                         ExceptionType::OutOfMemory);
-                }
                 {
                     struct UtilStackFrame *child = util_stack_current(&stack);
                     child->f = f1;
@@ -423,25 +416,8 @@ static void dump_iterative(bddp f)
             }
             /* Fall through */
 
-        case 2: /* After f1 - now dump this node */
-            /* Dump this node */
-            v = B_VAR_NP(fp);
-            f0 = B_GET_BDDP(fp->f0);
-            f0 = B_ABS(f0);
-            f1 = B_GET_BDDP(fp->f1);
-
-            printf("N");
-            printf(B_BDDP_FD, B_NDX(frame->f));
-            printf(" = [V%d(%d), ", v, Var[v].lev);
-            if(B_CST(f0)) printf(B_BDDP_FD, B_VAL(f0));
-            else { printf("N"); printf(B_BDDP_FD, B_NDX(f0)); }
-            printf(", ");
-            if(B_NEG(f1)) putchar('~');
-            if(B_CST(f1)) printf(B_BDDP_FD, B_ABS(B_VAL(f1)));
-            else { printf("N"); printf(B_BDDP_FD, B_NDX(f1)); }
-            printf("]");
-            if(B_Z_NP(fp)) printf(" #Z");
-            printf("\n");
+        case 2: /* After f1 - now visit this node */
+            visit(frame->f, ctx);
             goto pop_frame;
         }
         continue;
@@ -449,9 +425,51 @@ static void dump_iterative(bddp f)
     pop_frame:
         util_stack_pop(&stack);
     }
+    }
+    catch (...) {
+        util_stack_free(&stack);
+        throw;
+    }
 
     util_stack_free(&stack);
 }
+
+static void traverse_postorder_recursive(bddp f, void (*visit)(bddp, void *),
+                                         void *ctx)
+{
+  bddp nx, f0, f1;
+  struct B_NodeTable *fp;
+
+  if(B_CST(f)) return; /* Constant */
+  fp = B_NP(f);
+
+  /* Check visit flag */
+  nx = B_GET_BDDP(fp->nx);
+  if(nx & B_CST_MASK) return;
+
+  /* Set visit flag */
+  B_SET_BDDP(fp->nx, nx | B_CST_MASK);
+
+  /* Visit its subgraphs recursively */
+  f0 = B_ABS(B_GET_BDDP(fp->f0));
+  f1 = B_GET_BDDP(fp->f1);
+  BDD_RECUR_INC;
+  traverse_postorder_recursive(f0, visit, ctx);
+  traverse_postorder_recursive(f1, visit, ctx);
+  BDD_RECUR_DEC;
+
+  visit(f, ctx);
+}
+
+void traverse_postorder(bddp f, void (*visit)(bddp, void *), void *ctx)
+{
+  if (UTIL_USE_ITERATIVE()) traverse_postorder_iterative(f, visit, ctx);
+  else traverse_postorder_recursive(f, visit, ctx);
+}
+
+/* ============================================================
+ * Public observation functions
+ * ============================================================ */
 
 bddp bddused() { return NodeUsed; }
 
@@ -459,12 +477,11 @@ bddp bddsize(bddp f)
 /* Returns 0 for bddnull */
 {
   bddp num;
-  struct B_NodeTable *fp;
   int recur_count;
 
   if(f == bddnull) return 0;
   if(B_CST(f)) return 0; /* Constant */
-  if((fp=B_NP(f))>=Node+NodeSpc || fp->varrfc == 0)
+  if(B_BAD_NODE(f))
     err("bddsize: Invalid bddp", f, ExceptionType::InvalidBDDValue);
 
   recur_count = BDD_RecurCount;
@@ -475,13 +492,17 @@ bddp bddsize(bddp f)
 }
 
 bddp bddvsize(bddp *p, int lim)
-/* Returns 0 for bddnull */
+/* The number of nodes shared by p[0..lim-1], up to the first bddnull.
+   Returns 0 for bddnull. */
 {
   bddp num;
-  struct B_NodeTable *fp;
   int n, i, recur_count;
 
-  /* Check operand */
+  /* Check operands.  A negative lim used to be read as "no entries" and a
+     null p with a positive lim was dereferenced. */
+  if(lim < 0) err("bddvsize: Invalid lim", 0, ExceptionType::OutOfRange);
+  if(p == 0 && lim > 0)
+    err("bddvsize: Null array", 0, ExceptionType::InvalidBDDValue);
   n = lim;
   for(i=0; i<n; i++)
   {
@@ -490,8 +511,7 @@ bddp bddvsize(bddp *p, int lim)
       n = i;
       break;
     }
-    if(!B_CST(p[i])&&
-       ((fp=B_NP(p[i]))>=Node+NodeSpc || fp->varrfc==0))
+    if(!B_CST(p[i]) && B_BAD_NODE(p[i]))
       err("bddvsize: Invalid bddp", p[i], ExceptionType::InvalidBDDValue);
   }
   num = 0;
@@ -532,44 +552,23 @@ static bddp count_recursive(bddp f)
 
 bddp count(bddp f)
 {
-  /* Use iterative version when variable count exceeds threshold */
-  if (VarUsed >= UTIL_RECURSION_THRESHOLD) {
-    return count_iterative(f);
-  }
+  if (UTIL_USE_ITERATIVE()) return count_iterative(f);
   return count_recursive(f);
 }
 
-/* Recursive version of dump (internal) */
-static void dump_recursive(bddp f)
+/* Prints one node for dump().  The output goes to stdout unchecked; the
+   public entry points test ferror(stdout) once the dump is complete. */
+static void dump_node(bddp f, void *ctx)
 {
-  bddp nx, f0, f1;
-  bddvar v;
-  struct B_NodeTable *fp;
+  struct B_NodeTable *fp = B_NP(f);
+  bddvar v = B_VAR_NP(fp);
+  bddp f0 = B_ABS(B_GET_BDDP(fp->f0));
+  bddp f1 = B_GET_BDDP(fp->f1);
 
-  if(B_CST(f)) return; /* Constant */
-  fp = B_NP(f);
-
-  /* Check visit flag */
-  nx = B_GET_BDDP(fp->nx);
-  if(nx & B_CST_MASK) return;
-
-  /* Set visit flag */
-  B_SET_BDDP(fp->nx, nx | B_CST_MASK);
-
-  /* Dump its subgraphs recursively */
-  v = B_VAR_NP(fp);
-  f0 = B_GET_BDDP(fp->f0);
-  f0 = B_ABS(f0);
-  f1 = B_GET_BDDP(fp->f1);
-  BDD_RECUR_INC;
-  dump_recursive(f0);
-  dump_recursive(f1);
-  BDD_RECUR_DEC;
-
-  /* Dump this node */
+  (void)ctx;
   printf("N");
   printf(B_BDDP_FD, B_NDX(f));
-  printf(" = [V%d(%d), ", v, Var[v].lev);
+  printf(" = [V%u(%u), ", v, Var[v].lev);
   if(B_CST(f0)) printf(B_BDDP_FD, B_VAL(f0));
   else { printf("N"); printf(B_BDDP_FD, B_NDX(f0)); }
   printf(", ");
@@ -583,12 +582,7 @@ static void dump_recursive(bddp f)
 
 void dump(bddp f)
 {
-  /* Use iterative version when variable count exceeds threshold */
-  if (VarUsed >= UTIL_RECURSION_THRESHOLD) {
-    dump_iterative(f);
-    return;
-  }
-  dump_recursive(f);
+  traverse_postorder(f, dump_node, 0);
 }
 
 /* Recursive version of reset (internal) */
@@ -615,12 +609,8 @@ static void reset_recursive(bddp f)
 
 void reset(bddp f)
 {
-  /* Use iterative version when variable count exceeds threshold */
-  if (VarUsed >= UTIL_RECURSION_THRESHOLD) {
-    reset_iterative(f);
-    return;
-  }
-  reset_recursive(f);
+  if (UTIL_USE_ITERATIVE()) reset_iterative(f);
+  else reset_recursive(f);
 }
 
 void reset_aborted(bddp *p, int n, int recur_count)
@@ -646,13 +636,26 @@ void reset_aborted(bddp *p, int n, int recur_count)
 }
 
 int mp_add(struct B_MP *p, bddp ix)
+/* Adds the count ix (a plain number, or a reference into the
+   multi-precision table) to p.  Returns 0 on success and 1 in two cases
+   that the callers treat alike, as "the sum is not available": ix is
+   B_MP_NULL (p is left untouched), or the sum does not fit in B_MP_LMAX
+   words (p is left saturated at all ones and must not be read as a value).
+   A reference that names no table entry is a corrupt handle and is reported
+   as an internal error rather than read out of bounds. */
 {
   int len, i;
   bddp c, *wp;
 
   if(ix == B_MP_NULL) return 1;
   len = B_MP_LEN(ix);
-  if(len) wp = mptable[len-1].word+(B_MP_VAL(ix)*len);
+  if(len)
+  {
+    struct B_MPTable *mpt = &mptable[len-1];
+    if(mpt->word == 0 || B_MP_VAL(ix) >= mpt->used)
+      err("mp_add: invalid mp table reference", ix, ExceptionType::InternalError);
+    wp = mpt->word+(B_MP_VAL(ix)*len);
+  }
   else { wp = &ix; len = 1; }
   while(p->len < len) p->word[p->len++] = 0;
 
@@ -697,30 +700,44 @@ int mp_add(struct B_MP *p, bddp ix)
   /* The whole message has to be built by a single snprintf: every snprintf
      call starts writing at the beginning of the buffer, so a sequence of
      calls (as in the fprintf(stderr, ...) chain this code was derived from)
-     would leave only the last fragment and drop msg and num. */
+     would leave only the last fragment and drop msg and num.  The message
+     carries no trailing newline; that is the caller's to add when printing. */
   snprintf(msg_buf, msg_buf_size,
            "***** ERROR  %s ( " B_BDDP_FX " ) *****\n"
            " NodeLimit : " B_BDDP_FD "\t NodeSpc : " B_BDDP_FD
-           "\t VarSpc : %d\n"
+           "\t VarSpc : %u\n"
            " CacheSpc : " B_BDDP_FD "\t NodeUsed : " B_BDDP_FD
-           "\t VarUsed : %d\n",
+           "\t VarUsed : %u",
            msg, num, NodeLimit, NodeSpc, VarSpc, CacheSpc, NodeUsed, VarUsed);
 
-  std::string errorMsg(msg_buf);
+  /* The exception object holds its message in a std::string, whose
+     construction allocates -- and an out-of-memory error is raised exactly
+     when the heap may be exhausted.  A std::bad_alloc from that construction
+     would escape as an exception this library never promised; it is caught
+     here and replaced by the library's own error, built from a message
+     short enough to need no heap allocation. */
+  try
+  {
+    std::string errorMsg(msg_buf);
 
-  // Throw appropriate exception based on exType
-  switch (exType) {
-    case ExceptionType::InvalidBDDValue:
-      throw BDDInvalidBDDValueException(errorMsg, num);
-    case ExceptionType::OutOfRange:
-      throw BDDOutOfRangeException(errorMsg, num);
-    case ExceptionType::OutOfMemory:
-      throw BDDOutOfMemoryException(errorMsg, num);
-    case ExceptionType::FileFormat:
-      throw BDDFileFormatException(errorMsg, num);
-    case ExceptionType::InternalError:
-    default:
-      throw BDDInternalErrorException(errorMsg, num);
+    // Throw appropriate exception based on exType
+    switch (exType) {
+      case ExceptionType::InvalidBDDValue:
+        throw BDDInvalidBDDValueException(errorMsg, num);
+      case ExceptionType::OutOfRange:
+        throw BDDOutOfRangeException(errorMsg, num);
+      case ExceptionType::OutOfMemory:
+        throw BDDOutOfMemoryException(errorMsg, num);
+      case ExceptionType::FileFormat:
+        throw BDDFileFormatException(errorMsg, num);
+      case ExceptionType::InternalError:
+      default:
+        throw BDDInternalErrorException(errorMsg, num);
+    }
+  }
+  catch(const std::bad_alloc&)
+  {
+    throw BDDOutOfMemoryException("out of memory", num);
   }
 }
 
