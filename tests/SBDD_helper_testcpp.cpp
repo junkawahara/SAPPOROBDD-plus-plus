@@ -25,6 +25,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <limits>
+#include <locale>
+#include <sstream>
 
 #define BDD_CPP
 #include "bddc.h"
@@ -112,6 +115,44 @@ void test_gmp_conversion()
     for (int i = 0; i < 10; ++i) { /* check only for i < 10 */
         test(z[i] == sbddh_llint_to_mpz(static_cast<llint>(z_ullint[i])));
     }
+
+    /* negative values, including both sides of the int boundary and
+       LLONG_MIN, whose absolute value llint cannot represent */
+    test(sbddh_llint_to_mpz(-1) == mpz_class(-1));
+    test(sbddh_llint_to_mpz(-2147483647LL - 1)
+        == mpz_class("-2147483648")); // INT_MIN
+    test(sbddh_llint_to_mpz(-2147483649LL)
+        == mpz_class("-2147483649")); // INT_MIN - 1
+    test(sbddh_llint_to_mpz(-9223372036854775807LL - 1)
+        == mpz_class("-9223372036854775808")); // LLONG_MIN
+}
+
+/* sbddh_llint_to_mpz and sbddh_ullint_to_mpz once formatted a value
+   that does not fit in int or unsigned int into a fresh
+   std::stringstream, which inherits the global C++ locale. A numpunct with digit grouping made the stream
+   write e.g. "2,147,483,648", which the GMP string parser rejects with
+   std::invalid_argument. The conversions must not depend on the global
+   locale, so run the conversion tests again with a grouping locale
+   installed globally. */
+class GroupingNumpunct : public std::numpunct<char> {
+protected:
+    virtual char do_thousands_sep() const { return ','; }
+    virtual std::string do_grouping() const { return "\3"; }
+};
+
+void test_gmp_conversion_with_grouping_locale()
+{
+    std::locale saved = std::locale::global(
+        std::locale(std::locale::classic(), new GroupingNumpunct()));
+    {
+        /* the locale must actually group digits into the form the GMP
+           parser rejects, or this test would check nothing */
+        std::ostringstream ss;
+        ss << 2147483648LL;
+        test(ss.str() == "2,147,483,648");
+    }
+    test_gmp_conversion();
+    std::locale::global(saved);
 }
 
 #endif
@@ -139,7 +180,7 @@ void test_BDD_functions()
     test(isConstant(ZBDD(0)));
     test(isConstant(ZBDD(1)));
     test(!isConstant(b1));
-    test(!isConstant(b1));
+    test(!isConstant(b2));
     test(!isConstant(z1));
     test(!isConstant(z2));
     test(!isConstant(z3));
@@ -149,7 +190,7 @@ void test_BDD_functions()
     test(isTerminal(ZBDD(0)));
     test(isTerminal(ZBDD(1)));
     test(!isTerminal(b1));
-    test(!isTerminal(b1));
+    test(!isTerminal(b2));
     test(!isTerminal(z1));
     test(!isTerminal(z2));
     test(!isTerminal(z3));
@@ -184,6 +225,9 @@ void test_BDD_functions()
     test(!isEmptyMember(z1));
     test(isEmptyMember(z2));
     test(isEmptyMember(z3));
+    /* the error value must not be treated as containing the empty set */
+    test(!isEmptyMember(ZBDD(-1)));
+    test(!isMemberZ(ZBDD(-1), std::vector<bddvar>()));
 
     test_eq(getVar(BDD(0)), 0);
     test_eq(getVar(BDD(1)), 0);
@@ -260,10 +304,22 @@ void test_BDD_functions()
     test_eq(getLev(s5), bddlevofvar(5));
     test_eq(s5.Card(), 1);
 
+    test(getSingleSet(0) == ZBDD(1));
+    test_eq(getSingleSet(0).Card(), 1);
+    test(getSingleSet(0).GetID() == bddsingle);
+
     ZBDD f1 = getSingleSet(2, 1, 2);
     test_eq(f1.Card(), 1);
     test(getChild1(f1) == getSingleton(1));
     test_eq(getVar(f1), 2);
+    /* the order of the arguments does not matter, and duplicated
+       arguments are regarded as one element */
+    test(getSingleSet(2, 2, 1) == f1);
+    test(getSingleSet(4, 2, 1, 2, 1) == f1);
+    fprintf(stderr, "(the following \"out of range\" messages are expected)\n");
+    test(getSingleSet(2, 1, bddvarused() + 1) == ZBDD(-1));
+    test(getSingleSet(std::vector<bddvar>(1, 0)) == ZBDD(-1));
+    fprintf(stderr, "(end of the expected messages)\n");
 
     std::set<bddvar> se1;
     se1.insert(1);
@@ -313,6 +369,29 @@ void test_BDD_functions()
     bps[2] = ZBDD(-1);
     test_eq(countNodes(bps, false), 0);
 
+    /* BDD and ZBDD have no operator<, so a comparator must be given */
+    std::set<ZBDD, DDComparator<ZBDD> > zset;
+    test_eq(countNodes(zset, false), 0);
+    zset.insert(fs[1]);
+    test_eq(countNodes(zset, false), 5);
+    zset.insert(fs[2]);
+    test_eq(countNodes(zset, false), 7);
+    zset.insert(fs[1]); /* already inserted */
+    test_eq(countNodes(zset, false), 7);
+    zset.insert(ZBDD(-1));
+    test_eq(countNodes(zset, false), 0);
+
+    std::set<BDD, DDComparator<BDD> > bset;
+    test_eq(countNodes(bset, false), 0);
+    std::vector<BDD> bvec;
+    for (int i = 0; i < 3; ++i) {
+        BDD bf = exampleBdd(static_cast<ullint>(i));
+        bset.insert(bf);
+        bvec.push_back(bf);
+        test_eq(countNodes(bset, false), countNodes(bvec, false));
+        test_eq(countNodes(bset, true), countNodes(bvec, true));
+    }
+
 #if __cplusplus >= 201103L /* use C++ random class */
     std::mt19937 mt(1);
     for (int i = 0; i < 10; ++i) {
@@ -325,6 +404,14 @@ void test_BDD_functions()
         ZBDD fx = getRandomZBDDWithCard(i * 10 + 5, i * 10 + 10, mt);
         test(fx.Card() == static_cast<unsigned int>(i * 10 + 10));
     }
+
+    /* card == 2^level is the maximum, and larger cards are errors */
+    test(getRandomZBDDWithCard(3, 8, mt).Card() == 8u);
+    test(getRandomZBDDWithCard(3, 9, mt) == ZBDD(-1));
+    test(getRandomZBDDWithCard(0, 1, mt).Card() == 1u);
+    test(getRandomZBDDWithCard(0, 2, mt) == ZBDD(-1));
+    test(getRandomZBDDWithCard(3, 0, mt) == ZBDD(0));
+    test(getRandomZBDDWithCard(3, -1, mt) == ZBDD(-1));
 #endif
 
     ullint rand_state = 31415926535ull;
@@ -339,14 +426,81 @@ void test_BDD_functions()
         ZBDD fx = getRandomZBDDWithCardX(i * 10 + 5, i * 10 + 10, &rand_state);
         test(fx.Card() == static_cast<unsigned int>(i * 10 + 10));
     }
+
+    /* card == 2^level is the maximum, and larger cards are errors */
+    test(getRandomZBDDWithCardX(3, 8, &rand_state).Card() == 8u);
+    test(getRandomZBDDWithCardX(3, 9, &rand_state) == ZBDD(-1));
+    test(getRandomZBDDWithCardX(0, 1, &rand_state).Card() == 1u);
+    test(getRandomZBDDWithCardX(0, 2, &rand_state) == ZBDD(-1));
+    test(getRandomZBDDWithCardX(3, 0, &rand_state) == ZBDD(0));
+    test(getRandomZBDDWithCardX(3, -1, &rand_state) == ZBDD(-1));
+
     {
-        BDD fx = exampleBdd();
-        ZBDD fy = exampleZbdd();
+        /* fixed-vector test: the Xorshift versions are documented to be
+           environment-independent, so a fixed seed must yield the same
+           DD on any compiler (the 0-child consumes the random sequence
+           first). The bit for assignment a is 1 iff the set/assignment
+           {level i : bit i-1 of a is 1} belongs to the generated DD. */
+        const std::string expected_sig =
+            "00101100111000100001000110110011";
+        ullint fixed_state = 31415926535ull;
+        ZBDD fz = getUniformlyRandomZBDDX(5, &fixed_state);
+        std::string zsig;
+        for (int a = 0; a < 32; ++a) {
+            std::vector<bddvar> vs;
+            for (int lev = 1; lev <= 5; ++lev) {
+                if (((a >> (lev - 1)) & 1) != 0) {
+                    vs.push_back(bddvaroflev(lev));
+                }
+            }
+            zsig += (isMemberZ(fz, vs) ? '1' : '0');
+        }
+        test(zsig == expected_sig);
+
+        fixed_state = 31415926535ull;
+        BDD fb = getUniformlyRandomBDDX(5, &fixed_state);
+        std::string bsig;
+        for (int a = 0; a < 32; ++a) {
+            BDD g = fb;
+            for (int lev = 5; lev >= 1; --lev) {
+                int var = bddvaroflev(lev);
+                g = (((a >> (lev - 1)) & 1) != 0 ? g.At1(var) : g.At0(var));
+            }
+            bsig += (g == BDD(1) ? '1' : '0');
+        }
+        /* the BDD signature equals the ZBDD one because both DDs encode
+           the same sequence of random terminal bits */
+        test(bsig == expected_sig);
     }
-    for (int i = 0; i < 10; ++i) {
-        BDD fx = exampleBdd(i);
-        ZBDD fy = exampleZbdd(i);
+
+    /* exampleBdd / exampleZbdd は決定的である: 同じ kind は同じ DD を
+       返し、その DD は文書化されている手続き（kind + 1 を Xorshift の
+       状態とし、3〜8 変数の DD を一様ランダムに構築する）を再現した
+       ものと一致する */
+    for (ullint kind = 0; kind < 10; ++kind) {
+        BDD fx = exampleBdd(kind);
+        ZBDD fy = exampleZbdd(kind);
+        test(fx == exampleBdd(kind));
+        test(fy == exampleZbdd(kind));
+        test(getLev(fx) <= 8);
+        test(getLev(fy) <= 8);
+        {
+            ullint ex_state = kind + 1;
+            ullint ev = sbddextended_getXRand(&ex_state);
+            int ex_size = static_cast<int>((ev % 6) + 3);
+            test(3 <= ex_size && ex_size <= 8);
+            test(fx == getUniformlyRandomBDDX(ex_size, &ex_state));
+        }
+        {
+            ullint ex_state = kind + 1;
+            ullint ev = sbddextended_getXRand(&ex_state);
+            int ex_size = static_cast<int>((ev % 6) + 3);
+            test(fy == getUniformlyRandomZBDDX(ex_size, &ex_state));
+        }
     }
+    /* 既定引数は kind == 0 と同じ */
+    test(exampleBdd() == exampleBdd(0));
+    test(exampleZbdd() == exampleZbdd(0));
 }
 
 void test_at_random_cpp()
@@ -373,7 +527,11 @@ void test_at_random_cpp()
 
     /* make array whose elements are distinct */
     while (sp < N) {
-        c = (((ullint)rand() << 32) | ((ullint)rand())) % w_pow;
+        /* 2^32 is a multiple of w_pow (2^30), so a shift of 32
+           would make the first draw contribute nothing to the
+           remainder; 15 is the smallest number of bits that
+           rand() gives on any implementation. */
+        c = (((ullint)rand() << 15) | ((ullint)rand())) % w_pow;
         if (c == 0) {
             continue;
         }
@@ -403,7 +561,7 @@ void test_at_random_cpp()
     }
 
     for (i = 0; i < 2 * (int)N; ++i) {
-        c = (ullint)rand() & w_pow;
+        c = (ullint)rand() % w_pow;
         found = false;
         for (j = 0; j < (int)N; ++j) {
             if (ar[j] == c) {
@@ -421,6 +579,26 @@ void test_at_random_cpp()
     test(isMemberZ(f, std::vector<bddvar>()));
     test(isMember(f, std::vector<bddvar>()));
 
+    /* ZBDD(-1) contains nothing (and no message is printed) */
+    test(!isMember(ZBDD(-1), std::vector<bddvar>(1, 1)));
+    test(!isMember(ZBDD(-1), std::vector<bddvar>()));
+
+    { /* duplicated variables are regarded as one element */
+        ZBDD dup_f = getSingleSet(2, 1, 2);
+        std::vector<bddvar> dup;
+        dup.push_back(1);
+        dup.push_back(2);
+        dup.push_back(2);
+        test(isMemberZ(dup_f, dup));
+        test(isMember(dup_f, dup));
+
+        dup.clear();
+        dup.push_back(1);
+        dup.push_back(1);
+        test(!isMemberZ(dup_f, dup));
+        test(!isMember(dup_f, dup));
+    }
+
     ofs.open(g_filename1);
     if (!ofs) {
         fprintf(stderr, "file cannot be opened\n");
@@ -430,6 +608,10 @@ void test_at_random_cpp()
     ofs.close();
 
     ifs.open(g_filename1);
+    if (!ifs) {
+        fprintf(stderr, "file cannot be opened\n");
+        exit(1);
+    }
     g = importZBDDAsKnuth(ifs, 0);
     ifs.close();
     if (remove(g_filename1) != 0) {
@@ -448,6 +630,10 @@ void test_at_random_cpp()
     ofs.close();
 
     ifs.open(g_filename1, std::ifstream::binary);
+    if (!ifs) {
+        fprintf(stderr, "file cannot be opened\n");
+        exit(1);
+    }
     g = importZBDDAsBinary(ifs);
     ifs.close();
     if (remove(g_filename1) != 0) {
@@ -456,6 +642,10 @@ void test_at_random_cpp()
     }
 
     test(f == g);
+
+    std::vector<bddvar> emptybv;
+    f = getPowerSet(emptybv);
+    test(f == ZBDD(1));
 
     f = getPowerSetIncluding(3, 2);
     test(f.Card() == 4);
@@ -491,6 +681,28 @@ void test_at_random_cpp()
     test(f.OnSet(4).Card() == 2);
     test(f.OffSet(4).Card() == 2);
 
+    {
+        /* a required variable duplicated in the vector version must not
+           cancel out (two Change calls would remove the variable) */
+        std::vector<bddvar> smallbasev;
+        smallbasev.push_back(2);
+        std::vector<bddvar> duptargetv;
+        duptargetv.push_back(3);
+        duptargetv.push_back(3);
+        f = getPowerSetIncluding(smallbasev, duptargetv);
+        test(f.Card() == 2); /* {3} and {2, 3} */
+        test(f.OnSet(3).Card() == 2);
+        test(f.OffSet(3).Card() == 0);
+        std::set<bddvar> duptargets(duptargetv.begin(), duptargetv.end());
+        test(f == getPowerSetIncluding(smallbasev, duptargets));
+        /* a duplicated variable contained in the base is idempotent */
+        duptargetv.push_back(2);
+        duptargetv.push_back(2);
+        f = getPowerSetIncluding(smallbasev, duptargetv);
+        test(f.Card() == 1); /* {2, 3} */
+        test(f.OnSet(2).Card() == 1);
+        test(f.OnSet(3).Card() == 1);
+    }
 
     f = getPowerSetNotIncluding(3, 2);
     test(f.Card() == 4);
@@ -517,8 +729,29 @@ void test_at_random_cpp()
     f = getPowerSetWithCard(basev, 3);
     test(f.Card() == 1);
 
+    f = getPowerSetWithCard(basev, 4);
+    test(f == ZBDD(0));
+
+    f = getPowerSetWithCard(basev, -1);
+    test(f == ZBDD(0));
+
+    f = getPowerSetWithCard(basev, -2);
+    test(f == ZBDD(0));
+
+    std::vector<bddvar> dupv; /* treated as the set {2, 4} */
+    dupv.push_back(2);
+    dupv.push_back(2);
+    dupv.push_back(4);
+    f = getPowerSetWithCard(dupv, 2);
+    test(f == getSingleSet(2, 2, 4));
+    f = getPowerSetWithCard(dupv, 3);
+    test(f == ZBDD(0));
+
     f = getPowerSetWithCard(5, 2);
     test(f.Card() == 10);
+
+    f = getPowerSetWithCard(5, -1);
+    test(f == ZBDD(0));
 
     f = getPowerSetWithCard(3, 2);
     test(f == getSingleSet(2, 1, 2) +
@@ -532,6 +765,19 @@ void test_at_random_cpp()
     f = makeDontCare(getSingleSet(basev), sv);
     /*printZBDDElements(std::cout, f); */
     test(f.Card() == 8);
+    {
+        /* 範囲外の変数番号はメッセージ付きで ZBDD(-1)、bddnull の f は
+           ZBDD(-1) */
+        std::vector<bddvar> badv;
+        badv.push_back(1);
+        badv.push_back(bddvarused() + 1);
+        fprintf(stderr, "(the following \"out of range\" message is expected)\n");
+        test(makeDontCare(getPowerSet(2), badv) == ZBDD(-1));
+        fprintf(stderr, "(end of the expected message)\n");
+        test(makeDontCare(ZBDD(-1), sv) == ZBDD(-1));
+        test(makeDontCare(ZBDD(0), sv) == ZBDD(0));
+        test(makeDontCare(ZBDD(1), sv) == getPowerSet(sv));
+    }
     test(f.OnSet(3).Card() == 4);
     test(f.OffSet(3).Card() == 4);
     test(f.OnSet(4).Card() == 8);
@@ -559,6 +805,267 @@ void test_io_cpp()
     test(ZStr(ZBDD(-1)) == std::string("N"));
     test(ZStr(ZBDD(0)) == std::string("E"));
     test(ZStr(ZBDD(1)) == std::string("{}"));
+}
+
+/* 空のストリームを読み込んでも、未初期化の buf を参照せずに
+   bddnull を返すことを確認する */
+void test_graphillion_empty_stream_cpp()
+{
+    fprintf(stderr, "(the following \"Unexpected end\" messages are expected)\n");
+
+    {
+        std::stringstream ss;
+        BDD b = importBDDAsGraphillion(ss);
+        test(b.GetID() == bddnull);
+    }
+    {
+        std::stringstream ss;
+        ZBDD f = importZBDDAsGraphillion(ss);
+        test(f.GetID() == bddnull);
+    }
+
+    fprintf(stderr, "(end of the expected messages)\n");
+}
+
+/* printZBDDElementsAsValueList の出力形式を検査する */
+void test_value_list_cpp()
+{
+    ZBDD f = getSingleSet(1, 1) + getSingleSet(2, 2, 3);
+
+    /* 各集合は 0/1 の値列（変数 1..num_of_variables の順、delim2 区切り）
+       として、delim1 区切りで出力される */
+    std::ostringstream oss;
+    printZBDDElementsAsValueList(oss, f, "|", " ", 3);
+    test(oss.str() == std::string("0 1 1|1 0 0"));
+
+    /* 空集合のみの族は全変数 0 の 1 行 */
+    std::ostringstream oss2;
+    printZBDDElementsAsValueList(oss2, ZBDD(1), "|", " ", 3);
+    test(oss2.str() == std::string("0 0 0"));
+
+    /* num_of_variables が範囲外なら何も出力しない */
+    fprintf(stderr, "(the following \"num_of_variables\" message is "
+            "expected)\n");
+    std::ostringstream oss3;
+    printZBDDElementsAsValueList(oss3, f, "|", " ", 0);
+    test(oss3.str().empty());
+    fprintf(stderr, "(end of the expected message)\n");
+}
+
+/* 空の入力は空集合のみからなる集合族 {{}} である（C 版の
+   test_elementsformat_terminal と同じ規則を istream 版で確認する） */
+void test_elementsformat_empty_stream_cpp()
+{
+    {
+        std::stringstream ss("");
+        test(constructZBDDFromElements(ss) == ZBDD(1));
+    }
+    {
+        std::stringstream ss("   ");
+        test(constructZBDDFromElements(ss) == ZBDD(1));
+    }
+    {
+        std::stringstream ss("\n");
+        test(constructZBDDFromElements(ss) == ZBDD(1));
+    }
+    /* 往復: 区切り文字指定版の出力は空であり、読み戻すと {{}} に戻る */
+    {
+        std::stringstream ss;
+        printZBDDElements(ss, ZBDD(1), "\n", " ");
+        test(ss.str().empty());
+        test(constructZBDDFromElements(ss) == ZBDD(1));
+    }
+}
+
+/* ストリームモードでも、長すぎる行や行中の NUL 文字を含む入力は
+   プロセスを終了せずに bddnull を返すことを確認する */
+void test_readline_errors_stream_cpp()
+{
+    fprintf(stderr, "(the following \"line\" messages are expected)\n");
+
+    {
+        std::string longline(2000, '1');
+        longline += "\n";
+        std::stringstream ss(longline);
+        ZBDD f = importZBDDAsGraphillion(ss);
+        test(f.GetID() == bddnull);
+    }
+    {
+        std::string nulline("0 1 B");
+        nulline += '\0';
+        nulline += "T\n.\n";
+        std::stringstream ss(nulline);
+        ZBDD f = importZBDDAsGraphillion(ss);
+        test(f.GetID() == bddnull);
+    }
+
+    fprintf(stderr, "(end of the expected messages)\n");
+
+    /* 事前に failbit が立っている（EOF ではない）ストリームは、正常な
+       EOF や「長すぎる行」ではなく I/O エラーとして扱われ、失敗が
+       有効な結果（空の集合族など）に化けない */
+    fprintf(stderr, "(the following \"I/O error\" messages are expected)\n");
+    {
+        std::stringstream ss("1\n");
+        ss.setstate(std::ios::failbit);
+        ZBDD f = constructZBDDFromElements(ss);
+        test(f.GetID() == bddnull);
+    }
+    {
+        std::stringstream ss("0 1 B\nT\n.\n");
+        ss.setstate(std::ios::failbit);
+        ZBDD f = importZBDDAsGraphillion(ss);
+        test(f.GetID() == bddnull);
+    }
+    fprintf(stderr, "(end of the expected messages)\n");
+}
+
+/* 例外を有効にした istream からのインポート中に送出された例外が、
+   各インポータの catch 節（作業領域と DD 参照を解放して再送出する）を
+   通って正しく伝播することを検査する。elements 形式は正常な入力でも
+   最後の EOF 検出の get() が failbit を立てるため、failbit 例外を
+   有効にすると必ず送出される。解放漏れ自体は ASan ビルドで検査される。 */
+void test_import_stream_exceptions_cpp()
+{
+    /* elements */
+    {
+        std::stringstream ss("1 2\n3\n");
+        ss.exceptions(std::ios::failbit | std::ios::badbit);
+        bool thrown = false;
+        try {
+            ZBDD f = constructZBDDFromElements(ss);
+            (void)f;
+        } catch (const std::ios_base::failure&) {
+            thrown = true;
+        }
+        test(thrown);
+    }
+    /* knuth: 終端のない入力の EOF で getline が failbit を立てる */
+    {
+        std::stringstream ss("#1\n2:0,1\n");
+        ss.exceptions(std::ios::failbit | std::ios::badbit);
+        bool thrown = false;
+        try {
+            ZBDD f = importZBDDAsKnuth(ss, false);
+            (void)f;
+        } catch (const std::ios_base::failure&) {
+            thrown = true;
+        }
+        test(thrown);
+    }
+    /* graphillion */
+    {
+        std::stringstream ss("0 1 B T\n");
+        ss.exceptions(std::ios::failbit | std::ios::badbit);
+        bool thrown = false;
+        try {
+            ZBDD f = importZBDDAsGraphillion(ss);
+            (void)f;
+        } catch (const std::ios_base::failure&) {
+            thrown = true;
+        }
+        test(thrown);
+    }
+    /* binary: 正しい出力の末尾を切り詰め ノード領域の途中で EOF にする */
+    {
+        std::ostringstream oss;
+        ZBDD f = getPowerSet(3);
+        exportZBDDAsBinary(oss, f, false);
+        std::string data = oss.str();
+        test(data.size() > 8);
+        std::stringstream ss(data.substr(0, data.size() - 4));
+        ss.exceptions(std::ios::failbit | std::ios::badbit);
+        bool thrown = false;
+        try {
+            ZBDD g = importZBDDAsBinary(ss);
+            (void)g;
+        } catch (const std::ios_base::failure&) {
+            thrown = true;
+        }
+        test(thrown);
+    }
+}
+
+/* ノードが 1 つも含まれないストリームを読み込んでも、bddnode_buf の
+   領域外を読まずに bddnull を返すことを確認する */
+void test_knuth_empty_stream_cpp()
+{
+    fprintf(stderr, "(the following \"Unexpected end\" messages are expected)\n");
+
+    {
+        std::stringstream ss;
+        BDD b = importBDDAsKnuth(ss, false);
+        test(b.GetID() == bddnull);
+    }
+    {
+        std::stringstream ss;
+        ZBDD f = importZBDDAsKnuth(ss, false);
+        test(f.GetID() == bddnull);
+    }
+    {
+        std::stringstream ss("#1\n");
+        BDD b = importBDDAsKnuth(ss, false);
+        test(b.GetID() == bddnull);
+    }
+    {
+        std::stringstream ss("#1\n");
+        ZBDD f = importZBDDAsKnuth(ss, false);
+        test(f.GetID() == bddnull);
+    }
+
+    fprintf(stderr, "(end of the expected messages)\n");
+}
+
+/* 全ての書き込みを拒否する streambuf */
+class FailingStreambuf : public std::streambuf {
+protected:
+    virtual int_type overflow(int_type) {
+        return traits_type::eof();
+    }
+    virtual std::streamsize xsputn(const char*, std::streamsize) {
+        return 0;
+    }
+};
+
+/* ostream への書き込みが失敗したとき、WriteObject が false を返すことを
+   確認する。数値の overload は書き込み後の状態を調べていなかった。 */
+void test_writeobject_failure_cpp()
+{
+    {
+        FailingStreambuf buf;
+        std::ostream ost(&buf);
+        WriteObject wo(true, false, &ost);
+        test(!wo("abc", NULL));
+        test(!ost);
+    }
+    {
+        FailingStreambuf buf;
+        std::ostream ost(&buf);
+        WriteObject wo(true, false, &ost);
+        test(!wo((unsigned char)1u, NULL));
+        test(!ost);
+    }
+    {
+        FailingStreambuf buf;
+        std::ostream ost(&buf);
+        WriteObject wo(true, false, &ost);
+        test(!wo((unsigned short)1u, NULL));
+        test(!ost);
+    }
+    {
+        FailingStreambuf buf;
+        std::ostream ost(&buf);
+        WriteObject wo(true, false, &ost);
+        test(!wo((unsigned int)1u, NULL));
+        test(!ost);
+    }
+    {
+        FailingStreambuf buf;
+        std::ostream ost(&buf);
+        WriteObject wo(true, false, &ost);
+        test(!wo((ullint)1ull, NULL));
+        test(!ost);
+    }
 }
 
 void test_io_all_func_cpp()
@@ -605,6 +1112,14 @@ void test_io_all_func_cpp()
                 test(b == g1);
             }
         }
+        {
+            /* elements 形式は ZBDD のみに対応している */
+            std::stringstream ss;
+            printZBDDElements(ss, f, "\n", " ");
+            ss.seekg(0);
+            ZBDD g1 = constructZBDDFromElements(ss);
+            test(f == g1);
+        }
         for (int i = 0; i < 2; ++i) {
             std::stringstream ss;
             if (i == 1) {
@@ -640,6 +1155,271 @@ void test_io_all_func_cpp()
     }
 }
 
+/* s の中に部分文字列 sub が現れる回数を返す */
+size_t countSubstring(const std::string& s, const std::string& sub)
+{
+    size_t count = 0;
+    size_t pos = 0;
+
+    while ((pos = s.find(sub, pos)) != std::string::npos) {
+        ++count;
+        pos += sub.size();
+    }
+    return count;
+}
+
+/* filename の内容を文字列として読み込む */
+std::string fileToString(const char* filename)
+{
+    std::ifstream ifs(filename, std::ifstream::binary);
+    if (!ifs) {
+        fprintf(stderr, "file cannot be opened\n");
+        exit(1);
+    }
+    std::ostringstream oss;
+    oss << ifs.rdbuf();
+    return oss.str();
+}
+
+/* graphviz 形式で出力された DD の構造を検査する。
+   size は（否定枝表現を用いない）ノードの個数、height は根のレベル */
+void test_graphviz_content_cpp(const std::string& s, ullint size, int height)
+{
+    test_eq(countSubstring(s, "digraph {"), 1u);
+    /* 1つのノードにつき、ノードの定義行と 0-枝、1-枝の行が出力される */
+    test_eq(countSubstring(s, "shape = circle"), size);
+    test_eq(countSubstring(s, ", style = dotted];"), size);
+    test_eq(countSubstring(s, ", penwidth = 2.5];"), size);
+    /* 各レベルと終端のための rank 行 */
+    test_eq(countSubstring(s, "{rank = same;"), (ullint)height + 1);
+    /* レベルを縦に並べるための不可視のノードと枝 */
+    test_eq(countSubstring(s, "style = invis"), (ullint)height + 2);
+}
+
+/* SVG 形式で出力された DD の構造を検査する */
+void test_svg_content_cpp(const std::string& s, ullint size)
+{
+    test(s.compare(0, 4, "<svg") == 0);
+    test_eq(countSubstring(s, "</svg>"), 1u);
+    /* ノードごとに円と、その中に描かれる変数番号のラベルがある */
+    test_eq(countSubstring(s, "<circle"), size);
+    /* ノードごとに 0-枝と 1-枝の線がある */
+    test_eq(countSubstring(s, "<line"), 2 * size);
+    /* 2つの終端は矩形と、その中に描かれるラベルで表される */
+    test_eq(countSubstring(s, "<rect"), 2u);
+    test_eq(countSubstring(s, "<text"), size + 2);
+}
+
+/* FILE* に出力した内容が、ostream に出力した内容と一致することを確認する */
+void test_export_file_and_stream_cpp(const std::string& s, bool is_zbdd,
+                                        bool is_svg, const ZBDD& f,
+                                        const BDD& b)
+{
+    FILE* fp = test_fopen(g_filename1, "wb");
+    if (is_svg) {
+        if (is_zbdd) {
+            exportZBDDAsSvg(fp, f);
+        } else {
+            exportBDDAsSvg(fp, b);
+        }
+    } else {
+        if (is_zbdd) {
+            exportZBDDAsGraphviz(fp, f);
+        } else {
+            exportBDDAsGraphviz(fp, b);
+        }
+    }
+    fclose(fp);
+
+    test(s == fileToString(g_filename1));
+
+    if (remove(g_filename1) != 0) {
+        fprintf(stderr, "remove failed\n");
+        exit(1);
+    }
+}
+
+void test_graphviz_zbdd_cpp(const ZBDD& f)
+{
+    DDIndex<int> index(f);
+    std::stringstream ss;
+    std::stringstream ss_index;
+
+    exportZBDDAsGraphviz(ss, f);
+    test_graphviz_content_cpp(ss.str(), index.size(), index.height());
+
+    test_export_file_and_stream_cpp(ss.str(), true, false, f, BDD(0));
+
+    /* あらかじめ構築したインデックスを渡しても同じ内容が出力される */
+    exportZBDDAsGraphviz(ss_index, f, NULL, &index);
+    test(ss.str() == ss_index.str());
+}
+
+void test_graphviz_bdd_cpp(const BDD& b)
+{
+    DDIndex<int> index(b);
+    std::stringstream ss;
+    std::stringstream ss_index;
+
+    exportBDDAsGraphviz(ss, b);
+    test_graphviz_content_cpp(ss.str(), index.size(), index.height());
+
+    test_export_file_and_stream_cpp(ss.str(), false, false, ZBDD(0), b);
+
+    exportBDDAsGraphviz(ss_index, b, NULL, &index);
+    test(ss.str() == ss_index.str());
+}
+
+void test_svg_zbdd_cpp(const ZBDD& f)
+{
+    DDIndex<int> index(f);
+    std::stringstream ss;
+    std::stringstream ss_index;
+
+    exportZBDDAsSvg(ss, f);
+    test_svg_content_cpp(ss.str(), index.size());
+
+    test_export_file_and_stream_cpp(ss.str(), true, true, f, BDD(0));
+
+    /* あらかじめ構築したインデックスを渡しても同じ内容が出力される */
+    exportZBDDAsSvg(ss_index, f, NULL, &index);
+    test(ss.str() == ss_index.str());
+}
+
+void test_svg_bdd_cpp(const BDD& b)
+{
+    DDIndex<int> index(b);
+    std::stringstream ss;
+    std::stringstream ss_index;
+
+    exportBDDAsSvg(ss, b);
+    test_svg_content_cpp(ss.str(), index.size());
+
+    test_export_file_and_stream_cpp(ss.str(), false, true, ZBDD(0), b);
+
+    exportBDDAsSvg(ss_index, b, NULL, &index);
+    test(ss.str() == ss_index.str());
+}
+
+void test_graphviz_cpp()
+{
+    ZBDD f = ZBDD_ID(make_test_zbdd());
+    BDD b = (BDDvar(1) & BDDvar(2)) | BDDvar(3);
+    std::stringstream ss;
+
+    /* 終端のみからなる DD では、終端の定義だけが出力される */
+    exportZBDDAsGraphviz(ss, ZBDD(0));
+    test_eq(countSubstring(ss.str(), "digraph {"), 1u);
+    test_eq(countSubstring(ss.str(), "shape = circle"), 0u);
+    test_eq(countSubstring(ss.str(), "t0 [label"), 1u);
+    test_eq(countSubstring(ss.str(), "t1 [label"), 0u);
+
+    std::stringstream ss1;
+    exportZBDDAsGraphviz(ss1, ZBDD(1));
+    test_eq(countSubstring(ss1.str(), "digraph {"), 1u);
+    test_eq(countSubstring(ss1.str(), "shape = circle"), 0u);
+    test_eq(countSubstring(ss1.str(), "t0 [label"), 0u);
+    test_eq(countSubstring(ss1.str(), "t1 [label"), 1u);
+
+    test_graphviz_zbdd_cpp(f);
+    test_graphviz_zbdd_cpp(getPowerSetWithCard(5, 2));
+    test_graphviz_zbdd_cpp(getSingleSet(1, 1));
+    test_graphviz_bdd_cpp(b);
+    test_graphviz_bdd_cpp(BDDvar(1));
+}
+
+void test_svg_cpp()
+{
+    ZBDD f = ZBDD_ID(make_test_zbdd());
+    BDD b = (BDDvar(1) & BDDvar(2)) | BDDvar(3);
+
+    /* 終端のみからなる DD では、根である終端だけが描かれるため、
+       0終端と1終端の出力が区別できる */
+    std::stringstream ss;
+    exportZBDDAsSvg(ss, ZBDD(0));
+    test(ss.str().compare(0, 4, "<svg") == 0);
+    test_eq(countSubstring(ss.str(), "<circle"), 0u);
+    test_eq(countSubstring(ss.str(), "<line"), 0u);
+    test_eq(countSubstring(ss.str(), "<rect"), 1u);
+    test_eq(countSubstring(ss.str(), ">0</text>"), 1u);
+    test_eq(countSubstring(ss.str(), ">1</text>"), 0u);
+
+    std::stringstream ss1;
+    exportZBDDAsSvg(ss1, ZBDD(1));
+    test(ss1.str().compare(0, 4, "<svg") == 0);
+    test_eq(countSubstring(ss1.str(), "<circle"), 0u);
+    test_eq(countSubstring(ss1.str(), "<line"), 0u);
+    test_eq(countSubstring(ss1.str(), "<rect"), 1u);
+    test_eq(countSubstring(ss1.str(), ">0</text>"), 0u);
+    test_eq(countSubstring(ss1.str(), ">1</text>"), 1u);
+
+    test(ss.str() != ss1.str());
+
+    /* 0-終端に到達する枝が 1 本もない ZBDD（{{},{1},{2}}）では、
+       0-終端の矩形が孤立ノードとして描かれない */
+    {
+        std::stringstream ssz;
+        ZBDD g = ZBDD(1) + getSingleSet(1, 1) + getSingleSet(1, 2);
+        exportZBDDAsSvg(ssz, g);
+        test_eq(countSubstring(ssz.str(), "<circle"), 2u);
+        test_eq(countSubstring(ssz.str(), "<rect"), 1u);
+        /* 変数 2, 1 のノードのラベルと 1-終端のラベルのみ
+           （">1</text>" はノードの変数番号 1 と終端 1 の 2 回現れる） */
+        test_eq(countSubstring(ssz.str(), "<text"), 3u);
+        test_eq(countSubstring(ssz.str(), ">0</text>"), 0u);
+        test_eq(countSubstring(ssz.str(), ">1</text>"), 2u);
+    }
+
+    test_svg_zbdd_cpp(f);
+    test_svg_zbdd_cpp(getPowerSetWithCard(5, 2));
+    test_svg_zbdd_cpp(getSingleSet(1, 1));
+    test_svg_bdd_cpp(b);
+    test_svg_bdd_cpp(BDDvar(1));
+
+    fprintf(stderr, "(the following \"bddnull\" / \"does not hold\" "
+            "messages are expected)\n");
+
+    /* bddnull は正当な結果に見える SVG を書かずにエラーを報告する */
+    {
+        std::stringstream ssn;
+        exportZBDDAsSvg(ssn, ZBDD(-1));
+        test(ssn.str().empty());
+    }
+    /* DD を保持しない（bddnull から構築した）DDIndex を渡した場合も
+       エラーを報告して何も書き込まない */
+    {
+        std::stringstream ssn;
+        DDIndex<int> null_index((ZBDD(-1)));
+        exportZBDDAsSvg(ssn, f, NULL, &null_index);
+        test(ssn.str().empty());
+    }
+
+    fprintf(stderr, "(end of the expected messages)\n");
+}
+
+/* The input iterator requirements include a postfix operator++ whose
+   result dereferences to the value before the increment. */
+template <typename InputIterator>
+void check_iterator_postfix(const InputIterator& first,
+                            const InputIterator& last)
+{
+    const int check_th = 1000;
+    InputIterator prefix_itor = first;
+    InputIterator postfix_itor = first;
+    int count = 0;
+    while (postfix_itor != last && count < check_th) {
+        test(prefix_itor != last);
+        typename InputIterator::value_type v = *postfix_itor++;
+        test(v == *prefix_itor);
+        ++prefix_itor;
+        ++count;
+    }
+    if (count < check_th) {
+        test(postfix_itor == last);
+        test(prefix_itor == last);
+    }
+}
+
 void test_index_cpp()
 {
     ZBDD f = ZBDD_ID(make_test_zbdd());
@@ -651,13 +1431,22 @@ void test_index_cpp()
     test_eq(index.sizeAtLevel(2), 2);
     test_eq(index.sizeAtLevel(3), 1);
 
-    std::vector<bddvar> vec;
+    std::vector<ullint> vec;
     index.sizeEachLevel(vec);
 
     test_eq(vec.size(), 4);
     test_eq(vec[1], 1);
     test_eq(vec[2], 2);
     test_eq(vec[3], 1);
+
+    /* 互換性のために残している bddvar 版 */
+    std::vector<bddvar> vec_var;
+    index.sizeEachLevel(vec_var);
+
+    test_eq(vec_var.size(), 4);
+    test_eq(vec_var[1], 1);
+    test_eq(vec_var[2], 2);
+    test_eq(vec_var[3], 1);
 
     DDNodeIndex::DDNodeIterator itor = index.begin();
     int count = 0;
@@ -666,6 +1455,8 @@ void test_index_cpp()
         ++count;
     }
     test_eq(count, 4);
+
+    check_iterator_postfix(index.begin(), index.end());
 
     ZBDD g = f.Change(4);
 
@@ -691,8 +1482,10 @@ void test_index_cpp()
     test_eq(index3.count(), 3);
     test_eq(index3.size(), 4);
 
+    /* the raw mode (the default) of a larger DD; the C test checks
+       the same DD with bddNodeIndex_makeRawIndexZ */
     f = getPowerSet(vararr);
-    DDNodeIndex index4(f, false);
+    DDNodeIndex index4(f, true);
     test_eq(index4.count(), 1ll << nn);
     test_eq(index4.size(), f.Size());
 
@@ -709,6 +1502,40 @@ void test_index_cpp()
     DDNodeIndex index7(ZBDD(1), false);
     test_eq(index7.count(), 1);
     test_eq(index7.size(), 0);
+
+    /* BDD から構築したインデックスでは、ノードの構造を扱う関数と
+       DDNodeIterator が利用できる。count() は ZDD のみに対応しており、
+       終端でない BDD に対して呼び出すとエラー終了するので呼び出さない。 */
+    BDD b = BDDvar(1) & BDDvar(3);
+    DDNodeIndex index8(b, false);
+    test_eq(index8.size(), 2);
+    test_eq(index8.sizeAtLevel(1), 1);
+    test_eq(index8.sizeAtLevel(2), 0);
+    test_eq(index8.sizeAtLevel(3), 1);
+
+    std::vector<ullint> vec8;
+    index8.sizeEachLevel(vec8);
+    test_eq(vec8.size(), 4);
+    test_eq(vec8[1], 1);
+    test_eq(vec8[2], 0);
+    test_eq(vec8[3], 1);
+
+    int count8 = 0;
+    DDNodeIndex::DDNodeIterator itor8 = index8.begin();
+    while (itor8 != index8.end()) {
+        ++itor8;
+        ++count8;
+    }
+    test_eq(count8, 2);
+
+    /* 終端の BDD は count_arr を参照せずに 0 / 1 を返す */
+    DDNodeIndex index9(BDD(0), false);
+    test_eq(index9.count(), 0);
+    test_eq(index9.size(), 0);
+
+    DDNodeIndex index10(BDD(1), false);
+    test_eq(index10.count(), 1);
+    test_eq(index10.size(), 0);
 }
 
 bool test_count_if_size1(std::set<bddvar> s)
@@ -773,6 +1600,7 @@ void check_iterator_all(const ZBDD& f, DDIndex<int>& dd_index,
                         const std::vector<llint>& weights =
                             std::vector<llint>())
 {
+    check_iterator_postfix(first, last);
     if (first == last) {
         test(f == ZBDD(0) || f == ZBDD(-1));
         return;
@@ -894,6 +1722,8 @@ void test_elementIterator_cpp()
             ddindex_f.weight_min_begin(weights);
         test(min_itor != ddindex_f.weight_min_end());
         test(*min_itor == s12);
+        test_eq(min_itor->size(), s12.size()); /* operator-> */
+        test(min_itor->count(1) > 0);
 
         ++min_itor;
         test(min_itor != ddindex_f.weight_min_end());
@@ -927,6 +1757,7 @@ void test_elementIterator_cpp()
         ZBDD fa(0);
         test(random_itor != ddindex_f.random_end());
         test(isMember(f, *random_itor));
+        test_eq(random_itor->size(), (*random_itor).size()); /* operator-> */
         fa += getSingleSet(*random_itor);
 
         ++random_itor;
@@ -947,6 +1778,8 @@ void test_elementIterator_cpp()
             ddindex_f.dict_begin();
         test(dict_itor != ddindex_f.dict_end());
         test(*dict_itor == s23);
+        test_eq(dict_itor->size(), s23.size()); /* operator-> */
+        test(dict_itor->count(3) > 0);
 
         ++dict_itor;
         test(dict_itor != ddindex_f.dict_end());
@@ -963,6 +1796,7 @@ void test_elementIterator_cpp()
             ddindex_f.dict_rbegin();
         test(dict_ritor != ddindex_f.dict_rend());
         test(*dict_ritor == s12);
+        test(dict_ritor->count(2) > 0); /* operator-> */
 
         ++dict_ritor;
         test(dict_ritor != ddindex_f.dict_rend());
@@ -1184,6 +2018,7 @@ void test_elementIterator_cpp()
     {
         ElementIteratorHolder eih(f);
         check_iterator(eih.begin(), eih.end());
+        check_iterator_postfix(eih.begin(), eih.end());
         check_iterator(ddindex_f.weight_min_begin(weights),
                         ddindex_f.weight_min_end());
         check_iterator(ddindex_f.weight_max_begin(weights),
@@ -1194,6 +2029,32 @@ void test_elementIterator_cpp()
                         ddindex_f.dict_end());
         check_iterator(ddindex_f.dict_rbegin(),
                         ddindex_f.dict_rend());
+    }
+
+    /* the holder takes a reference of its own, so constructing it from
+       a temporary ZBDD is safe even when the garbage collection runs
+       before the iteration */
+    {
+        ElementIteratorHolder eih(getSingleSet(3, 10, 20, 30));
+        bddgc();
+        ElementIterator itor = eih.begin();
+        test(itor != eih.end());
+        std::set<bddvar> s = *itor;
+        test_eq(s.size(), 3);
+        test(s.count(10) > 0);
+        test(s.count(20) > 0);
+        test(s.count(30) > 0);
+        ++itor;
+        test(itor == eih.end());
+    }
+
+    /* a BDD that is not a terminal must be rejected */
+    {
+        fprintf(stderr, "(the following \"only ZDD\" message is expected)\n");
+        BDD b = BDDvar(1) & BDDvar(2);
+        ElementIteratorHolder eih(b.GetID());
+        test(eih.begin() == eih.end());
+        fprintf(stderr, "(end of the expected message)\n");
     }
 }
 
@@ -1271,6 +2132,19 @@ void check_k_lightest(const ZBDD& f, DDIndex<int>& dd_index,
                 }
             }
         }
+        for (int strict = -1; strict <= 1; ++strict) {
+            test(dd_index.getKHeaviestZBDD(0, weights, strict) == ZBDD(0));
+            test(dd_index.getKHeaviestZBDD(card + 1, weights, strict) == f);
+#ifdef SBDDH_GMP
+            test(dd_index.getKHeaviestZBDD(mpz_class(-1), weights, strict)
+                == ZBDD(0));
+            test(dd_index.getKHeaviestZBDD(mpz_class(0), weights, strict)
+                == ZBDD(0));
+            test(dd_index.getKHeaviestZBDD(
+                sbddh_ullint_to_mpz(card) + mpz_class(1), weights, strict)
+                == f);
+#endif
+        }
     }
 }
 
@@ -1278,6 +2152,87 @@ void check_k_lightest(const ZBDD& f, DDIndex<int>& dd_index,
 llint v_to_w(bddvar v)
 {
     return (llint)(v * v + 3 * v + 8);
+}
+
+void test_weightRange_cost_boundaries()
+{
+    const llint min_cost = sbddextended_bddcost_min();
+    const llint max_cost = sbddextended_bddcost_max();
+    test(sbddextended_is_valid_bddcost(min_cost));
+    test(sbddextended_is_valid_bddcost(max_cost));
+    test(!sbddextended_is_valid_bddcost(min_cost - 1));
+    test(!sbddextended_is_valid_bddcost(max_cost + 1));
+    test(!sbddextended_is_valid_bddcost(static_cast<llint>(bddcost_null)));
+    test(!sbddextended_is_valid_bddcost(-static_cast<llint>(bddcost_null)));
+
+    ZBDD f = getSingleSet(1, 1);
+    std::vector<llint> weights;
+    weights.push_back(0);
+    weights.push_back(max_cost);
+    test(weightLE(f, max_cost, weights) == f);
+    test(weightLT(f, max_cost, weights) == ZBDD(0));
+    test(weightGE(f, max_cost, weights) == f);
+    test(weightGT(f, max_cost, weights) == ZBDD(0));
+    test(weightEQ(f, max_cost, weights) == f);
+    test(weightNE(f, max_cost, weights) == ZBDD(0));
+    test(weightLE(f, min_cost - 1, weights) == ZBDD(0));
+
+    weights[1] = min_cost;
+    test(weightLE(f, min_cost, weights) == f);
+    test(weightLT(f, min_cost, weights) == ZBDD(0));
+    test(weightGE(f, min_cost, weights) == f);
+    test(weightGT(f, min_cost, weights) == ZBDD(0));
+    test(weightEQ(f, min_cost, weights) == f);
+    test(weightNE(f, min_cost, weights) == ZBDD(0));
+    test(weightLT(f, LLONG_MIN, weights) == ZBDD(0));
+    test(weightGE(f, LLONG_MIN, weights) == f);
+    test(weightGT(f, LLONG_MAX, weights) == ZBDD(0));
+
+    /* weights[0] is documented to be unused and may hold any value,
+       including values outside the valid cost range */
+    weights[0] = LLONG_MAX;
+    weights[1] = 1;
+    test(weightLE(f, 1, weights) == f);
+    test(weightLT(f, 1, weights) == ZBDD(0));
+    test(weightEQ(f, 1, weights) == f);
+    weights[0] = LLONG_MIN;
+    test(weightLE(f, 1, weights) == f);
+    weights[0] = 0;
+
+    std::ostringstream err_stream;
+    std::streambuf* cerr_buf = std::cerr.rdbuf(err_stream.rdbuf());
+    weights[1] = max_cost + 1;
+    test(weightLE(f, 0, weights) == ZBDD(-1));
+    weights[1] = min_cost - 1;
+    test(weightLE(f, 0, weights) == ZBDD(-1));
+    weights[1] = 0;
+    test(weightLE(f, max_cost + 1, weights) == ZBDD(-1));
+
+    /* individually valid weights whose sum overflows bddcost must be
+       refused, not silently miscomputed */
+    {
+        ZBDD f3 = getPowerSet(3);
+        std::vector<llint> weights3;
+        weights3.push_back(0);
+        for (int i = 1; i <= 3; ++i) {
+            weights3.push_back(1500000000LL);
+        }
+        test(weightLE(f3, max_cost, weights3) == ZBDD(-1));
+        DDIndex<int> f3_index(f3);
+        std::vector<llint> weights4;
+        weights4.push_back(0);
+        weights4.push_back(2000000000LL);
+        weights4.push_back(-2000000000LL);
+        weights4.push_back(1);
+        test(f3_index.getKLightestZBDD(3, weights4, 0) == ZBDD(-1));
+    }
+    std::cerr.rdbuf(cerr_buf);
+
+    /* bddnull propagates as the error sentinel */
+    weights[1] = 1;
+    test(weightRange(ZBDD(-1), 0, 1, weights) == ZBDD(-1));
+    test(weightLE(ZBDD(-1), 1, weights) == ZBDD(-1));
+    test(weightGE(ZBDD(-1), 1, weights) == ZBDD(-1));
 }
 
 void check_ddindex(const ZBDD& f, DDIndex<int>& dd_index)
@@ -1417,6 +2372,8 @@ void check_ddindex(const ZBDD& f, DDIndex<int>& dd_index)
     check_k_lightest(f, dd_index, weights);
 
     /* check iterators */
+    check_iterator_postfix(dd_index.begin(), dd_index.end());
+
     check_iterator_all(f, dd_index,
         dd_index.weight_min_begin(weights),
         dd_index.weight_min_end(),
@@ -1513,6 +2470,17 @@ void test_ddindex(bool exhaustive)
     DDIndex<int> s3(f3);
     check_ddindex(f3, s3);
 
+    std::set<bddvar> present_set;
+    present_set.insert(1);
+    ZBDD f_missing = getSingleSet(present_set);
+    DDIndex<int> missing_index(f_missing);
+    std::set<bddvar> missing_set;
+    missing_set.insert(2);
+    test_eq((llint)-1, missing_index.getOrderNumber(missing_set));
+#ifdef SBDDH_GMP
+    test(missing_index.getOrderNumberMP(missing_set) == mpz_class(-1));
+#endif
+
     if (exhaustive) {
         ullint seed = 1;
         for (int i = 0; i < 1000; ++i) {
@@ -1559,21 +2527,964 @@ void test_ddindex(bool exhaustive)
     test(sp.getOrderNumberMP(ss) == last_value);
     test(ss == sp.getSet(last_value));
 
+    /* the card is exactly 2^64, that is, 0 modulo 2^64.
+       Every set of f64 contains the variable 65, so an empty
+       sampled set means that the sampling failed. */
+    while (bddvarused() < 65) {
+        bddnewvar();
+    }
+    ZBDD f64 = getPowerSet(64).Change(65);
+    DDIndex<int> index64(f64);
+    test(index64.countMP().get_str() == "18446744073709551616");
+    test_eq(index64.count(), 0ull); /* the card modulo 2^64 */
+    ullint state64 = 1;
+    for (int i = 0; i < 10; ++i) {
+        std::set<bddvar> varset64 = index64.sampleRandomlyA(&state64);
+        test(varset64.count(65) == 1);
+        test(isMember(f64, varset64));
+    }
+
+    /* The ullint k-set APIs must compute with the exact card in the
+       GMP build.  They used to run on ullint internally, so the card
+       2^64 was truncated to 0 and k >= card returned the whole f64. */
+    ZBDD kset64 = index64.getKSetsZBDD(static_cast<ullint>(1));
+    test(kset64.Card() == 1);
+    test(kset64 - f64 == ZBDD(0)); /* kset64 is a subset of f64 */
+
+    std::vector<llint> weights64(66, 1);
+    ZBDD lightest64 = index64.getKLightestZBDD(static_cast<ullint>(1),
+        weights64, 0);
+    test(lightest64 == ZBDD(1).Change(65)); /* the unique minimum {65} */
+    ZBDD heaviest64 = index64.getKHeaviestZBDD(static_cast<ullint>(1),
+        weights64, 0);
+    ZBDD full_set64 = ZBDD(1);
+    for (bddvar v = 1; v <= 65; ++v) {
+        full_set64 = full_set64.Change(v);
+    }
+    test(heaviest64 == full_set64); /* the unique maximum {1, ..., 65} */
+
 #endif
+}
+
+void test_ddindex_large_getset_order()
+{
+    const int n = 63;
+    ZBDD base = getPowerSet(n);
+    DDIndex<int> base_index(base);
+
+    test(base_index.count() == (1ull << 63));
+    test(base_index.getSet(-1).empty());
+
+    std::set<bddvar> first = base_index.getSet(0);
+    test(first.empty());
+
+    std::set<bddvar> second = base_index.getSet(1);
+    test(!second.empty());
+    test(isMember(base, second));
+
+    std::set<bddvar> last_signed = base_index.getSet(LLONG_MAX);
+    test(!last_signed.empty());
+    test(isMember(base, last_signed));
+
+    ZBDD shifted = base.Change(n + 1);
+    DDIndex<int> shifted_index(shifted);
+
+    test(shifted_index.count() == (1ull << 63));
+    std::set<bddvar> shifted_first = shifted_index.getSet(0);
+    test(shifted_first.count((bddvar)(n + 1)) == 1);
+    test(isMember(shifted, shifted_first));
+
+    std::set<bddvar> shifted_last = shifted_index.getSet(LLONG_MAX);
+    test(shifted_last.count((bddvar)(n + 1)) == 1);
+    test(isMember(shifted, shifted_last));
+
+    DDIndex<int>::DictIterator shifted_itor = shifted_index.dict_begin();
+    test((*shifted_itor).count((bddvar)(n + 1)) == 1);
+    ++shifted_itor;
+    test((*shifted_itor).count((bddvar)(n + 1)) == 1);
+
+    ZBDD plus_one = base + ZBDD(1).Change(n + 1);
+    DDIndex<int> plus_one_index(plus_one);
+
+    test(plus_one_index.count() == ((1ull << 63) + 1ull));
+    DDIndex<int>::DictIterator plus_one_ritor = plus_one_index.dict_rbegin();
+    std::set<bddvar> plus_one_last = *plus_one_ritor;
+    test(!plus_one_last.empty());
+    test(isMember(plus_one, plus_one_last));
+
+    /* The card is 2^63 + 1, so the order number does not fit in llint.
+       sampleRandomly used to build
+       std::uniform_int_distribution<llint>(0, count() - 1), whose upper
+       bound wraps to a negative value here (undefined behaviour, and an
+       abort with assertion-enabled standard libraries). */
+#ifdef SBDDH_GMP
+    gmp_randclass random(gmp_randinit_default);
+    random.seed(1);
+    for (int i = 0; i < 10; ++i) {
+        std::set<bddvar> varset = plus_one_index.sampleRandomly(random);
+        test(isMember(plus_one, varset));
+    }
+#elif __cplusplus >= 201103L
+    std::mt19937_64 mt(1);
+    for (int i = 0; i < 10; ++i) {
+        std::set<bddvar> varset = plus_one_index.sampleRandomly(mt);
+        test(isMember(plus_one, varset));
+    }
+#endif
+}
+
+void test_ddindex_extreme_weights()
+{
+    /* LLONG_MIN / LLONG_MAX は正当な集合の重みとしても現れるため、
+       「到達不能」の印と混同してはならない */
+    const llint llint_min = std::numeric_limits<llint>::min();
+    const llint llint_max = std::numeric_limits<llint>::max();
+
+    ZBDD f = getSingleSet(2, 1, 2); /* {{1, 2}} */
+    DDIndex<int> dd_index(f);
+    std::vector<llint> weights(3);
+    weights[0] = 0;
+    weights[2] = 0;
+
+    weights[1] = llint_min;
+    std::set<bddvar> ss;
+    test_eq(dd_index.getMaximum(weights, ss), llint_min);
+    test_eq(ss.size(), 2u);
+    test(ss.count(1) > 0 && ss.count(2) > 0);
+    ss.clear();
+    test_eq(dd_index.getMinimum(weights, ss), llint_min);
+    test_eq(ss.size(), 2u);
+
+    weights[1] = llint_max;
+    ss.clear();
+    test_eq(dd_index.getMaximum(weights, ss), llint_max);
+    test_eq(ss.size(), 2u);
+    ss.clear();
+    test_eq(dd_index.getMinimum(weights, ss), llint_max);
+    test_eq(ss.size(), 2u);
+    test(ss.count(1) > 0 && ss.count(2) > 0);
+
+    ZBDD g = f + getSingleSet(1, 2); /* {{1, 2}, {2}} */
+    DDIndex<int> dd_index2(g);
+    weights[1] = llint_min;
+    ss.clear();
+    test_eq(dd_index2.getMaximum(weights, ss), 0ll);
+    test_eq(ss.size(), 1u);
+    test(ss.count(2) > 0);
+    ss.clear();
+    test_eq(dd_index2.getMinimum(weights, ss), llint_min);
+    test_eq(ss.size(), 2u);
+
+    weights[1] = llint_max;
+    ss.clear();
+    test_eq(dd_index2.getMaximum(weights, ss), llint_max);
+    test_eq(ss.size(), 2u);
+    ss.clear();
+    test_eq(dd_index2.getMinimum(weights, ss), 0ll);
+    test_eq(ss.size(), 1u);
+    test(ss.count(2) > 0);
+
+    /* オーバーフローしない限り、極値の重みでも getSum は正しい和を返す */
+    weights[1] = llint_max;
+    test_eq(dd_index.getSum(weights), llint_max);
+    weights[1] = llint_min;
+    test_eq(dd_index.getSum(weights), llint_min);
+    test_eq(dd_index2.getSum(weights), llint_min);
+
+    weights[1] = -5;
+    weights[2] = 3;
+    test_eq(dd_index2.getSum(weights), 1ll); /* (-5 + 3) + 3 */
+}
+
+void test_ddindex_clear()
+{
+    ZBDD f = getPowerSet(4);
+
+    DDIndex<int> dd_index(f);
+
+    /* clear() 前は有効 */
+    test(dd_index.isValid());
+    test(dd_index.is_valid()); /* 旧名 */
+    test(dd_index.getRawPointer() != NULL);
+    test_eq(dd_index.count(), 16ull);
+    test_eq(dd_index.usedVar().size(), 4u);
+
+    /* clear() 前に取得したイテレータは clear() 後には無効になるが、
+       operator++ で end() に到達する（無限ループにならない） */
+    DDIndex<int>::DDNodeIterator stale_itor = dd_index.begin();
+
+    /* clear() は何度呼んでもよい */
+    dd_index.clear();
+    dd_index.clear();
+    dd_index.clear();
+
+    ++stale_itor;
+    test(stale_itor == dd_index.end());
+
+    test(!dd_index.isValid());
+    test(!dd_index.is_valid());
+    test(dd_index.getRawPointer() == NULL);
+
+    /* clear() 後も各メンバ関数を安全に呼び出せる */
+    test_eq(dd_index.height(), 0);
+    test_eq(dd_index.size(), 0ull);
+    test_eq(dd_index.size(1), 0ull);
+    test(dd_index.getZBDD() == ZBDD(0));
+    test_eq(dd_index.count(), 0ull);
+
+    std::vector<ullint> size_arr;
+    dd_index.sizeEachLevel(size_arr);
+    test_eq(size_arr.size(), 0u);
+
+    /* 互換性のために残している bddvar 版 */
+    std::vector<bddvar> size_arr_var;
+    dd_index.sizeEachLevel(size_arr_var);
+    test_eq(size_arr_var.size(), 0u);
+
+    test_eq(dd_index.usedVar().size(), 0u);
+
+    std::vector<llint> weights;
+    for (int w = 0; w <= 4; ++w) {
+        weights.push_back(w);
+    }
+    std::set<bddvar> ss;
+    test_eq(dd_index.getMaximum(weights, ss), 0ll);
+    test_eq(dd_index.getMaximum(weights), 0ll);
+    test_eq(dd_index.getMinimum(weights, ss), 0ll);
+    test_eq(dd_index.getMinimum(weights), 0ll);
+    test_eq(dd_index.getSum(weights), 0ll);
+
+    std::set<bddvar> empty_set;
+    test_eq(dd_index.getOrderNumber(empty_set), -1ll);
+    test_eq(dd_index.getSet(0).size(), 0u);
+    test(dd_index.getKSetsZBDD(2ull) == ZBDD(0));
+
+#ifdef SBDDH_BDDCT
+    test(dd_index.getKLightestZBDD(2ull, weights, 0) == ZBDD(0));
+    test(dd_index.getKHeaviestZBDD(2ull, weights, 0) == ZBDD(0));
+#endif
+
+#ifdef SBDDH_GMP
+    test_eq(dd_index.countMP().get_si(), 0l);
+    test_eq(dd_index.getSumMP(weights).get_si(), 0l);
+    test_eq(dd_index.getOrderNumberMP(empty_set).get_si(), -1l);
+    gmp_randclass random(gmp_randinit_default);
+    random.seed(1);
+    test_eq(dd_index.sampleRandomly(random).size(), 0u);
+#else
+#if __cplusplus >= 201103L
+    std::mt19937 mt(1);
+    test_eq(dd_index.sampleRandomly(mt).size(), 0u);
+#else
+    test_eq(dd_index.sampleRandomly().size(), 0u);
+#endif
+#endif
+
+    ullint state = 1;
+    test_eq(dd_index.sampleRandomlyA(&state).size(), 0u);
+
+    /* ノード取得 */
+    test(dd_index.root().getBddp() == bddfalse);
+    test(dd_index.getNode(1, 0).getBddp() == bddfalse);
+
+    /* イテレータは開始と終了が一致する */
+    test(dd_index.begin() == dd_index.end());
+    test(dd_index.weight_min_begin(weights) == dd_index.weight_min_end());
+    test(dd_index.weight_max_begin(weights) == dd_index.weight_max_end());
+    test(dd_index.random_begin() == dd_index.random_end());
+    test(dd_index.dict_begin() == dd_index.dict_end());
+    test(dd_index.dict_rbegin() == dd_index.dict_rend());
+
+    /* clear() 済みの DDIndex がスコープを抜けても二重解放しない */
+}
+
+/* 空の族（要素数 0）から構築した DDIndex */
+void test_ddindex_empty_family()
+{
+    DDIndex<int> dd_index(ZBDD(0));
+
+    test(dd_index.isValid());
+    test_eq(dd_index.count(), 0ull);
+#ifdef SBDDH_GMP
+    test(dd_index.countMP() == mpz_class(0));
+#endif
+
+    /* 要素が 1 つもないので、サンプリングは空集合を返す */
+#ifdef SBDDH_GMP
+    gmp_randclass random(gmp_randinit_default);
+    random.seed(1);
+    test_eq(dd_index.sampleRandomly(random).size(), 0u);
+#else
+#if __cplusplus >= 201103L
+    std::mt19937 mt(1);
+    test_eq(dd_index.sampleRandomly(mt).size(), 0u);
+#else
+    test_eq(dd_index.sampleRandomly().size(), 0u);
+#endif
+#endif
+
+    ullint state = 1;
+    test_eq(dd_index.sampleRandomlyA(&state).size(), 0u);
+
+    test(dd_index.random_begin() == dd_index.random_end());
+}
+
+/* 乱数状態 0 を渡してもサンプリングが退化しないことを確認する */
+void test_ddindex_zero_rand_state()
+{
+    ZBDD f = getPowerSet(8);
+    DDIndex<int> dd_index(f);
+
+    ullint state = 0;
+    std::set<bddvar> first = dd_index.sampleRandomlyA(&state);
+    test(state != 0);
+    test(isMember(f, first));
+
+    bool varied = false;
+    for (int i = 0; i < 100; ++i) {
+        std::set<bddvar> varset = dd_index.sampleRandomlyA(&state);
+        test(isMember(f, varset));
+        if (varset != first) {
+            varied = true;
+        }
+    }
+    test(varied);
+
+    varied = false;
+    DDIndex<int>::RandomIterator itor = dd_index.random_begin(0);
+    std::set<bddvar> head = *itor;
+    for (int i = 0; i < 100 && itor != dd_index.random_end(); ++i, ++itor) {
+        test(isMember(f, *itor));
+        if (*itor != head) {
+            varied = true;
+        }
+    }
+    test(varied);
+}
+
+/* bddnull から構築した DDIndex は無効なインデックスになる */
+void test_ddindex_null()
+{
+    DDIndex<int> dd_index(ZBDD(-1));
+
+    test(!dd_index.isValid());
+    test(!dd_index.is_valid()); /* 旧名 */
+    test(dd_index.getRawPointer() == NULL);
+
+    /* clear() 後と同じく、各メンバ関数を安全に呼び出せる */
+    test_eq(dd_index.count(), 0ull);
+#ifdef SBDDH_GMP
+    test(dd_index.countMP() == mpz_class(0));
+#endif
+    test_eq(dd_index.height(), 0);
+    test_eq(dd_index.size(), 0ull);
+    test(dd_index.getZBDD() == ZBDD(0));
+    test_eq(dd_index.usedVar().size(), 0u);
+    test_eq(dd_index.getSet(0).size(), 0u);
+
+    ullint state = 1;
+    test_eq(dd_index.sampleRandomlyA(&state).size(), 0u);
+
+    test(dd_index.begin() == dd_index.end());
+
+    /* bddp を渡すコンストラクタと BDD からの構築でも同様 */
+    DDIndex<int> dd_index_p(bddnull);
+    test(!dd_index_p.isValid());
+    test_eq(dd_index_p.count(), 0ull);
+
+    DDIndex<int> dd_index_b(BDD(-1));
+    test(!dd_index_b.isValid());
+    test_eq(dd_index_b.size(), 0ull);
+}
+
+/* BDD から構築した DDIndex では、ノードの構造のみを扱う関数が利用できる。
+   数え上げ・重み系の関数は checkZBDD() がエラーメッセージを表示して
+   exit(1) するため、ここでは呼び出さない。 */
+void test_ddindex_bdd()
+{
+    BDD f = BDDvar(1) & BDDvar(3);
+    DDIndex<int> dd_index(f);
+
+    test(dd_index.isValid());
+    test_eq(dd_index.height(), 3);
+    test_eq(dd_index.size(), 2ull);
+    test_eq(dd_index.size(1), 1ull);
+    test_eq(dd_index.size(2), 0ull);
+    test_eq(dd_index.size(3), 1ull);
+
+    std::vector<ullint> size_arr;
+    dd_index.sizeEachLevel(size_arr);
+    test_eq(size_arr.size(), 4u);
+    test_eq(size_arr[1], 1u);
+    test_eq(size_arr[2], 0u);
+    test_eq(size_arr[3], 1u);
+
+    /* 互換性のために残している bddvar 版 */
+    std::vector<bddvar> size_arr_var;
+    dd_index.sizeEachLevel(size_arr_var);
+    test_eq(size_arr_var.size(), 4u);
+    test_eq(size_arr_var[1], 1u);
+    test_eq(size_arr_var[2], 0u);
+    test_eq(size_arr_var[3], 1u);
+
+    std::set<bddvar> used = dd_index.usedVar();
+    test_eq(used.size(), 2u);
+    test(used.count(1) > 0);
+    test(used.count(3) > 0);
+
+    /* 根ノードとその子ノードを取得できる */
+    DDNode<int> root = dd_index.root();
+    test(root.getBddp() == f.GetID());
+    test(root.child(0).isTerminal(0));
+    test(root.child(1).getBddp() == BDDvar(1).GetID());
+
+    /* terminal(t), child(c) and isTerminal(t) interpret their argument
+       as a truth value (nonzero means 1), consistently */
+    test(dd_index.terminal(0).isTerminal(0));
+    test(dd_index.terminal(1).isTerminal(1));
+    test(dd_index.terminal(2).isTerminal(2));
+    test(!dd_index.terminal(2).isTerminal(0));
+    test(dd_index.terminal(0).getBddp() == bddfalse);
+    test(dd_index.terminal(2).getBddp() == bddtrue);
+
+    /* ノードを巡行できる */
+    int num_nodes = 0;
+    for (DDIndex<int>::DDNodeIterator itor = dd_index.begin();
+            itor != dd_index.end(); ++itor) {
+        ++num_nodes;
+    }
+    test_eq(num_nodes, 2);
+}
+
+/* 旧関数名（マクロではなくインライン関数として提供している別名）が、
+   新しい名前と同じ結果を返すことを確認する。すべてのオーバーロードを
+   1回ずつ呼び、引数の型が新しい関数と一致していることも確かめる。 */
+void test_compatibility_cpp()
+{
+    std::vector<bddvar> base_variables;
+    std::vector<bddvar> tvec;
+    std::set<bddvar> tset;
+    base_variables.push_back(2);
+    base_variables.push_back(3);
+    tvec.push_back(1);
+    tset.insert(1);
+
+    /* getPowerSetIncluding */
+    test(getAllSetsIncluding(base_variables, tvec)
+            == getPowerSetIncluding(base_variables, tvec));
+    test(getAllSetsIncluding(base_variables, tset)
+            == getPowerSetIncluding(base_variables, tset));
+    test(getAllSetsIncluding(base_variables, static_cast<bddvar>(1))
+            == getPowerSetIncluding(base_variables, static_cast<bddvar>(1)));
+    test(getAllSetsIncluding(3, tvec) == getPowerSetIncluding(3, tvec));
+    test(getAllSetsIncluding(3, tset) == getPowerSetIncluding(3, tset));
+    test(getAllSetsIncluding(3, 1) == getPowerSetIncluding(3, 1));
+
+    test(getAllPowerSetsIncluding(base_variables, tvec)
+            == getPowerSetIncluding(base_variables, tvec));
+    test(getAllPowerSetsIncluding(base_variables, tset)
+            == getPowerSetIncluding(base_variables, tset));
+    test(getAllPowerSetsIncluding(base_variables, static_cast<bddvar>(1))
+            == getPowerSetIncluding(base_variables, static_cast<bddvar>(1)));
+    test(getAllPowerSetsIncluding(3, tvec) == getPowerSetIncluding(3, tvec));
+    test(getAllPowerSetsIncluding(3, tset) == getPowerSetIncluding(3, tset));
+    test(getAllPowerSetsIncluding(3, 1) == getPowerSetIncluding(3, 1));
+
+    /* getPowerSetNotIncluding */
+    test(getAllPowerSetsNotIncluding(3, tvec)
+            == getPowerSetNotIncluding(3, tvec));
+    test(getAllPowerSetsNotIncluding(3, tset)
+            == getPowerSetNotIncluding(3, tset));
+    test(getAllPowerSetsNotIncluding(3, 1) == getPowerSetNotIncluding(3, 1));
+
+    /* getPowerSetWithCard */
+    test(getAllSetsWithCard(base_variables, 1)
+            == getPowerSetWithCard(base_variables, 1));
+    test(getAllSetsWithCard(3, 1) == getPowerSetWithCard(3, 1));
+    test(getAllPowerSetsWithCard(base_variables, 1)
+            == getPowerSetWithCard(base_variables, 1));
+    test(getAllPowerSetsWithCard(3, 1) == getPowerSetWithCard(3, 1));
+
+    { /* int リテラル以外のスカラー引数がコンテナ用テンプレートに
+         奪われず、非テンプレート版へ解決されることを確認する。 */
+        int n = 3;
+        bddvar v = 1;
+        unsigned int u = 3;
+        test(getAllSetsIncluding(n, v) == getPowerSetIncluding(3, 1));
+        test(getAllPowerSetsIncluding(n, v) == getPowerSetIncluding(3, 1));
+        test(getPowerSetIncluding(n, v) == getPowerSetIncluding(3, 1));
+        test(getAllPowerSetsNotIncluding(n, v)
+                == getPowerSetNotIncluding(3, 1));
+        test(getAllSetsWithCard(u, 1) == getPowerSetWithCard(3, 1));
+        test(getAllPowerSetsWithCard(u, 1) == getPowerSetWithCard(3, 1));
+        test(getPowerSetWithCard(u, 1) == getPowerSetWithCard(3, 1));
+    }
+
+    ZBDD f = getPowerSet(3);
+    BDD b = (BDDvar(1) & BDDvar(2)) | BDDvar(3);
+    DDIndex<int> zindex(f);
+    DDIndex<int> bindex(b);
+    FILE* fp;
+
+    { /* binary 形式 */
+        std::stringstream so1;
+        std::stringstream sn1;
+        std::stringstream so2;
+        std::stringstream sn2;
+        writeZBDDToBinary(so1, f);
+        exportZBDDAsBinary(sn1, f);
+        test(!sn1.str().empty());
+        test(so1.str() == sn1.str());
+        writeZBDDToBinary(so2, f, false, &zindex);
+        exportZBDDAsBinary(sn2, f, false, &zindex);
+        test(so2.str() == sn2.str());
+
+        fp = test_fopen(g_filename1, "wb");
+        writeZBDDToBinary(fp, f);
+        fclose(fp);
+        std::string fo1 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "wb");
+        exportZBDDAsBinary(fp, f);
+        fclose(fp);
+        test(fo1 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "wb");
+        writeZBDDToBinary(fp, f, false, &zindex);
+        fclose(fp);
+        std::string fo2 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "wb");
+        exportZBDDAsBinary(fp, f, false, &zindex);
+        fclose(fp);
+        test(fo2 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "wb");
+        exportZBDDAsBinary(fp, f);
+        fclose(fp);
+        fp = test_fopen(g_filename1, "rb");
+        test(constructZBDDFromBinary(fp) == f);
+        fclose(fp);
+        std::stringstream ss_read(sn1.str());
+        test(constructZBDDFromBinary(ss_read) == f);
+    }
+
+    { /* graphillion 形式 */
+        std::stringstream so1;
+        std::stringstream sn1;
+        std::stringstream so2;
+        std::stringstream sn2;
+        writeZBDDForGraphillion(so1, f);
+        exportZBDDAsGraphillion(sn1, f);
+        test(so1.str() == sn1.str());
+        writeZBDDForGraphillion(so2, f, -1, &zindex);
+        exportZBDDAsGraphillion(sn2, f, -1, &zindex);
+        test(so2.str() == sn2.str());
+
+        fp = test_fopen(g_filename1, "w");
+        writeZBDDForGraphillion(fp, f);
+        fclose(fp);
+        std::string fo1 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsGraphillion(fp, f);
+        fclose(fp);
+        test(fo1 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "w");
+        writeZBDDForGraphillion(fp, f, -1, &zindex);
+        fclose(fp);
+        std::string fo2 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsGraphillion(fp, f, -1, &zindex);
+        fclose(fp);
+        test(fo2 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "r");
+        test(constructZBDDFromGraphillion(fp) == f);
+        fclose(fp);
+        std::stringstream ss_read(sn1.str());
+        test(constructZBDDFromGraphillion(ss_read) == f);
+    }
+
+    { /* Knuth 形式 */
+        std::stringstream so1;
+        std::stringstream sn1;
+        std::stringstream so2;
+        std::stringstream sn2;
+        writeZBDDToFileKnuth(so1, f);
+        exportZBDDAsKnuth(sn1, f);
+        test(so1.str() == sn1.str());
+        writeZBDDToFileKnuth(so2, f, false, &zindex);
+        exportZBDDAsKnuth(sn2, f, false, &zindex);
+        test(so2.str() == sn2.str());
+
+        fp = test_fopen(g_filename1, "w");
+        writeZBDDToFileKnuth(fp, f);
+        fclose(fp);
+        std::string fo1 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsKnuth(fp, f);
+        fclose(fp);
+        test(fo1 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "w");
+        writeZBDDToFileKnuth(fp, f, false, &zindex);
+        fclose(fp);
+        std::string fo2 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsKnuth(fp, f, false, &zindex);
+        fclose(fp);
+        test(fo2 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsKnuth(fp, f);
+        fclose(fp);
+        fp = test_fopen(g_filename1, "r");
+        test(constructZBDDFromFileKnuth(fp, false) == f);
+        fclose(fp);
+        std::stringstream ss_read(sn1.str());
+        test(constructZBDDFromFileKnuth(ss_read, false) == f);
+
+        /* BDD の入力 */
+        std::stringstream bsn;
+        exportBDDAsKnuth(bsn, b);
+        fp = test_fopen(g_filename1, "w");
+        exportBDDAsKnuth(fp, b);
+        fclose(fp);
+        fp = test_fopen(g_filename1, "r");
+        test(constructBDDFromFileKnuth(fp, false) == b);
+        fclose(fp);
+        std::stringstream bss_read(bsn.str());
+        test(constructBDDFromFileKnuth(bss_read, false) == b);
+    }
+
+    { /* graphviz 形式 */
+        std::stringstream so1;
+        std::stringstream sn1;
+        std::stringstream so2;
+        std::stringstream sn2;
+        writeZBDDForGraphviz(so1, f);
+        exportZBDDAsGraphviz(sn1, f);
+        test(so1.str() == sn1.str());
+        writeZBDDForGraphviz(so2, f, NULL, &zindex);
+        exportZBDDAsGraphviz(sn2, f, NULL, &zindex);
+        test(so2.str() == sn2.str());
+
+        fp = test_fopen(g_filename1, "w");
+        writeZBDDForGraphviz(fp, f);
+        fclose(fp);
+        std::string fo1 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsGraphviz(fp, f);
+        fclose(fp);
+        test(fo1 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "w");
+        writeZBDDForGraphviz(fp, f, NULL, &zindex);
+        fclose(fp);
+        std::string fo2 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportZBDDAsGraphviz(fp, f, NULL, &zindex);
+        fclose(fp);
+        test(fo2 == fileToString(g_filename1));
+
+        std::stringstream bso1;
+        std::stringstream bsn1;
+        std::stringstream bso2;
+        std::stringstream bsn2;
+        writeBDDForGraphviz(bso1, b);
+        exportBDDAsGraphviz(bsn1, b);
+        test(bso1.str() == bsn1.str());
+        writeBDDForGraphviz(bso2, b, NULL, &bindex);
+        exportBDDAsGraphviz(bsn2, b, NULL, &bindex);
+        test(bso2.str() == bsn2.str());
+
+        fp = test_fopen(g_filename1, "w");
+        writeBDDForGraphviz(fp, b);
+        fclose(fp);
+        std::string bfo1 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportBDDAsGraphviz(fp, b);
+        fclose(fp);
+        test(bfo1 == fileToString(g_filename1));
+
+        fp = test_fopen(g_filename1, "w");
+        writeBDDForGraphviz(fp, b, NULL, &bindex);
+        fclose(fp);
+        std::string bfo2 = fileToString(g_filename1);
+        fp = test_fopen(g_filename1, "w");
+        exportBDDAsGraphviz(fp, b, NULL, &bindex);
+        fclose(fp);
+        test(bfo2 == fileToString(g_filename1));
+    }
+
+    if (remove(g_filename1) != 0) {
+        fprintf(stderr, "file cannot be removed\n");
+        exit(1);
+    }
+}
+
+/* インデックスは根への参照を自身で保持するので、一時オブジェクトから
+   構築してもガベージコレクション後に使用できる */
+/* == は T == double のとき -Wfloat-equal 警告になるので使わない */
+template<typename T>
+bool test_same_value(const T& a, const T& b)
+{
+    return !(a < b) && !(b < a);
+}
+
+/* DDIndex<T> の T（各ノードに付随する値の型）は int 以外でもよい。
+   テンプレートが T = int 以外でも実体化し、値の読み書きが働くことを
+   検査する。getStorageRef と makeCountIndex の直接呼び出しもここで
+   検査する（他のテストからは呼ばれない） */
+template<typename T>
+void test_ddindex_value_type(const ZBDD& f, const T& v1, const T& v2)
+{
+    DDIndex<T> index(f);
+
+    /* 明示的に呼んでも、内部で呼ばれるときと同じ結果になる */
+    index.makeCountIndex();
+    test_eq(index.count(), 3ull);
+    test_eq(index.size(), 4ull);
+
+    /* 根のノードの値を getStorageRef と DDNode<T>::value の両方から
+       読み書きする */
+    index.getStorageRef(f.GetID()) = v1;
+    test(test_same_value(index.root().value, v1));
+    index.root().value = v2;
+    test(test_same_value(index.getStorageRef(f.GetID()), v2));
+
+    /* すべてのノードに値を設定し、子をたどって読み出す */
+    for (int level = 1; level <= index.height(); ++level) {
+        for (ullint pos = 0; pos < index.size(level); ++pos) {
+            index.getNode(level, pos).value = v1;
+        }
+    }
+    test(test_same_value(index.root().value, v1));
+    test(test_same_value(index.root().child(1).value, v1));
+    test(!index.root().child(1).isTerminal());
+
+    /* T に依存しない機能が T を変えても働く */
+    std::vector<llint> weights(4, 1);
+    std::set<bddvar> s;
+    test_eq(index.getMaximum(weights, s), 2);
+    test_eq(index.getSet(0).size(), 2u);
+    test_eq(index.getKSetsZBDD(3ull).Card(), 3);
+}
+
+void test_ddindex_value_types()
+{
+    ZBDD f = ZBDD_ID(make_test_zbdd()); /* {{1,2},{1,3},{2,3}} */
+    test_ddindex_value_type<int>(f, 1, 2);
+    test_ddindex_value_type<double>(f, 1.5, 2.5);
+    test_ddindex_value_type<llint>(f, 1ll, 2ll);
+    test_ddindex_value_type<ullint>(f, 1ull, 2ull);
+    /* 既定構築できる非 POD の型でもよい */
+    test_ddindex_value_type<std::string>(f, std::string("a"),
+                                         std::string("b"));
+#ifdef SBDDH_GMP
+    test_ddindex_value_type<mpz_class>(f, mpz_class(1), mpz_class(2));
+#endif
+}
+
+void test_ddindex_lifetime()
+{
+    DDIndex<int> index(getSingleSet(3, 10, 20, 30));
+    bddgc();
+    test_eq(index.count(), 1ull);
+    std::set<bddvar> s = index.getSet(0);
+    test_eq(s.size(), 3u);
+    test(s.count(10) > 0);
+    test(s.count(20) > 0);
+    test(s.count(30) > 0);
+    test(index.getZBDD() == getSingleSet(3, 10, 20, 30));
+
+    DDNodeIndex index2(getSingleSet(2, 40, 50), false);
+    bddgc();
+    test_eq(index2.count(), 1ull);
+    test_eq(index2.size(), 2ull);
+}
+
+/* 合法な最大級の高さ（数万レベル）の DD で、以前は再帰だったために
+   プロセスのスタックを使い切り得た DDIndex の関数（getOrderNumber、
+   getSet、getKSetsZBDD）が動作することを検査する。多数の変数を作成して
+   bddvarused() を変化させるため、start_test_cpp の最後に呼び出すこと。 */
+void test_ddindex_deep()
+{
+    const bddvar N = 60000;
+    while (bddvarused() < N) {
+        bddnewvar();
+    }
+    std::vector<bddvar> vs;
+    vs.reserve(N);
+    for (bddvar v = 1; v <= N; ++v) {
+        vs.push_back(v);
+    }
+    ZBDD f = getSingleSet(vs);
+    DDIndex<int> index(f);
+    test_eq(index.height(), 60000);
+    test_eq(index.count(), 1ull);
+
+    std::set<bddvar> s(vs.begin(), vs.end());
+    test_eq(index.getOrderNumber(s), 0);
+
+    std::set<bddvar> t = index.getSet(0);
+    test_eq(t.size(), (size_t)N);
+    test(t == s);
+
+    /* k >= card(f): no rebuilding happens */
+    ZBDD g = index.getKSetsZBDD(1);
+    test(g == f);
+
+    /* the nested family {{}, {1}, {1,2}, ..., {1,...,N}}, on which
+       getKSetsZBDD(N) descends (and rebuilds the result along) a path
+       of tens of thousands of levels */
+    ZBDD chain(1);
+    ZBDD nested(1);
+    for (bddvar v = 1; v <= N; ++v) {
+        chain = chain.Change(static_cast<int>(v));
+        nested = nested + chain;
+    }
+    DDIndex<int> index2(nested);
+    test_eq(index2.count(), (ullint)N + 1);
+    ZBDD g2 = index2.getKSetsZBDD((ullint)N);
+    test_eq(sbddh_getCard<ullint>(g2), (ullint)N);
+    /* spot-check that the taken sets are members of the family; a full
+       g2 - nested comparison would exceed the recursion limit of the
+       SAPPOROBDD C++ operations on such a deep DD */
+    DDIndex<int> index3(g2);
+    const llint orders[3] = {0, (llint)N / 2, (llint)N - 1};
+    for (int oi = 0; oi < 3; ++oi) {
+        std::set<bddvar> ss = index3.getSet(orders[oi]);
+        test(isMember(nested, ss));
+    }
 }
 
 void start_test_cpp(bool exhaustive)
 {
 #ifdef SBDDH_GMP
     test_gmp_conversion();
+    test_gmp_conversion_with_grouping_locale();
 #endif
     test_BDD_functions();
+    test_weightRange_cost_boundaries();
     test_at_random_cpp();
     test_io_cpp();
+    test_graphillion_empty_stream_cpp();
+    test_elementsformat_empty_stream_cpp();
+    test_readline_errors_stream_cpp();
+    test_import_stream_exceptions_cpp();
+    test_knuth_empty_stream_cpp();
+    test_writeobject_failure_cpp();
     test_io_all_func_cpp();
+    test_value_list_cpp();
+    test_graphviz_cpp();
+    test_svg_cpp();
     test_index_cpp();
     test_elementIterator_cpp();
     test_ddindex(exhaustive);
+    test_ddindex_large_getset_order();
+    test_ddindex_extreme_weights();
+    test_ddindex_clear();
+    test_ddindex_empty_family();
+    test_ddindex_zero_rand_state();
+    test_ddindex_null();
+    test_ddindex_bdd();
+    test_ddindex_lifetime();
+    test_ddindex_value_types();
+    test_compatibility_cpp();
+    /* this one changes bddvarused(), so it comes last */
+    test_ddindex_deep();
+}
+
+/* SBDDH_NewVarRev で変数番号とレベルが一致しない構成を作り、DDIndex と
+   重み関数が変数番号とレベルを取り違えないことを検査する。グローバルな
+   変数順を変更するため、他のすべてのテストの後に呼び出すこと。 */
+void test_newvarrev_cpp()
+{
+    bddvar used = bddvarused();
+    SBDDH_NewVarRev(1);
+    bddvar v1 = bddvarused();
+    test_eq(v1, used + 1);
+    test_eq(bddlevofvar(v1), 1);
+
+    /* {{1}, {v1}} の DDIndex: 高さは変数 1 のレベル */
+    ZBDD f = getSingleSet(1, (bddvar)1) + getSingleSet(1, v1);
+    DDIndex<int> index(f);
+    test_eq(index.height(), bddlevofvar(1));
+    test_eq(index.count(), 2ull);
+
+    /* 辞書順では根に近い変数（レベルの高い変数 1）が「小さい」ので、
+       {1} が 0 番目、{v1} が 1 番目 */
+    std::set<bddvar> s0 = index.getSet(0);
+    test_eq(s0.size(), 1u);
+    test(s0.count(1) > 0);
+    std::set<bddvar> s1 = index.getSet(1);
+    test(s1.count(v1) > 0);
+    test_eq(index.getOrderNumber(s0), 0);
+    test_eq(index.getOrderNumber(s1), 1);
+
+    /* 重みは変数番号を添え字とする */
+    std::vector<llint> weights(static_cast<size_t>(v1) + 1, 0);
+    weights[1] = 10;
+    weights[v1] = 1;
+    test_eq(index.getMaximum(weights), 10);
+    test_eq(index.getMinimum(weights), 1);
+    test_eq(index.getSum(weights), 11);
+
+#ifdef SBDDH_BDDCT
+    {
+        std::vector<bddvar> vs;
+        vs.push_back(1);
+        vs.push_back(v1);
+        ZBDD f2 = getPowerSet(vs);
+        ZBDD le = weightLE(f2, 1, weights); /* {} と {v1} */
+        test_eq(le.Card(), 2);
+        test(isMember(le, std::vector<bddvar>(1, v1)));
+        test(!isMember(le, std::vector<bddvar>(1, 1)));
+    }
+#endif
+}
+
+/* 変数が多数ある場合の getSingleSet と、要素形式の往復を検査する。
+   printZBDDElements は各集合を根に近い変数から書き出すので、
+   その出力を constructZBDDFromElements に渡すと、変数はレベルの降順で
+   getSingleSet（bddgetsingleset）に渡される。test_singleset_manyvars で
+   追加した変数を使うので、その後に呼び出すこと。 */
+void test_singleset_manyvars_cpp()
+{
+    int n = static_cast<int>(bddvarused());
+    test(n >= TEST_MANYVARS_N);
+
+    /* レベルの降順 */
+    std::vector<bddvar> vs;
+    for (int i = n; i >= 1; --i) {
+        vs.push_back(bddvaroflev(static_cast<bddvar>(i)));
+    }
+    ZBDD f = getSingleSet(vs);
+    test(f.GetID() != bddnull);
+    /* Card や Size は DD の高さの深さまで再帰するので、この高さの DD には
+       使えない。根から 1-枝を反復でたどって検査する。 */
+    ZBDD h = f;
+    for (int i = 0; i < n; ++i) {
+        test_eq(getVar(h), vs[static_cast<size_t>(i)]);
+        test(getChild0(h) == ZBDD(0));
+        h = getChild1(h);
+    }
+    test(h == ZBDD(1));
+    test(isMember(f, vs));
+
+    std::stringstream ss;
+    printZBDDElements(ss, f, "\n", " ");
+    ZBDD g = constructZBDDFromElements(ss);
+    test(g == f);
+
+    /* 2 つの集合からなる族でも同様（2 つ目は根に近い 100 個の変数からなる
+       集合にして、和集合の演算の再帰が浅く済むようにする） */
+    std::vector<bddvar> vs2(vs.begin(), vs.begin() + 100);
+    ZBDD f2 = f + getSingleSet(vs2);
+    std::stringstream ss2;
+    printZBDDElements(ss2, f2, "\n", " ");
+    ZBDD g2 = constructZBDDFromElements(ss2);
+    test(g2 == f2);
 }
 
 int main(int argc, char** argv)
@@ -1584,6 +3495,13 @@ int main(int argc, char** argv)
     }
     start_test();
     start_test_cpp(exhaustive);
+    /* the following tests change the global variable order;
+       they must run last */
+    test_newvarrev();
+    test_newvarrev_cpp();
+    /* add thousands of variables; must run after the other tests */
+    test_singleset_manyvars();
+    test_singleset_manyvars_cpp();
 
     printf("test passed!\n");
     return 0;

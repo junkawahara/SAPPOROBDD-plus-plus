@@ -23,6 +23,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 int main(void)
 {
     start_test();
+    /* changes the global variable order; must run last */
+    test_newvarrev();
+    /* adds thousands of variables; must run after the other tests */
+    test_singleset_manyvars();
 
     printf("test passed!\n");
     return 0;
