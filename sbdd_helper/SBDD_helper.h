@@ -134,6 +134,25 @@ std::vector<const char*> sbddextended_strVectorToArray(
 
 #endif
 
+/* Returns bddvarmax, the largest variable index (equivalently, the
+   largest level) that SAPPOROBDD can represent, as an int. The levels
+   and the numbers of variables of this library are ints, while
+   bddvarmax is an unsigned macro whose value depends on the build of
+   SAPPOROBDD: the B_EXTEND build of SAPPOROBDD++ sets it to 2^32 - 2,
+   which no int can hold, and (int)bddvarmax is negative there, so a
+   range check written against that cast rejects every value. The result
+   is therefore clamped to INT_MAX - 1, which also keeps the "bound + 1"
+   that some of the callers compute inside int. bddvarmax fits in an int
+   in every other build, so the clamp does not change the bound there. */
+sbddextended_INLINE_FUNC
+int sbddextended_varMaxAsInt(void)
+{
+    if ((ullint)bddvarmax > (ullint)(INT_MAX - 1)) {
+        return INT_MAX - 1;
+    }
+    return (int)bddvarmax;
+}
+
 /* Returns 1 if s consists only of whitespace (the empty string does). */
 /* The importers use it to check that nothing follows the tokens that */
 /* a line of the format is made of. */
@@ -8599,11 +8618,12 @@ void printZBDDElementsAsValueList(FILE* fp, const ZBDD& zbdd, const std::string&
 {
     /* num_of_variables == 0 makes the inner function use the elements */
     /* format instead of the value list format, and a value larger than */
-    /* bddvarmax cannot be the number of variables of a DD and would make */
-    /* num_of_variables + 1 overflow below. */
-    if (!(1 <= num_of_variables && num_of_variables <= (int)bddvarmax)) {
+    /* the largest level of SAPPOROBDD cannot be the number of variables */
+    /* of a DD and would make num_of_variables + 1 overflow below. */
+    if (!(1 <= num_of_variables
+            && num_of_variables <= sbddextended_varMaxAsInt())) {
         fprintf(stderr, "num_of_variables must be in {1,...,%d}\n",
-                (int)bddvarmax);
+                sbddextended_varMaxAsInt());
         return;
     }
 
@@ -8616,9 +8636,10 @@ sbddextended_INLINE_FUNC
 void printZBDDElementsAsValueList(std::ostream& ost, const ZBDD& zbdd, const std::string& delim1, const std::string& delim2, int num_of_variables)
 {
     /* See the comment of the FILE* overload above. */
-    if (!(1 <= num_of_variables && num_of_variables <= (int)bddvarmax)) {
+    if (!(1 <= num_of_variables
+            && num_of_variables <= sbddextended_varMaxAsInt())) {
         std::cerr << "num_of_variables must be in {1,...,"
-                  << (int)bddvarmax << "}" << std::endl;
+                  << sbddextended_varMaxAsInt() << "}" << std::endl;
         return;
     }
 
@@ -8788,9 +8809,9 @@ bddp bddimportbddasbinary_inner(FILE* fp, int root_level, int is_zbdd
     /* terminates the process once the variable index range of SAPPOROBDD */
     /* is full, so reject a level that it cannot represent before any */
     /* variable is added. */
-    if (root_level > (int)bddvarmax) {
+    if (root_level > sbddextended_varMaxAsInt()) {
         fprintf(stderr, "The level of the root must be at most %d.\n",
-                (int)bddvarmax);
+                sbddextended_varMaxAsInt());
         return bddnull;
     }
 
@@ -9811,9 +9832,9 @@ bddp bddimportbddasgraphillion_inner(FILE* fp, int root_level, int is_zdd
     /* terminates the process once the variable index range of SAPPOROBDD */
     /* is full, so reject a level that it cannot represent before any */
     /* variable is added. */
-    if (root_level > (int)bddvarmax) {
+    if (root_level > sbddextended_varMaxAsInt()) {
         fprintf(stderr, "The level of the root must be at most %d.\n",
-                (int)bddvarmax);
+                sbddextended_varMaxAsInt());
         sbddextended_freeVectorsAndReturnNull();
     }
 
@@ -10538,18 +10559,20 @@ bddp bddimportbddasknuth_inner(FILE* fp, int is_hex, int root_level,
                         "header must be #%d\n", line_count, level_count);
                 sbddextended_freeVectorsAndReturnNull();
             }
-            ++level_count;
-            /* The height of the DD (level_count - 1) can never exceed */
-            /* bddvarmax (root_level, at least the height, is checked */
-            /* against bddvarmax below), so reject a larger header as */
-            /* soon as it is read. This also keeps level_count away */
-            /* from the int overflow on a stream of billions of header */
-            /* lines, and stops reading such an input early. */
-            if (level_count - 1 > (int)bddvarmax) {
+            /* The height of the DD (level_count - 1 after the */
+            /* increment below) can never exceed the largest level of */
+            /* SAPPOROBDD (root_level, at least the height, is checked */
+            /* against it below), so reject a larger header as soon as */
+            /* it is read. Checking before the increment also keeps */
+            /* level_count away from the int overflow on a stream of */
+            /* billions of header lines, and stops reading such an */
+            /* input early. */
+            if (level_count > sbddextended_varMaxAsInt()) {
                 fprintf(stderr, "The number of levels must be at most "
-                        "%d.\n", (int)bddvarmax);
+                        "%d.\n", sbddextended_varMaxAsInt());
                 sbddextended_freeVectorsAndReturnNull();
             }
+            ++level_count;
             sbddextended_MyVector_add(&level_vec, (llint)lo_vec.count);
         } else {
             if (!bddimportbddasknuth_readnode(buf, is_hex, &id, &lo, &hi)) {
@@ -10628,9 +10651,9 @@ bddp bddimportbddasknuth_inner(FILE* fp, int is_hex, int root_level,
     /* terminates the process once the variable index range of SAPPOROBDD */
     /* is full, so reject a level that it cannot represent before any */
     /* variable is added. */
-    if (root_level > (int)bddvarmax) {
+    if (root_level > sbddextended_varMaxAsInt()) {
         fprintf(stderr, "The level of the root must be at most %d.\n",
-                (int)bddvarmax);
+                sbddextended_varMaxAsInt());
         sbddextended_freeVectorsAndReturnNull();
     }
 
