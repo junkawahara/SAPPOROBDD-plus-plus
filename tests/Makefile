@@ -303,6 +303,23 @@ testsbddh: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
 testsbddhspp: SBDD_helper_testspp.cpp ../sbdd_helper/SBDD_helper.h Makefile
 	g++ -O3 -I../include -DB_64 $(SBDDH_OPT) SBDD_helper_testspp.cpp ../lib/BDD64.a -o testsbddhspp
 
+# The B_EXTEND counterparts of the two targets above.  That mode is the
+# one whose bddvarmax (2^32 - 2) does not fit in an int, which
+# the level range checks of SBDD_helper have to allow for.  No library
+# archive is built for the mode, so these link the object files that the
+# extend target compiles here; build them first with "make extend", or
+# let make build the four objects these rules depend on.
+SBDDH_EXTEND_OBJ = bddc_extend.o ZDD_extend.o BDD_extend.o BDDCT_extend.o
+
+testsbddh_extend: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
+        SBDD_helper_testc.c ../sbdd_helper/SBDD_helper.h Makefile \
+        $(SBDDH_EXTEND_OBJ)
+	g++ -O3 -I../include -DB_64 -DB_EXTEND $(SBDDH_OPT) SBDD_helper_testcpp.cpp $(SBDDH_EXTEND_OBJ) -o testsbddh_extend
+
+testsbddhspp_extend: SBDD_helper_testspp.cpp ../sbdd_helper/SBDD_helper.h \
+        Makefile $(SBDDH_EXTEND_OBJ)
+	g++ -O3 -I../include -DB_64 -DB_EXTEND $(SBDDH_OPT) SBDD_helper_testspp.cpp $(SBDDH_EXTEND_OBJ) -o testsbddhspp_extend
+
 
 # Run tests
 test: $(TARGETS)
@@ -370,7 +387,7 @@ test_iterative: $(TARGETS_ITERATIVE)
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_zdd_export.dat test_bddc_cache testsbddh testsbddh.exe testsbddhspp testsbddhspp.exe test_operator test_iterative_deep test_iterative_deep_extend
+	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_zdd_export.dat test_bddc_cache testsbddh testsbddh.exe testsbddhspp testsbddhspp.exe testsbddh_extend testsbddh_extend.exe testsbddhspp_extend testsbddhspp_extend.exe test_operator test_iterative_deep test_iterative_deep_extend
 	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_apply_iterative.o bddc_operations.o bddc_io.o bddc_util.o
 	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_apply_iterative_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
 	rm -f bddc_init_iterative.o bddc_node_iterative.o bddc_gc_iterative.o bddc_apply_iterative_forced.o bddc_apply_binary_iterative.o bddc_apply_unary_iterative.o bddc_apply_count_iterative.o bddc_apply_special_iterative.o bddc_apply_iterative_impl.o bddc_operations_iterative.o bddc_io_iterative.o bddc_util_iterative.o

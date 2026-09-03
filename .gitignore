@@ -73,6 +73,8 @@ y.output
 /tests/test_*
 /tests/testsbddh
 /tests/testsbddhspp
+/tests/testsbddh_extend
+/tests/testsbddhspp_extend
 !/tests/test_*.cpp
 !/tests/test_*.c
 !/tests/test_*.h
