@@ -16,8 +16,11 @@ PRG64_ST = bemII-static
 
 # B_STATIC: disables X11 plot (BDDXc is not buildable as C since the namespace change)
 OPT 	= -O3 -Wall -W -DYY_ALWAYS_INTERACTIVE -I$(INCL) -DB_STATIC
+# -DB_32 must match lib/BDD32.a: without it the application would be built
+# with a 64-bit bddp and linked against a library using a 32-bit one.
+OPT32   = $(OPT) -DB_32
 OPT64   = $(OPT) -DB_64
-OPT_ST  = $(OPT) -DB_STATIC -static
+OPT_ST  = $(OPT32) -DB_STATIC -static
 OPT64_ST = $(OPT64) -DB_STATIC -static
 
 OBJ	= print.o table.o lex.yy.o y.tab.o yywrap.o
@@ -34,7 +37,7 @@ static:	$(PRG64_ST)
 32static: $(PRG_ST)    
 
 $(PRG): $(OBJ) $(LIB)
-	$(CC) $(OPT) $(OBJ) $(LIB) -o $(PRG)
+	$(CC) $(OPT32) $(OBJ) $(LIB) -o $(PRG)
 
 $(PRG64): $(OBJ64) $(LIB64)
 	$(CC) $(OPT64) $(OBJ64) $(LIB64) $(XLIB64) -o $(PRG64)
@@ -46,7 +49,7 @@ $(PRG64_ST): $(OBJ64_ST) $(LIB64)
 	$(CC) $(OPT64_ST) $(OBJ64_ST) $(LIB64) -o $(PRG64_ST)
 
 print.o: print.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h $(INCL)/BDDDG.h
-	$(CC) $(OPT) -c print.cc
+	$(CC) $(OPT32) -c print.cc
 
 print_64.o: print.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h $(INCL)/BDDDG.h
 	$(CC) $(OPT64) -c print.cc -o print_64.o
@@ -58,13 +61,13 @@ print_64_st.o: print.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h $(INCL)/BDDDG.h
 	$(CC) $(OPT64_ST) -c print.cc -o print_64_st.o
 
 table.o: table.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h
-	$(CC) $(OPT) -c table.cc
+	$(CC) $(OPT32) -c table.cc
 
 table_64.o: table.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c table.cc -o table_64.o
 
 lex.yy.o: lex.yy.cc y.tab.h $(INCL)/BtoI.h $(INCL)/BDD.h 
-	$(CC) $(OPT) -c lex.yy.cc
+	$(CC) $(OPT32) -c lex.yy.cc
 
 lex.yy_64.o: lex.yy.cc y.tab.h $(INCL)/BtoI.h $(INCL)/BDD.h 
 	$(CC) $(OPT64) -c lex.yy.cc -o lex.yy_64.o
@@ -74,7 +77,7 @@ lex.yy.cc: BemLex.l
 	mv lex.yy.c lex.yy.cc
 
 y.tab.o: y.tab.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h $(INCL)/BDDDG.h
-	$(CC) $(OPT) -c y.tab.cc
+	$(CC) $(OPT32) -c y.tab.cc
 
 y.tab_64.o: y.tab.cc bemII.h $(INCL)/BtoI.h $(INCL)/BDD.h $(INCL)/BDDDG.h
 	$(CC) $(OPT64) -c y.tab.cc -o y.tab_64.o
@@ -90,7 +93,7 @@ y.tab.h: BemYacc.y++
 	mv y.tab.c y.tab.cc
 
 yywrap.o: yywrap.c
-	gcc $(OPT) -c yywrap.c
+	gcc $(OPT32) -c yywrap.c
 
 yywrap_64.o: yywrap.c
 	gcc $(OPT64) -c yywrap.c -o yywrap_64.o

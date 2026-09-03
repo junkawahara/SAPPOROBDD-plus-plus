@@ -13,8 +13,11 @@ PRG_ST  = gpm32-static
 PRG64_ST = gpm-static
 
 OPT 	= -O3 -Wall -Wextra -Wshadow -DYY_ALWAYS_INTERACTIVE -I$(INCL)
+# -DB_32 must match lib/BDD32.a: without it the application would be built
+# with a 64-bit bddp and linked against a library using a 32-bit one.
+OPT32   = $(OPT) -DB_32
 OPT64   = $(OPT) -DB_64
-OPT_ST  = $(OPT) -DB_STATIC -static
+OPT_ST  = $(OPT32) -DB_STATIC -static
 OPT64_ST = $(OPT64) -DB_STATIC -static
 
 OBJ	= gpm.o
@@ -36,7 +39,7 @@ static:	$(PRG64_ST)
 32static: $(PRG_ST)    
 
 $(PRG): $(OBJ) $(LIB)
-	$(CC) $(OPT) $(OBJ) $(LIB) -o $(PRG)
+	$(CC) $(OPT32) $(OBJ) $(LIB) -o $(PRG)
 
 $(PRG64): $(OBJ64) $(LIB64)
 	$(CC) $(OPT64) $(OBJ64) $(LIB64) $(XLIB64) -o $(PRG64)
@@ -48,7 +51,7 @@ $(PRG64_ST): $(OBJ64_ST) $(LIB64)
 	$(CC) $(OPT64_ST) $(OBJ64_ST) $(LIB64) -o $(PRG64_ST)
 
 gpm.o: gpm.cc $(HDRS)
-	$(CC) $(OPT) -c gpm.cc
+	$(CC) $(OPT32) -c gpm.cc
 
 gpm_64.o: gpm.cc $(HDRS)
 	$(CC) $(OPT64) -c gpm.cc -o gpm_64.o

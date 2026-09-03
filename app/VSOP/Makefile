@@ -18,8 +18,11 @@ PRG64_LCM = vsop-lcm
 
 # B_STATIC: disables X11 plot (BDDXc is not buildable as C since the namespace change)
 OPT 	= -O3 -Wall -Wextra -Wshadow -DYY_ALWAYS_INTERACTIVE -I$(INCL) -DB_STATIC
+# -DB_32 must match lib/BDD32.a: without it the application would be built
+# with a 64-bit bddp and linked against a library using a 32-bit one.
+OPT32   = $(OPT) -DB_32
 OPT64   = $(OPT) -DB_64
-OPT_ST  = $(OPT) -DB_STATIC -static
+OPT_ST  = $(OPT32) -DB_STATIC -static
 OPT64_ST = $(OPT64) -DB_STATIC -static
 
 OBJ	= print.o table.o lex.yy.o y.tab.o yywrap.o
@@ -39,7 +42,7 @@ static:	$(PRG64_ST)
 lcm: $(PRG64_LCM)    
 
 $(PRG): $(OBJ) $(LIB)
-	$(CC) $(OPT) $(OBJ) $(LIB) -o $(PRG)
+	$(CC) $(OPT32) $(OBJ) $(LIB) -o $(PRG)
 
 $(PRG64): $(OBJ64) $(LIB64)
 	$(CC) $(OPT64) $(OBJ64) $(LIB64) $(XLIB64) -o $(PRG64)
@@ -55,7 +58,7 @@ $(PRG64_LCM): $(OBJ64_LCM) $(LIB64)
 
 print.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
          $(INCL)/ZDD.h $(INCL)/BDD.h
-	$(CC) $(OPT) -c print.cc
+	$(CC) $(OPT32) -c print.cc
 
 print_64.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
             $(INCL)/ZDD.h $(INCL)/BDD.h
@@ -70,13 +73,13 @@ print_64_st.o: print.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
 	$(CC) $(OPT64_ST) -c print.cc -o print_64_st.o
 
 table.o: table.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
-	$(CC) $(OPT) -c table.cc
+	$(CC) $(OPT32) -c table.cc
 
 table_64.o: table.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c table.cc -o table_64.o
 
 lex.yy.o: lex.yy.cc y.tab.cc $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
-	$(CC) $(OPT) -c lex.yy.cc
+	$(CC) $(OPT32) -c lex.yy.cc
 
 lex.yy_64.o: lex.yy.cc y.tab.cc $(INCL)/CtoI.h $(INCL)/ZDD.h $(INCL)/BDD.h
 	$(CC) $(OPT64) -c lex.yy.cc -o lex.yy_64.o
@@ -94,7 +97,7 @@ lex.yy_lcm.cc: vsoplex_lcm.l
 
 y.tab.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
          $(INCL)/ZDD.h $(INCL)/BDD.h
-	$(CC) $(OPT) -c y.tab.cc
+	$(CC) $(OPT32) -c y.tab.cc
 
 y.tab_64.o: y.tab.cc vsop.h $(INCL)/CtoI.h $(INCL)/ZDDDG.h \
             $(INCL)/ZDD.h $(INCL)/BDD.h
@@ -121,7 +124,7 @@ y.tab_lcm.cc: vsopyacc_lcm.y++
 	mv y.tab.c y.tab_lcm.cc
 
 yywrap.o: yywrap.c
-	gcc $(OPT) -c yywrap.c
+	gcc $(OPT32) -c yywrap.c
 
 yywrap_64.o: yywrap.c
 	gcc $(OPT64) -c yywrap.c -o yywrap_64.o
