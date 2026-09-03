@@ -295,6 +295,14 @@ testsbddh: SBDD_helper_testc_cpp.h SBDD_helper_testcpp.cpp \
         SBDD_helper_testc.c ../sbdd_helper/SBDD_helper.h Makefile
 	g++ -O3 -I../include -DB_64 $(SBDDH_OPT) SBDD_helper_testcpp.cpp ../lib/BDD64.a -o testsbddh
 
+# The test drivers above are shared with the classic SAPPOROBDD and thus
+# compile SBDD_helper in its default configuration.  This one is the
+# upstream smoke test of the SAPPOROBDD_PLUS_PLUS configuration, which
+# the header selects only when that macro is defined (the test source
+# defines it itself).
+testsbddhspp: SBDD_helper_testspp.cpp ../sbdd_helper/SBDD_helper.h Makefile
+	g++ -O3 -I../include -DB_64 $(SBDDH_OPT) SBDD_helper_testspp.cpp ../lib/BDD64.a -o testsbddhspp
+
 
 # Run tests
 test: $(TARGETS)
@@ -362,7 +370,7 @@ test_iterative: $(TARGETS_ITERATIVE)
 
 # Clean
 clean:
-	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_zdd_export.dat test_bddc_cache testsbddh testsbddh.exe test_operator test_iterative_deep test_iterative_deep_extend
+	rm -f *.o $(TARGETS) $(TARGETS_EXTEND) $(TARGETS_ITERATIVE) test_ZBDD_results.txt test_ZBDD_Hash_results.txt test_zdd_export.dat test_bddc_cache testsbddh testsbddh.exe testsbddhspp testsbddhspp.exe test_operator test_iterative_deep test_iterative_deep_extend
 	rm -f bddc_init.o bddc_node.o bddc_gc.o bddc_apply.o bddc_apply_binary.o bddc_apply_unary.o bddc_apply_count.o bddc_apply_special.o bddc_apply_iterative.o bddc_operations.o bddc_io.o bddc_util.o
 	rm -f bddc_init_extend.o bddc_node_extend.o bddc_gc_extend.o bddc_apply_extend.o bddc_apply_binary_extend.o bddc_apply_unary_extend.o bddc_apply_count_extend.o bddc_apply_special_extend.o bddc_apply_iterative_extend.o bddc_operations_extend.o bddc_io_extend.o bddc_util_extend.o
 	rm -f bddc_init_iterative.o bddc_node_iterative.o bddc_gc_iterative.o bddc_apply_iterative_forced.o bddc_apply_binary_iterative.o bddc_apply_unary_iterative.o bddc_apply_count_iterative.o bddc_apply_special_iterative.o bddc_apply_iterative_impl.o bddc_operations_iterative.o bddc_io_iterative.o bddc_util_iterative.o
