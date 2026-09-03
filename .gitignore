@@ -72,6 +72,7 @@ y.output
 # Test executables and generated data (sources are kept below)
 /tests/test_*
 /tests/testsbddh
+/tests/testsbddhspp
 !/tests/test_*.cpp
 !/tests/test_*.c
 !/tests/test_*.h
